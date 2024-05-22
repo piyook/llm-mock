@@ -1,0 +1,14 @@
+{
+    "extends": [],
+    "prettier": "true",
+    "rules": {
+        "import/extensions": 0,
+        "n/file-extension-in-import": 0,
+        "new-cap": 0,
+        "unicorn/prevent-abbreviations": 0,
+        "react/react-in-jsx-scope": 0,
+        "@typescript-eslint/triple-slash-reference": 0,
+        "n/prefer-global/process": 0,
+        "import/no-unassigned-import": 0
+    }
+}

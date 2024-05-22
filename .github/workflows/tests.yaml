@@ -1,0 +1,55 @@
+name: standard checks
+
+on:
+    workflow_dispatch:
+    pull_request:
+        types: [opened, edited, synchronize]
+
+env:
+    HUSKY: 0
+
+jobs:
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'npm'
+            - run: npm ci
+            - run: npm run lint
+
+    prettier:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'npm'
+            - run: npm ci
+            - run: npm run pretty
+
+    audit:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'npm'
+            - run: npm ci
+            - run: npm audit
+
+    # test:
+    #     needs: [lint, prettier, audit]
+    #     runs-on: ubuntu-latest
+    #     steps:
+    #         - uses: actions/checkout@v4
+    #         - uses: actions/setup-node@v4
+    #           with:
+    #               node-version: '20'
+    #               cache: 'npm'
+    #         - run: npm ci
+    #         - run: npm run test

@@ -1,0 +1,13 @@
+services:
+  mswtest:
+    image: ${PROJECT_NAME}:latest
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    environment:
+      NODE_ENV: development
+      HUSKY: 0
+      SERVER_PORT: ${SERVER_PORT}
+      USE_API_URL_PREFIX: ${USE_API_URL_PREFIX}
+    ports:
+      - 8000:8000
