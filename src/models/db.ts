@@ -1,7 +1,5 @@
 import { factory } from '@mswjs/data';
-import { cat } from './cat.js';
-import { user } from './user.js';
-import { post } from './post.js';
+import { gpt } from './gpt.js';
 
 // Create database model
-export const db = factory({ cat, user, post });
+export const db = factory({ gpt });

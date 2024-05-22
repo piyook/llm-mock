@@ -1,5 +1,5 @@
 services:
-  mswtest:
+  mock-server:
     image: ${PROJECT_NAME}:latest
     build:
       context: .
