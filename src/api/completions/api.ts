@@ -2,12 +2,14 @@
 import { http, HttpResponse } from 'msw';
 import { faker } from '@faker-js/faker';
 import { db } from '../../models/db.js';
+import { buildResponse } from '../../utilities/build-response.js';
+import { validateRequest } from '../../utilities/validate-request.js';
 
 // Add any http handler here (get, push , delete etc., and middleware as needed)
 
 let dataResponseCount = 0;
 
-const mockGPTResponse = () => {
+const mockGPTResponse = async () => {
     let content = '';
 
     switch (process.env?.MOCK_GPT_MODE) {
@@ -37,37 +39,32 @@ const mockGPTResponse = () => {
         }
     }
 
-    return {
-        id: 'chatcmpl-6wJZ9Ebt8puAO4zW3zUpgFwS8BfJB',
-        object: 'chat.completion',
-        created: 1_679_356_255,
-        model: 'gpt-3.5-turbo-0301',
-        usage: {
-            prompt_tokens: 45,
-            completion_tokens: 19,
-            total_tokens: 64,
-        },
-        choices: [
-            {
-                message: {
-                    role: 'assistant',
-                    content,
-                },
-                finish_reason: 'stop',
-                index: 0,
-                logprobs: null,
-            },
-        ],
-    };
+    return buildResponse(content);
 };
 
 function handler(pathName: string) {
     return [
-        http.get(`/${pathName}`, ({ request }) => {
-            return HttpResponse.json(mockGPTResponse());
+        http.get(`/${pathName}`, async ({ request }) => {
+            return HttpResponse.json(await mockGPTResponse());
         }),
-        http.post(`/${pathName}`, ({ request }) => {
-            return HttpResponse.json(mockGPTResponse());
+        http.post(`/${pathName}`, async ({ request }) => {
+            if (await validateRequest(request)) {
+                return HttpResponse.json(await mockGPTResponse());
+            }
+
+            console.log(
+                `REQUEST ERROR: Invalid or missing request format for this LLM Model:${process.env?.LLM_NAME?.toUpperCase()}`,
+            );
+
+            return new HttpResponse(
+                `Invalid or Missing Request For this LLM Model: ${process.env?.LLM_NAME?.toUpperCase()}`,
+                {
+                    status: 400,
+                    headers: {
+                        'Content-Type': 'text/plain',
+                    },
+                },
+            );
         }),
     ];
 }

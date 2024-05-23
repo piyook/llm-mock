@@ -1,4 +1,4 @@
-# Local Mock API Framework
+# Local Mock GPT API Framework
 
 ## Purpose
 
@@ -160,14 +160,14 @@ The templates directory contains useful templates for different type of handlers
 ### Change api url prefix
 
 By default the api paths with be prefixed with "api/" this can be modified with the
-USE_API_URL_PREFIX environment variable in the .env file.
+LLM_URL_ENDPOINT environment variable in the .env file.
 
 By setting this to blank then the path will just be the api name E.g localhost:8000/users
 
 You can set this to any value E.g
 
 ```
-USE_API_URL_PREFIX=things
+LLM_URL_ENDPOINT=things
 ```
 
 will give localhost:8000/things/users
