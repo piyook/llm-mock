@@ -12,7 +12,10 @@ const mockGPTResponse = () => {
 
     switch (process.env?.MOCK_GPT_MODE) {
         case 'lorem': {
-            content = faker.lorem.paragraphs({ min: 1, max: 10 });
+            content = faker.lorem.sentences({
+                min: 1,
+                max: Number.parseInt(process.env?.MAX_LOREM_PARAS ?? '5', 10),
+            });
             break;
         }
 
