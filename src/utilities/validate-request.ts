@@ -27,15 +27,12 @@ export const validateRequest = async (
         return false;
     }
 
-    console.log(request.body);
-
     // Check request has a body and it is an object
     if (typeof request.body !== 'object' || request.body === null) {
         return false;
     }
 
     // Check request has basic keys required for a request
-
     return request
         .json()
         .then((data) => {
