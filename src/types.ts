@@ -1,6 +1,4 @@
-export type Post = {
-    userId: number;
+export type Gpt = {
     id: number;
-    title: string;
-    body: string;
+    content: string;
 };

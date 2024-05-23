@@ -179,3 +179,37 @@ By default this is set to 8000 but can be changed by setting the SERVER_PORT in 
 ```
 SERVER_PORT=1234
 ```
+
+### Return stored responses
+
+Set the following environment variable to 'stored' to use responses stored int the data/data.json file:
+
+```
+MOCK_GPT_MODE=stored
+```
+
+The responses increment for each http request and restart as the beginning once all have been used.
+
+### Return randomly generated lorem ipsum responses
+
+Set the following environment variable to 'lorem' to use responses stored in the data/data.json file:
+
+```
+MOCK_GPT_MODE=lorem
+```
+
+A random number of sentences are generated in the response and the maximum sentence number can be set with:
+
+```
+MAX_LOREM_PARAS=8
+```
+
+### Debugging
+
+You can toggle the detailed debug mode that shows more detail on each request and response by setting:
+
+```
+DEBUG=*
+```
+
+set to FALSE to remove debugging details
