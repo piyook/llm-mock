@@ -8,7 +8,7 @@ const { apiHandlers, apiPaths } = await getApiPaths();
 
 const httpServer = createServer(...apiHandlers, ...serverPage(apiPaths));
 
-httpServer.listen(process.env.SERVER_PORT);
+httpServer.listen(process.env?.SERVER_PORT ?? 8000);
 
 // Execute dB seeder functions
 for (const seeder of Object.values(seeders)) {

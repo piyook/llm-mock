@@ -7,6 +7,14 @@ import { db } from '../../models/db.js';
 
 let dataResponseCount = 0;
 
+const chatTemplate = (await import(
+    `../../response-templates/${process.env.LLM_NAME ?? 'chatgpt'}_chat.json`,
+    {
+        assert: { type: 'json' },
+    }
+)) as { default: JSON[] };
+
+console.log(chatTemplate);
 const mockGPTResponse = () => {
     let content = '';
 
@@ -37,28 +45,14 @@ const mockGPTResponse = () => {
         }
     }
 
-    return {
-        id: 'chatcmpl-6wJZ9Ebt8puAO4zW3zUpgFwS8BfJB',
-        object: 'chat.completion',
-        created: 1_679_356_255,
-        model: 'gpt-3.5-turbo-0301',
-        usage: {
-            prompt_tokens: 45,
-            completion_tokens: 19,
-            total_tokens: 64,
-        },
-        choices: [
-            {
-                message: {
-                    role: 'assistant',
-                    content,
-                },
-                finish_reason: 'stop',
-                index: 0,
-                logprobs: null,
-            },
-        ],
-    };
+    const newResponse = JSON.parse(
+        JSON.stringify(chatTemplate.default[0]).replace(
+            /DYNAMIC_CONTENT_HERE/,
+            content,
+        ),
+    ) as JSON;
+
+    return newResponse;
 };
 
 function handler(pathName: string) {

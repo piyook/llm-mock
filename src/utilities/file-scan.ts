@@ -19,9 +19,7 @@ export default async function getApiPaths() {
 
     const files = fs.readdirSync(apiFolder);
 
-    const prefix = process.env?.USE_API_URL_PREFIX
-        ? process.env.USE_API_URL_PREFIX + '/'
-        : '';
+    const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 
     for (const file of files) {
         const filePath = path.join(apiFolder, file);
@@ -50,9 +48,7 @@ export default async function getApiPaths() {
         .then((handlers) => {
             for (const [index, handler] of handlers.entries()) {
                 // Add new handlers with the desired apiPath to return array - remember to spread these out as may be more than one
-                apiHandlers.push(
-                    ...handler.default(`${prefix}${apiPaths[index]}`),
-                );
+                apiHandlers.push(...handler.default(`${prefix}`));
             }
         })
         .then(() => {
