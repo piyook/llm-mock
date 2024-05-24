@@ -185,7 +185,7 @@ SERVER_PORT=1234
 Set the following environment variable to 'stored' to use responses stored int the data/data.json file:
 
 ```
-MOCK_GPT_MODE=stored
+MOCK_LLM_RESPONSE_TYPE=stored
 ```
 
 The responses increment for each http request and restart as the beginning once all have been used.
@@ -195,7 +195,7 @@ The responses increment for each http request and restart as the beginning once 
 Set the following environment variable to 'lorem' to use responses stored in the data/data.json file:
 
 ```
-MOCK_GPT_MODE=lorem
+MOCK_LLM_RESPONSE_TYPE=lorem
 ```
 
 A random number of sentences are generated in the response and the maximum sentence number can be set with:
@@ -203,6 +203,11 @@ A random number of sentences are generated in the response and the maximum sente
 ```
 MAX_LOREM_PARAS=8
 ```
+
+### Validate Requests to the LLM are in the correct format
+
+-   add a request template for the LLM of choice
+-   set env var to ON
 
 ### Debugging
 

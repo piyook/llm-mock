@@ -6,24 +6,46 @@ const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 const homePage = (apiPaths: string[]) => {
     const htmlString = `
         <html>
-        <body style="background-color: #4B6A03; display: flex; flex-direction: column; justify-content: center; align-items: center; height:100%; font-family: sans-serif;">
+            <body style="background-color: #00200B; display: flex; flex-direction: column; justify-content: center; align-items: center; height:100%; font-family: sans-serif;">
 
-        <div style="text-align: center; width: 80%; background-color: #E9FCBC; padding:50px; border-radius: 10px; ">
-        <h1> Mock API Server Is Running</h1>
+            <div style="text-align: center; width: 80%; background-color: #00200B; padding:50px; border-radius: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; color:white">
+                <h1 style="padding-bottom: 50px;"> Mock LLM Server: <span class="highlight">Running</span></h1>
 
-        <h3 style="color: green; font-weight: bold;">http://localhost:${process.env.SERVER_PORT} </h3>
-        <h2 style="color: white; font-weight: bold;padding-bottom: 50px;">LLM Template Engine: <span style="color: green; font-weight: bold;">${process.env?.LLM_NAME?.toUpperCase() ?? 'NONE'}</span> </h2>
+                <div style="text-align:left;width:clamp(650px, 800px, 90%)); ">
+                <h3 class="info">Server Address: <span class="highlight">localhost</span> </h3>
+                <h3 class="info">Server Port: <span class="highlight">${process.env?.SERVER_PORT?.toUpperCase() ?? 'NONE'}</span> </h3>
+                <h3 class="info">Server URL: <span class="highlight">${process.env?.LLM_URL_ENDPOINT?.toUpperCase() ?? 'NONE'}</span> </h3>
+                <h3 class="info">Mocked LLM: <span class="highlight">${process.env?.LLM_NAME?.toUpperCase() ?? 'NONE'}</span> </h3>
+                <h3 class="info">Response Type: <span class="highlight">${process.env.MOCK_LLM_RESPONSE_TYPE?.toUpperCase() ?? 'NONE'}</span> </h3>
+                <h3 class="info">${process.env.MOCK_LLM_RESPONSE_TYPE === 'lorem' ? `   Maximum sentences: <span class="highlight"> ${process.env?.MAX_LOREM_PARAS} </span>` : ''}</h3>
+                <h3 class="info">POST Request Validation: <span class="highlight">${process.env?.VALIDATE_REQUESTS?.toUpperCase() ?? 'NONE'}</span> </h3>
+                <h3 class="info">Debug Mode: <span class="highlight">${process.env.DEBUG === '*' ? 'ON' : 'OFF'}</span> </h3>
+            
+                <h3  class="info">API endpoint (GET & POST): ${apiPaths.map((path) => '<a class="highlight" href="' + prefix + '">/' + prefix + '</a>').join('')}</h3>
+                </div>
+            <div>
         
-        <h3  style="text-align: left; color:grey">LLM API endpoint:</h3>
-        <div>
-     
-        ${apiPaths.map((path) => '<h3> <a style="color: green; font-weight: bold" href="' + prefix + '">/' + prefix + '</a></h3>').join('')}
+            
+            <p style="color:grey;font-style:italic; margin-top:70px;">modify settings in .env file and restart server</p>
+    
+            </body>
+            <style> 
+            
+            .highlight { 
+                background-color:#28831C;
+                padding:5px 10px 5px 10px;
+                border-radius: 5px;
+                font-weight: bold;
+                color: white;
+                margin-left: 15px;
+                border: 3px white solid;
+            }
 
-        </div>
-
-        </div>
-      
-        </body>
+            .info {
+                font-weight: bold;
+                padding: 10px 0px 10px 0px;
+            }
+            </style>
         </html>
     `;
 

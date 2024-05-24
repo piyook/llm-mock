@@ -8,6 +8,11 @@ services:
             NODE_ENV: development
             HUSKY: 0
             SERVER_PORT: ${SERVER_PORT}
+            MOCK_LLM_RESPONSE_TYPE: ${MOCK_LLM_RESPONSE_TYPE}
+            MAX_LOREM_PARAS: ${MAX_LOREM_PARAS}
             LLM_URL_ENDPOINT: ${LLM_URL_ENDPOINT}
+            DEBUG: ${DEBUG}
+            LLM_NAME: ${LLM_NAME}
+            VALIDATE_REQUESTS: ${VALIDATE_REQUESTS}
         ports:
             - 8000:8000

@@ -12,7 +12,7 @@ let dataResponseCount = 0;
 const mockGPTResponse = async () => {
     let content = '';
 
-    switch (process.env?.MOCK_GPT_MODE) {
+    switch (process.env?.MOCK_LLM_RESPONSE_TYPE) {
         case 'lorem': {
             content = faker.lorem.sentences({
                 min: 1,
