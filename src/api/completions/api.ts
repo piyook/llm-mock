@@ -53,7 +53,7 @@ function handler(pathName: string) {
             }
 
             console.log(
-                `REQUEST ERROR: Invalid or missing request format for this LLM Model:${process.env?.LLM_NAME?.toUpperCase()}`,
+                `\nREQUEST ERROR: Invalid or missing request format for this LLM Model:${process.env?.LLM_NAME?.toUpperCase()}`,
             );
 
             return new HttpResponse(
