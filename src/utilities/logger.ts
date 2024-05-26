@@ -17,12 +17,12 @@ export default function logger(
     const logPath = path.join(logFolder, 'api_request_log.json');
 
     // Convert the object to a string
-    const logEntry = `[{"validation_status":"${state}", "reason": "${reason}", "information": "${information}","request_time":"${new Date().toLocaleString()}"},${JSON.stringify(
+    const logEntry = `[{ "request_validation":{"validation_status":"${state}", "reason": "${reason}", "information": "${information}","request_time":"${new Date().toLocaleString()}"},"sent_POST_request":${JSON.stringify(
         logItem,
     )
         .trim()
         .replaceAll('\\n', '')
-        .replaceAll(/\s{2,}/g, ' ')}]`;
+        .replaceAll(/\s{2,}/g, ' ')}}]`;
 
     // Append the log entry to the log file
 
