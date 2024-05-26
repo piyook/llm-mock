@@ -18,8 +18,9 @@ const homePage = (apiPaths: string[]) => {
                 <h3 class="info">Server URL: <span class="highlight">${process.env?.LLM_URL_ENDPOINT?.toUpperCase() ?? 'NONE'}</span> </h3>
                 <h3 class="info">LLM Template: <span class="highlight">${process.env?.LLM_NAME?.toUpperCase() ?? 'NONE'}</span> </h3>
                 <h3 class="info">Response Type: <span class="highlight">${process.env.MOCK_LLM_RESPONSE_TYPE?.toUpperCase() ?? 'NONE'}</span> </h3>
-                <h3 class="info">${process.env.MOCK_LLM_RESPONSE_TYPE === 'lorem' ? `   Maximum sentences: <span class="highlight"> ${process.env?.MAX_LOREM_PARAS} </span>` : ''}</h3>
-                <h3  class="info">API endpoint (GET & POST): ${apiPaths.map((path) => '<a class="highlight" href="' + prefix + '">/' + prefix + '</a>').join('')}</h3>
+                <h3 class="info">${process.env.MOCK_LLM_RESPONSE_TYPE === 'lorem' ? `Maximum sentences: <span class="highlight"> ${process.env?.MAX_LOREM_PARAS} </span>` : ''}</h3>
+
+                <h3  class="info">API endpoint (GET & POST): ${apiPaths.map(() => '<a class="highlight" href="' + prefix + '">/' + prefix + '</a>').join('')}</h3>
                 <div class="spacer"></div>
                 <h3 class="info">LLM Request Validation: <span class="highlight">${process.env?.VALIDATE_REQUESTS?.toUpperCase() ?? 'NONE'}</span> </h3>
                 <h3 class="info">Http Request Log: <span class="highlight">${process.env?.LOG_REQUESTS?.toUpperCase() ?? 'NONE'}</span> </h3>
@@ -28,9 +29,9 @@ const homePage = (apiPaths: string[]) => {
             
                 </div>
             <div>
-        
             
-            <p style="color:grey;font-style:italic; margin-top:70px;">modify settings in .env file and restart server</p>
+            
+            <p style="color:grey;font-style:italic; margin-top:70px;">modify settings in .env file and restart server. <br/>LOG_REQUESTS and VALIDATE_REQUESTS must be 'ON' to log POST requests</p>
     
             </body>
             <style> 

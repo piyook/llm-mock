@@ -1,4 +1,4 @@
-export type Gpt = {
+export type Llm = {
     id: number;
     content: string;
 };

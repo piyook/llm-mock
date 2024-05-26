@@ -17,7 +17,7 @@ const createHtml = () => {
             logs = fs.readFileSync(logPath, 'utf8');
         } catch {
             logs =
-                '{"message": "No logs found", "solution": "Set VALIDATE_REQUESTS env var to ON. Restart the server then retry the request"}';
+                '{"message": "No logs found", "solution": "Set VALIDATE_REQUESTS and LOG_REQUESTS env vars to ON. Restart the server then retry the request"}';
         }
 
         return logs;
@@ -30,8 +30,8 @@ const createHtml = () => {
         </header>
             <body style="margin: 0px; background-color: #00200B; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height:100vh; font-family: sans-serif;">
             <h2 style="color:white">Last POST Request Made</h2>
-            <h5 style="color:indianred">Set both LOG_REQUESTS and VALIDATE_REQUESTS env vars to 'ON' to validate and log http POST requests</h5>
             <h3 style="color:white">File can be viewed in /src/logs folder in container or local machine</h3>
+            <h5 style="color:grey; margin-top:-10px;">LOG_REQUESTS and VALIDATE_REQUESTS env vars must both be 'ON' to validate and log requests</h5>
 <div class="json-container" style="width: 100%; padding:20px; box-sizing: border-box;">
 ${prettyPrintJson.toHtml(JSON.parse(readLogs()), { indent: 4, lineNumbers: true })}
 </div>

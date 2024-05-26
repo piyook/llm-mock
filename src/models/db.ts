@@ -1,5 +1,5 @@
 import { factory } from '@mswjs/data';
-import { gpt } from './gpt.js';
+import { llm } from './llm.js';
 
 // Create database model
-export const db = factory({ gpt });
+export const db = factory({ llm });

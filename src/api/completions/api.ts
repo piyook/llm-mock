@@ -20,7 +20,7 @@ const mockGPTResponse = async () => {
         }
 
         case 'stored': {
-            const storedResponses = db.gpt.getAll();
+            const storedResponses = db.llm.getAll();
 
             const random = faker.number.int({
                 min: 0,

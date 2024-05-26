@@ -1,6 +1,6 @@
 import { primaryKey } from '@mswjs/data';
 
-export const gpt = {
+export const llm = {
     id: primaryKey(Number),
     content: String,
 };
