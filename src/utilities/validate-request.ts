@@ -1,8 +1,11 @@
 import { type DefaultBodyType, type StrictRequest } from 'msw';
 import logger from './logger.js';
 
-const logRequestBody = (data: Record<string, any>) => {
-    console.log('Request Body:', data);
+const logRequestBody = (data: DefaultBodyType) => {
+    console.log(
+        `Request data viewable in browser 'localhost:${process.env?.SERVER_PORT ?? '8000'}/logs' or in the 'logs/ folder'`,
+    );
+    logger(data);
 };
 
 export const validateRequest = async (
@@ -39,8 +42,7 @@ export const validateRequest = async (
         .then((data) => {
             // Log Request if Debug is set to on
             if (process.env?.LOG_REQUESTS?.toUpperCase() === 'ON') {
-                console.log('REQUEST:', data);
-                logger(data);
+                logRequestBody(data);
             }
 
             const requiredKeys = Object.keys(requestTemplate.default[0]);
@@ -66,7 +68,8 @@ export const validateRequest = async (
             return true;
         })
         .catch(() => {
-            console.log('UNEXPECTED ERROR BEING CAUGHT');
+            console.log('UNEXPECTED ERROR: Failed to parse request body');
+            logRequestBody(request.body);
             return false;
         });
 };
