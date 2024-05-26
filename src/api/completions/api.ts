@@ -7,8 +7,6 @@ import { validateRequest } from '../../utilities/validate-request.js';
 
 // Add any http handler here (get, push , delete etc., and middleware as needed)
 
-let dataResponseCount = 0;
-
 const mockGPTResponse = async () => {
     let content = '';
 
@@ -24,13 +22,12 @@ const mockGPTResponse = async () => {
         case 'stored': {
             const storedResponses = db.gpt.getAll();
 
-            dataResponseCount =
-                dataResponseCount > storedResponses.length - 1
-                    ? 0
-                    : dataResponseCount;
-            content = storedResponses[dataResponseCount].content;
-            dataResponseCount++;
-            console.log({ dataResponseCount });
+            const random = faker.number.int({
+                min: 0,
+                max: storedResponses.length - 1,
+            });
+            content = storedResponses[random].content;
+
             break;
         }
 
