@@ -1,11 +1,12 @@
 import 'dotenv/config';
 import { http, HttpResponse } from 'msw';
+import { db } from '../models/db.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 
-const homePage = (apiPaths: string[]) => {
-    const htmlString = `
-        <html>
+const homePage = (apiPaths: string[], dbEntries: number) => {
+    const htmlString = (dbEntries: number) =>
+        `<html>
             <body style="margin: 0px; background-color: #00200B; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height:100vh; font-family: sans-serif;">
 
             <div style="text-align: center; width: 80%;padding:50px; border-radius: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; color:white">
@@ -19,7 +20,7 @@ const homePage = (apiPaths: string[]) => {
                 <h3 class="info">LLM Template: <span class="highlight">${process.env?.LLM_NAME?.toUpperCase() ?? 'NONE'}</span> </h3>
                 <h3 class="info">Response Type: <span class="highlight">${process.env.MOCK_LLM_RESPONSE_TYPE?.toUpperCase() ?? 'NONE'}</span> </h3>
                 <h3 class="info">${process.env.MOCK_LLM_RESPONSE_TYPE === 'lorem' ? `Maximum sentences: <span class="highlight"> ${process.env?.MAX_LOREM_PARAS} </span>` : ''}</h3>
-
+                <h3 class="info">${process.env.MOCK_LLM_RESPONSE_TYPE === 'stored' ? `Total Stored Responses: <span class="highlight"> ${dbEntries ?? 0} </span>` : ''}</h3>
                 <h3  class="info">API endpoint (GET & POST): ${apiPaths.map(() => '<a class="highlight" href="' + prefix + '">/' + prefix + '</a>').join('')}</h3>
                 <div class="spacer"></div>
                 <h3 class="info">LLM Request Validation: <span class="highlight">${process.env?.VALIDATE_REQUESTS?.toUpperCase() ?? 'NONE'}</span> </h3>
@@ -65,7 +66,8 @@ const homePage = (apiPaths: string[]) => {
 
     return [
         http.get(`/`, () => {
-            return new HttpResponse(htmlString, {
+            const dbEntries = db.llm.getAll()?.length ?? 1;
+            return new HttpResponse(htmlString(dbEntries - 1), {
                 status: 200,
                 headers: {
                     'Content-Type': 'text/html',
