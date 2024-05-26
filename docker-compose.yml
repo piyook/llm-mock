@@ -14,5 +14,6 @@ services:
             DEBUG: ${DEBUG}
             LLM_NAME: ${LLM_NAME}
             VALIDATE_REQUESTS: ${VALIDATE_REQUESTS}
+            LOG_REQUESTS: ${LOG_REQUESTS}
         ports:
             - 8000:8000

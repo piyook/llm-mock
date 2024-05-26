@@ -3,10 +3,15 @@ import { createServer } from '@mswjs/http-middleware';
 import * as seeders from './seeders/index.js';
 import getApiPaths from './utilities/file-scan.js';
 import serverPage from './utilities/server-page.js';
+import logPage from './utilities/log-page.js';
 
 const { apiHandlers, apiPaths } = await getApiPaths();
 
-const httpServer = createServer(...apiHandlers, ...serverPage(apiPaths));
+const httpServer = createServer(
+    ...apiHandlers,
+    ...serverPage(apiPaths),
+    ...logPage(),
+);
 
 httpServer.listen(process.env?.SERVER_PORT ?? 8000);
 
