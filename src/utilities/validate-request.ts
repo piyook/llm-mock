@@ -1,4 +1,5 @@
 import { type DefaultBodyType, type StrictRequest } from 'msw';
+import logger from './logger.js';
 
 const logRequestBody = (data: Record<string, any>) => {
     console.log('Request Body:', data);
@@ -36,6 +37,12 @@ export const validateRequest = async (
     return request
         .json()
         .then((data) => {
+            // Log Request if Debug is set to on
+            if (process.env?.LOG_REQUESTS?.toUpperCase() === 'ON') {
+                console.log('REQUEST:', data);
+                logger(data);
+            }
+
             const requiredKeys = Object.keys(requestTemplate.default[0]);
 
             if (typeof data !== 'object' || data === null) {

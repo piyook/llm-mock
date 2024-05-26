@@ -20,6 +20,7 @@
         "@types/express": "^4.17.21",
         "dotenv": "^16.4.5",
         "msw": "^2.3.0",
+        "pretty-print-json": "^3.0.1",
         "tsx": "^4.10.2",
         "typescript": "^5.4.5",
         "xo": "^0.58.0"
