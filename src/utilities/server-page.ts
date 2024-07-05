@@ -7,7 +7,7 @@ const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 const homePage = (apiPaths: string[], dbEntries: number) => {
     const htmlString = (dbEntries: number) =>
         `<html>
-            <body style="margin: 0px; background-color: #00200B; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height:100vh; font-family: sans-serif;">
+            <body style="margin: 0px; background-color: #383838; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height:100vh; font-family: sans-serif;">
 
             <div style="text-align: center; width: 80%;padding:50px; border-radius: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; color:white">
                 <h1 style="padding-bottom: 10px;"> Mock LLM Server: <span class="highlight">Running</span></h1>
@@ -45,8 +45,13 @@ const homePage = (apiPaths: string[], dbEntries: number) => {
                 color: white;
                 margin-left: 15px;
                 border: 3px white solid;
+                transition: all 0.2s ease;
             }
-
+                
+            .highlight:hover {
+                background-color: white;
+                color: #28831C;
+            }
             .info {
                 font-weight: bold;
                 padding: 10px 0px 10px 0px;

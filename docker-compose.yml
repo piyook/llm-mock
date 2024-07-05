@@ -16,4 +16,4 @@ services:
             VALIDATE_REQUESTS: ${VALIDATE_REQUESTS}
             LOG_REQUESTS: ${LOG_REQUESTS}
         ports:
-            - 8000:8000
+            - ${SERVER_PORT}:${SERVER_PORT}
