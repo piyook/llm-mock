@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type DefaultBodyType } from 'msw';
-import { unescapeLeadingUnderscores } from 'typescript';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +12,8 @@ export default function logger(
     reason = '',
     information = '',
 ) {
+    if (process.env?.LOG_REQUESTS?.toUpperCase() !== 'ON') return;
+
     const logFolder = `${__dirname}/../logs`;
     const logPath = path.join(logFolder, 'api_request_log.json');
 

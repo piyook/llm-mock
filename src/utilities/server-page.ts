@@ -4,7 +4,7 @@ import { db } from '../models/db.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 
-const homePage = (apiPaths: string[], dbEntries: number) => {
+const homePage = (apiPaths: string[]) => {
     const htmlString = (dbEntries: number) =>
         `<html>
             <body style="margin: 0px; background-color: #383838; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height:100vh; font-family: sans-serif;">

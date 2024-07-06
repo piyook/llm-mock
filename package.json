@@ -6,12 +6,13 @@
         "stop": "docker compose down --volumes",
         "rebuild": "docker compose down --volumes && docker compose up -d --force-recreate --build",
         "restart": "npm stop && npm start",
-        "nuke": "bash nuke.sh",
         "prepare": "husky || true",
         "lint": "xo 'src/**/*.{js,jsx,ts,tsx}'",
         "lint-fix": "xo 'src/**/*.{js,jsx,ts,tsx}' --fix",
         "pretty": "prettier 'src/**/*.{js,jsx,ts,tsx,css,scss,md}' --check",
-        "pretty-fix": "prettier 'src/**/*.{js,jsx,ts,tsx,css,scss,md}' --write"
+        "pretty-fix": "prettier 'src/**/*.{js,jsx,ts,tsx,css,scss,md}' --write",
+        "test": "vitest run",
+        "nuke": "bash nuke.sh"
     },
     "dependencies": {
         "@faker-js/faker": "^8.4.1",
@@ -23,6 +24,7 @@
         "pretty-print-json": "^3.0.1",
         "tsx": "^4.16.2",
         "typescript": "^5.5.3",
+        "vitest": "^1.6.0",
         "xo": "^0.58.0"
     },
     "devDependencies": {
