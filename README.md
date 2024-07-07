@@ -90,7 +90,11 @@ By default this is set to 8000 but can be changed by setting the SERVER_PORT in 
 SERVER_PORT=1234
 ```
 
-### Return stored responses
+### Return Mock Responses
+
+The LLM response can be set to return random Lorem Ipsum or a random stored response.
+
+![LLM Mock Lorem Response](image2.png)
 
 Set the following environment variable to 'stored' to use responses stored int the data/data.json file:
 
@@ -98,7 +102,9 @@ Set the following environment variable to 'stored' to use responses stored int t
 MOCK_LLM_RESPONSE_TYPE=stored
 ```
 
-The responses increment for each http request and restart as the beginning once all have been used.
+![LLM Mock Stored Response](image3.png)
+
+The responses are randomly picked and change for each http request.
 
 ### Return randomly generated lorem ipsum responses
 
@@ -118,6 +124,8 @@ MAX_LOREM_PARAS=8
 
 -   add a request template for the LLM of choice
 -   set env var to ON
+
+This will provide error messages on why the request did not meet the required LLM API request format.
 
 ### Debugging
 

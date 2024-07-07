@@ -28,7 +28,7 @@ export const validateRequest = async (
     // Load request template if one exists otherwise fail validation
     try {
         requestTemplate = (await import(
-            `../request-templates/${process.env.LLM_NAME ?? 'chatgpt'}_chat.json`,
+            `../request-templates/${process.env.LLM_NAME ?? 'chatgpt'}_req.json`,
             {
                 assert: { type: 'json' },
             }
@@ -46,11 +46,12 @@ export const validateRequest = async (
 
     // Check request has a body and it is an object
     if (typeof request.body !== 'object' || request.body === null) {
+        console.log('ERROR: missing request body');
         logRequestBody({
-            data: request.body,
+            data: 'Missing or invalid request body',
             state: 'FAILED',
             reason: 'INVALID REQUEST',
-            information: 'request must not be null and must be an object',
+            information: 'Missing or Invalid Request Body',
         });
         return false;
     }
@@ -60,20 +61,18 @@ export const validateRequest = async (
         .json()
         .then((data) => {
             // Log Request if Debug is set to on
-            if (process.env?.LOG_REQUESTS?.toUpperCase() === 'ON') {
-                logRequestBody({
-                    data,
-                    state: 'PASSED',
-                    reason: 'REQUEST STRUCTURE OK',
-                    information: 'request structure matches template',
-                });
-            }
+            logRequestBody({
+                data,
+                state: 'PASSED',
+                reason: 'REQUEST STRUCTURE OK',
+                information: 'request structure matches template',
+            });
 
             const requiredKeys = Object.keys(requestTemplate.default[0]);
 
             if (typeof data !== 'object' || data === null) {
                 logRequestBody({
-                    data: request.body,
+                    data: request?.body,
                     state: 'FAILED',
                     reason: 'INVALID REQUEST BODY',
                     information: 'data must not be null and must be an object',
@@ -83,16 +82,24 @@ export const validateRequest = async (
 
             const requestKeys = Object.keys(data);
 
+            let missingKeys = false;
+            const missingKeyInformation: string[] = [];
+
             for (const key of requiredKeys) {
                 if (!requestKeys.includes(key)) {
-                    logRequestBody({
-                        data,
-                        state: 'FAILED',
-                        reason: 'INVALID / MISSING KEY(S)',
-                        information: `missing key: ${key}`,
-                    });
-                    return false;
+                    missingKeys = true;
+                    missingKeyInformation.push(key.toUpperCase());
                 }
+            }
+
+            if (missingKeys) {
+                logRequestBody({
+                    data,
+                    state: 'FAILED',
+                    reason: 'INVALID / MISSING KEY(S)',
+                    information: `missing keys: ${missingKeyInformation.join(' , ')}`,
+                });
+                return false;
             }
 
             return true;

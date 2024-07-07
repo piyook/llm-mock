@@ -4,13 +4,13 @@ import { db } from '../models/db.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 
-const homePage = (apiPaths: string[], dbEntries: number) => {
+const homePage = (apiPaths: string[]) => {
     const htmlString = (dbEntries: number) =>
         `<html>
             <body style="margin: 0px; background-color: #383838; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height:100vh; font-family: sans-serif;">
 
             <div style="text-align: center; width: 80%;padding:50px; border-radius: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; color:white">
-                <h1 style="padding-bottom: 10px;"> Mock LLM Server: <span class="highlight">Running</span></h1>
+                <h1 style="padding-bottom: 10px;" data-cy="title"> Mock LLM Server: <span class="highlight">Running</span></h1>
                 <div class="spacer"></div>
 
                 <div style="text-align:left;width:clamp(650px, 800px, 90%)); ">
