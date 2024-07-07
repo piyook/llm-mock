@@ -1,10 +1,10 @@
 /* eslint-disable  @typescript-eslint/naming-convention */
 import { expect, test, describe, vi, afterEach } from 'vitest';
 import { type DefaultBodyType, type StrictRequest } from 'msw';
-import { validateRequest } from '../utilities/validate-request.js';
+import { validateRequest } from '../../utilities/validate-request.js';
 
 // Mock out imported logger function
-vi.mock('../utilities/logger.js');
+vi.mock('../../utilities/logger.js');
 
 afterEach(() => {
     vi.resetAllMocks();
@@ -16,7 +16,7 @@ describe('logging works as expected', async () => {
         process.env.LOG_REQUESTS = 'ON';
 
         // Create instance of mocked logger function imported into validateRequest
-        const logger = await import('../utilities/logger.js');
+        const logger = await import('../../utilities/logger.js');
         const request = {
             async json() {
                 return new Promise((resolve) => {
