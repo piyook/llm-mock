@@ -3,11 +3,8 @@ import { expect, test, describe, vi } from 'vitest';
 import { type DefaultBodyType, type StrictRequest } from 'msw';
 import { validateRequest } from '../utilities/validate-request.js';
 
-process.env.VALIDATE_REQUESTS = 'ON';
-process.env.LOG_REQUESTS = 'OFF';
-
-describe('Test utilities', async () => {
-    test('test validate request passes correct request', async () => {
+describe('validation function works as expected', async () => {
+    test('passes with correct request', async () => {
         process.env.VALIDATE_REQUESTS = 'ON';
         process.env.LOG_REQUESTS = 'OFF';
         const request = {
@@ -38,7 +35,7 @@ describe('Test utilities', async () => {
         expect(validationResult).toBe(true);
     });
 
-    test('test validate request fails for incorrect request', async () => {
+    test('fails with incorrect request', async () => {
         process.env.VALIDATE_REQUESTS = 'ON';
         process.env.LOG_REQUESTS = 'OFF';
         const request = {
