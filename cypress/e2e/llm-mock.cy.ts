@@ -1,6 +1,6 @@
 describe('Mock LLM Spec', () => {
     it('should be up and running', () => {
-        cy.visit('http://localhost:8001');
+        cy.visit('http://127.0.0.1:8001');
         cy.get('[data-cy="title"]').should(
             'have.text',
             ' Mock LLM Server: Running',
