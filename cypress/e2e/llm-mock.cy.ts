@@ -66,4 +66,12 @@ describe('Mock LLM Spec', () => {
             },
         );
     });
+
+    it('log page is active', () => {
+        cy.visit('/logs');
+        cy.get('[data-cy="logger-title"]').should(
+            'have.text',
+            'Last POST Request Made',
+        );
+    });
 });

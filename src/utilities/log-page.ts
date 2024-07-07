@@ -29,7 +29,7 @@ const createHtml = () => {
         <title>API Request Log</title>
         </header>
             <body style="margin: 0px; background-color: #00200B; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height:100vh; font-family: sans-serif;">
-            <h2 style="color:white">Last POST Request Made</h2>
+            <h2 style="color:white" data-cy="logger-title">Last POST Request Made</h2>
             <h3 style="color:white">File can be viewed in /src/logs folder in container or local machine</h3>
             <h5 style="color:grey; margin-top:-10px;">LOG_REQUESTS and VALIDATE_REQUESTS env vars must both be 'ON' to validate and log requests</h5>
 <div class="json-container" style="width: 100%; padding:20px; box-sizing: border-box;">
