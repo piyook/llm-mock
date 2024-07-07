@@ -4,5 +4,7 @@
 npx validate-branch-name
 npm run pretty
 npm run lint
-npm run test
 npm audit
+npm run test:unit
+npm run test:e2e
+

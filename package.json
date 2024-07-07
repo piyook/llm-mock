@@ -11,14 +11,18 @@
         "lint-fix": "xo 'src/**/*.{js,jsx,ts,tsx}' --fix",
         "pretty": "prettier 'src/**/*.{js,jsx,ts,tsx,css,scss,md}' --check",
         "pretty-fix": "prettier 'src/**/*.{js,jsx,ts,tsx,css,scss,md}' --write",
-        "test": "vitest run",
-        "nuke": "bash nuke.sh"
+        "test:unit": "vitest run",
+        "nuke": "bash nuke.sh",
+        "cypress:run": "cypress run",
+        "cypress:open": "cypress open",
+        "test:e2e": "npm start && npm run cypress:run && npm stop"
     },
     "dependencies": {
         "@faker-js/faker": "^8.4.1",
         "@mswjs/data": "^0.16.1",
         "@mswjs/http-middleware": "^0.10.1",
         "@types/express": "^4.17.21",
+        "cypress": "^13.13.0",
         "dotenv": "^16.4.5",
         "msw": "^2.3.1",
         "pretty-print-json": "^3.0.1",
