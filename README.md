@@ -226,6 +226,12 @@ MOCK_LLM_RESPONSE_TYPE = lorem;
 MAX_LOREM_PARAS = 8;
 ```
 
+
+
+https://github.com/user-attachments/assets/d36651ac-d7fa-41ad-b8d8-cd23812ae45a
+
+
+
 or use stored responses that are randomly provided by setting
 
 ```js
@@ -233,6 +239,12 @@ MOCK_LLM_RESPONSE_TYPE = stored;
 ```
 
 then just add required responses to the src/data/data.json file.
+
+
+
+https://github.com/user-attachments/assets/86115f16-63d7-49de-af32-c6f9c2bec7cf
+
+
 
 # Using Different LLMs
 
