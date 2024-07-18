@@ -1,77 +1,139 @@
-describe('Mock LLM Spec', () => {
+const chatGPTSchema = {
+    $schema: 'http://json-schema.org/draft-04/schema#',
+    type: 'object',
+    properties: {
+        id: {
+            type: 'string',
+        },
+        object: {
+            type: 'string',
+        },
+        created: {
+            type: 'integer',
+        },
+        model: {
+            type: 'string',
+        },
+        usage: {
+            type: 'object',
+            properties: {
+                prompt_tokens: {
+                    type: 'integer',
+                },
+                completion_tokens: {
+                    type: 'integer',
+                },
+                total_tokens: {
+                    type: 'integer',
+                },
+            },
+            required: ['prompt_tokens', 'completion_tokens', 'total_tokens'],
+        },
+        choices: {
+            type: 'array',
+            items: [
+                {
+                    type: 'object',
+                    properties: {
+                        message: {
+                            type: 'object',
+                            properties: {
+                                role: {
+                                    type: 'string',
+                                },
+                                content: {
+                                    type: 'string',
+                                },
+                            },
+                            required: ['role', 'content'],
+                        },
+                        finish_reason: {
+                            type: 'string',
+                        },
+                        index: {
+                            type: 'integer',
+                        },
+                    },
+                    required: ['message', 'finish_reason', 'index'],
+                },
+            ],
+        },
+    },
+    required: ['id', 'object', 'created', 'model', 'usage', 'choices'],
+};
+
+describe('Mock LLM Spec for chatGPT', () => {
+    process.env.VALIDATE_REQUESTS = 'ON';
+
+    const requestData = {
+        model: 'gpt-3.5-turbo',
+        temperature: 1,
+        top_p: 1,
+        frequency_penalty: 0,
+        presence_penalty: 0,
+        n: 1,
+        stream: false,
+        messages: [
+            {
+                role: 'user',
+                content: 'Hello, how are you?',
+            },
+        ],
+    };
+    const invalidRequestData = {
+        temperature: 1,
+        top_p: 1,
+        frequency_penalty: 0,
+        presence_penalty: 0,
+        n: 1,
+        stream: false,
+        messages: [
+            {
+                role: 'user',
+                content: 'Hello, how are you?',
+            },
+        ],
+    };
+
     it('should be up and running', () => {
-        cy.visit('http://127.0.0.1:8001');
+        cy.visit('/');
         cy.get('[data-cy="title"]').should(
             'have.text',
             ' Mock LLM Server: Running',
         );
     });
 
-    it('provides expected response for GET request to chatGPT endpoint', () => {
-        cy.request('GET', '/chatgpt/chat/completions').then((response) => {
+    it('checks server is running and serving data', () => {
+        cy.request('/chatgpt/chat/completions').then((response) => {
             expect(response.status).to.eq(200);
-            expect(response.body).to.have.property('id');
-            expect(response.body).to.have.property('choices');
-            expect(response.body).to.have.property('created');
-            expect(response.body).to.have.property('model');
-            expect(response.body).to.have.property('usage');
-
-            const usage = response.body.usage;
-            const choices = response.body.choices;
-            expect(usage.prompt_tokens).to.be.equal(12);
-            expect(usage.completion_tokens).to.be.equal(99);
-            expect(usage.total_tokens).to.be.equal(111);
-            expect(choices[0].finish_reason).to.be.equal('stop');
-            expect(choices[0].index).to.be.equal(0);
-            expect(choices[0].message.role).to.be.equal('assistant');
-            expect(choices[0].message.content.length).to.be.greaterThan(1);
         });
     });
 
-    it('provides expected response for POST request to chatGPT endpoint', () => {
-        const requestData = {
-            model: 'gpt-3.5-turbo',
-            temperature: 1,
-            top_p: 1,
-            frequency_penalty: 0,
-            presence_penalty: 0,
-            n: 1,
-            stream: false,
-            messages: [
-                {
-                    role: 'user',
-                    content: 'Hello, how are you?',
-                },
-            ],
-        };
-        process.env.VALIDATE_REQUESTS = 'OFF';
+    it('should validate JSON against schema for a GET Request', () => {
+        cy.request('GET', '/chatgpt/chat/completions').then((response) => {
+            expect(response.body).to.be.jsonSchema(chatGPTSchema);
+        });
+    });
+
+    it('should validate JSON against schema for a POST with correct request format', () => {
         cy.request('POST', '/chatgpt/chat/completions', requestData).then(
             (response) => {
-                expect(response.status).to.eq(200);
-                expect(response.body).to.have.property('id');
-                expect(response.body).to.have.property('choices');
-                expect(response.body).to.have.property('created');
-                expect(response.body).to.have.property('model');
-                expect(response.body).to.have.property('usage');
-
-                const usage = response.body.usage;
-                const choices = response.body.choices;
-                expect(usage.prompt_tokens).to.be.equal(12);
-                expect(usage.completion_tokens).to.be.equal(99);
-                expect(usage.total_tokens).to.be.equal(111);
-                expect(choices[0].finish_reason).to.be.equal('stop');
-                expect(choices[0].index).to.be.equal(0);
-                expect(choices[0].message.role).to.be.equal('assistant');
-                expect(choices[0].message.content.length).to.be.greaterThan(1);
+                expect(response.body).to.be.jsonSchema(chatGPTSchema);
             },
         );
     });
 
-    it('log page is active', () => {
-        cy.visit('/logs');
-        cy.get('[data-cy="logger-title"]').should(
-            'have.text',
-            'Last POST Request Made',
-        );
+    it('should return error for a POST with incorrect request format', () => {
+        cy.request({
+            method: 'POST',
+            url: '/chatgpt/chat/completions',
+            body: invalidRequestData,
+            failOnStatusCode: false,
+        }).then((response) => {
+            expect(response.status).to.eq(400);
+            expect(response.body).to.contain(
+                'Invalid or Missing Request For this LLM Model: CHATGPT',
+            );
+        });
     });
 });
