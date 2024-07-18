@@ -1,0 +1,39 @@
+[
+    {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "text": "Write the first line of a story about an API developer."
+                    }
+                ]
+            },
+            {
+                "role": "model",
+                "parts": [
+                    {
+                        "text": "In the bustling city of Meadow brook, lived a young boy named Alan. He was a bright and curious soul with an imaginative mind."
+                    }
+                ]
+            },
+            {
+                "role": "user",
+                "parts": [
+                    {
+                        "text": "Can you set it in a quiet village in 2010s Kenya?"
+                    }
+                ]
+            }
+        ],
+        "safety_settings": {
+            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "threshold": "BLOCK_LOW_AND_ABOVE"
+        },
+        "generation_config": {
+            "temperature": 0.2,
+            "topP": 0.8,
+            "topK": 40
+        }
+    }
+]

@@ -1,3 +1,5 @@
 node_modules
 *.log
 /src/logs/*.json
+cypress/screenshots
+cypress/videos
