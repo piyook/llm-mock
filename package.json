@@ -4,7 +4,7 @@
         "dev": "dotenvx run -f .env -- tsx watch ./src/server.ts",
         "start": "docker compose up -d --force-recreate",
         "stop": "docker compose down --volumes",
-        "rebuild": "docker compose down --volumes && docker compose up -d --force-recreate --no-cache --build",
+        "rebuild": "docker compose down --volumes && docker compose up -d --force-recreate --build",
         "restart": "npm stop && npm start",
         "prepare": "husky || true",
         "lint": "xo 'src/**/*.{js,jsx,ts,tsx}'",
