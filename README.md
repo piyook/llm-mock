@@ -233,3 +233,40 @@ MOCK_LLM_RESPONSE_TYPE = stored;
 ```
 
 then just add required responses to the src/data/data.json file.
+
+# Using Different LLMs
+
+Any LLM model can be set up by adding a JSON request-template into the request-templates folder for the shape of the expected request TO the LLM endpoint. This file name must have the format <LLM_NAME>\_req.json
+
+A JSON response-template is also added to the response-templates folder with the expected shape of the response object, replacing any expected content with 'DYNAMIC_CONTENT_HERE'. The file name must have the format <LLM_NAME>\_res.json
+
+Example:
+
+```js
+"message": {
+                    "role": "assistant",
+                    "content": "DYNAMIC_CONTENT_HERE"
+                },
+```
+
+This is where lorem or stored responses will be injected into the response object.
+
+Lastly the .env file will need to be updated for the model name (which has to be the same as <LLM_NAME>)
+
+For example to use Google Gemini (another example included in this repo) set the variables below the .env
+
+```js
+LLM_URL_ENDPOINT=models/gemini-pro:generateContent
+LLM_NAME=gemini
+VALIDATE_REQUESTS=ON
+```
+
+Gemini content is then available for GET and POST requests on
+
+```js
+http://localhost:8001/models/gemini-pro:generateContent.
+```
+
+Any validation issues with requests from the frontend can be viewed on localhost:8001/logs
+
+LLM framework that supports the new model (such as LangChain) can then be updated to use this endpoint (as for the chatGPT example).

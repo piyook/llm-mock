@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '@dotenvx/dotenvx';
 import { createServer } from '@mswjs/http-middleware';
 import * as seeders from './seeders/index.js';
 import getApiPaths from './utilities/file-scan.js';

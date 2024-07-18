@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import '@dotenvx/dotenvx';
 import { http, HttpResponse } from 'msw';
 import { db } from '../models/db.js';
 

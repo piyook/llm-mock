@@ -64,6 +64,8 @@ const chatGPTSchema = {
 
 describe('Mock LLM Spec for chatGPT', () => {
     process.env.VALIDATE_REQUESTS = 'ON';
+    process.env.LLM_NAME = 'chatgpt';
+    process.env.LLM_URL_ENDPOINT = 'chatgpt/chat/completions';
 
     const requestData = {
         model: 'gpt-3.5-turbo',

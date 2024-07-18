@@ -66,9 +66,4 @@ jobs:
                   node-version: '20'
                   cache: 'npm'
             - run: npm ci
-            - run: npm run start
-
-            - name: Cypress run
-              uses: cypress-io/github-action@v6
-              with:
-                  wait-on: 'http://localhost:8001'
+            - run: npm run test:e2e
