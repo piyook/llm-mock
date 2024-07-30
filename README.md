@@ -1,4 +1,6 @@
+![GitHub Release](https://img.shields.io/github/v/release/piyook/llm-mock)
 ![tests workflow](https://github.com/piyook/llm-mock/actions/workflows/tests.yaml/badge.svg)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 # Local Mock LLM API Framework
 
