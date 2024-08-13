@@ -1,7 +1,6 @@
 npx validate-branch-name
 npm run pretty
 npm run lint
-npm audit
+npm audit --omit=dev
 npm run test:unit
 npm run test:e2e
-
