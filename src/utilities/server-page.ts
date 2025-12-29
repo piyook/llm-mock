@@ -27,6 +27,10 @@ const homePage = (apiPaths: string[]) => {
                 <h3 class="info">Http Request Log: <span class="highlight">${process.env?.LOG_REQUESTS?.toUpperCase() ?? 'NONE'}</span> </h3>
                 <h3 class="info">Logs URL: <a class="highlight" href="/logs">localhost:${process.env?.SERVER_PORT}/logs</a> </h3>
                 <h3 class="info">Debug Mode: <span class="highlight">${process.env.DEBUG === '*' ? 'ON' : 'OFF'}</span> </h3>
+                <div class="spacer"></div>
+                <h3 class="info">Response Delay Min: <span class="highlight">${process.env?.RESPONSE_DELAY_MIN || '0'}ms</span> </h3>
+                <h3 class="info">Response Delay Max: <span class="highlight">${process.env?.RESPONSE_DELAY_MAX || '0'}ms</span> </h3>
+                <h3 class="info">Delay Status: <span class="highlight">${parseInt(process.env?.RESPONSE_DELAY_MIN || '0') > 0 || parseInt(process.env?.RESPONSE_DELAY_MAX || '0') > 0 ? 'ENABLED' : 'DISABLED'}</span> </h3>
             
                 </div>
             <div>

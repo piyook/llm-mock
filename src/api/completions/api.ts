@@ -4,6 +4,7 @@ import { faker } from '@faker-js/faker';
 import { db } from '../../models/db.js';
 import { buildResponse } from '../../utilities/build-response.js';
 import { validateRequest } from '../../utilities/validate-request.js';
+import { delay, getDelayConfig } from '../../utilities/delay.js';
 
 // Add any http handler here (get, push , delete etc., and middleware as needed)
 
@@ -42,10 +43,22 @@ const mockGPTResponse = async () => {
 function handler(pathName: string) {
 	return [
 		http.get(`/${pathName}`, async () => {
+			// Apply delay if configured
+			const delayConfig = getDelayConfig();
+			if (delayConfig.enabled) {
+				await delay(delayConfig.min, delayConfig.max);
+			}
+
 			return HttpResponse.json(await mockGPTResponse());
 		}),
 		http.post(`/${pathName}`, async ({ request }) => {
 			if (await validateRequest(request)) {
+				// Apply delay if configured
+				const delayConfig = getDelayConfig();
+				if (delayConfig.enabled) {
+					await delay(delayConfig.min, delayConfig.max);
+				}
+
 				return HttpResponse.json(await mockGPTResponse());
 			}
 
