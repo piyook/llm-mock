@@ -48,7 +48,7 @@ function handler(pathName: string) {
 			if (delayConfig.enabled) {
 				await delay(delayConfig.min, delayConfig.max);
 			}
-			
+
 			return HttpResponse.json(await mockGPTResponse());
 		}),
 		http.post(`/${pathName}`, async ({ request }) => {
@@ -58,7 +58,7 @@ function handler(pathName: string) {
 				if (delayConfig.enabled) {
 					await delay(delayConfig.min, delayConfig.max);
 				}
-				
+
 				return HttpResponse.json(await mockGPTResponse());
 			}
 

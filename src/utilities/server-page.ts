@@ -30,7 +30,7 @@ const homePage = (apiPaths: string[]) => {
                 <div class="spacer"></div>
                 <h3 class="info">Response Delay Min: <span class="highlight">${process.env?.RESPONSE_DELAY_MIN || '0'}ms</span> </h3>
                 <h3 class="info">Response Delay Max: <span class="highlight">${process.env?.RESPONSE_DELAY_MAX || '0'}ms</span> </h3>
-                <h3 class="info">Delay Status: <span class="highlight">${(parseInt(process.env?.RESPONSE_DELAY_MIN || '0') > 0 || parseInt(process.env?.RESPONSE_DELAY_MAX || '0') > 0) ? 'ENABLED' : 'DISABLED'}</span> </h3>
+                <h3 class="info">Delay Status: <span class="highlight">${parseInt(process.env?.RESPONSE_DELAY_MIN || '0') > 0 || parseInt(process.env?.RESPONSE_DELAY_MAX || '0') > 0 ? 'ENABLED' : 'DISABLED'}</span> </h3>
             
                 </div>
             <div>
