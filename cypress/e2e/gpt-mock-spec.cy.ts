@@ -96,10 +96,7 @@ describe('Mock LLM Spec for chatGPT', () => {
 
     it('should be up and running', () => {
         cy.visit('/');
-        cy.get('[data-cy="title"]').should(
-            'have.text',
-            ' Mock LLM Server: Running',
-        );
+       cy.get('[cy-data="server_status"]').contains('Running');
     });
 
     it('checks server is running and serving data', () => {

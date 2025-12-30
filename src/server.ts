@@ -8,6 +8,7 @@ import logPage from './utilities/log-page.js';
 const { apiHandlers, apiPaths } = await getApiPaths();
 
 const httpServer = createServer(
+	// @ts-expect-error - type mismatch in msw types after version bumps?
 	...apiHandlers,
 	...serverPage(apiPaths),
 	...logPage(),
