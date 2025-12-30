@@ -60,7 +60,7 @@ export const validateRequest = async (
 	return request
 		.json()
 		.then((data) => {
-			// Log Request if Debug is set to on
+			// Log Request if LOG_REQUESTS=ON
 			logRequestBody({
 				data,
 				state: 'PASSED',
