@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { http, HttpResponse } from 'msw';
+import type { FastifyInstance } from 'fastify';
 import { prettyPrintJson } from 'pretty-print-json';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -91,17 +91,10 @@ ol.json-lines >li::marker { font-family: system-ui, sans-serif; font-weight: nor
 	return htmlString;
 };
 
-const logPage = () => {
-	return [
-		http.get(`/logs`, () => {
-			return new HttpResponse(createHtml(), {
-				status: 200,
-				headers: {
-					'Content-Type': 'text/html',
-				},
-			});
-		}),
-	];
-};
+function logPage(app: FastifyInstance) {
+	app.get('/logs', async (request, reply) => {
+		return reply.type('text/html').send(createHtml());
+	});
+}
 
 export default logPage;
