@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { http, HttpResponse } from 'msw';
+import type { FastifyInstance } from 'fastify';
 import { faker } from '@faker-js/faker';
 import { db } from '../../models/db.js';
 import { buildResponse } from '../../utilities/build-response.js';
@@ -40,43 +40,44 @@ const mockGPTResponse = async () => {
 	return buildResponse(content);
 };
 
-function handler(pathName: string) {
-	return [
-		http.get(`/${pathName}`, async () => {
+function handler(app: FastifyInstance, pathName: string) {
+	const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
+	const fullPath = prefix || pathName;
+
+	// GET route
+	app.get(`/${fullPath}`, async (request, reply) => {
+		// Apply delay if configured
+		const delayConfig = getDelayConfig();
+		if (delayConfig.enabled) {
+			await delay(delayConfig.min, delayConfig.max);
+		}
+
+		return reply.send(await mockGPTResponse());
+	});
+
+	// POST route
+	app.post(`/${fullPath}`, async (request, reply) => {
+		if (await validateRequest(request)) {
 			// Apply delay if configured
 			const delayConfig = getDelayConfig();
 			if (delayConfig.enabled) {
 				await delay(delayConfig.min, delayConfig.max);
 			}
 
-			return HttpResponse.json(await mockGPTResponse());
-		}),
-		http.post(`/${pathName}`, async ({ request }) => {
-			if (await validateRequest(request)) {
-				// Apply delay if configured
-				const delayConfig = getDelayConfig();
-				if (delayConfig.enabled) {
-					await delay(delayConfig.min, delayConfig.max);
-				}
+			return reply.send(await mockGPTResponse());
+		}
 
-				return HttpResponse.json(await mockGPTResponse());
-			}
+		console.log(
+			`\nREQUEST ERROR: Invalid or missing request format for this LLM Model:${process.env?.LLM_NAME?.toUpperCase()}`,
+		);
 
-			console.log(
-				`\nREQUEST ERROR: Invalid or missing request format for this LLM Model:${process.env?.LLM_NAME?.toUpperCase()}`,
-			);
-
-			return new HttpResponse(
+		return reply
+			.status(400)
+			.type('text/plain')
+			.send(
 				`Invalid or Missing Request For this LLM Model: ${process.env?.LLM_NAME?.toUpperCase()}`,
-				{
-					status: 400,
-					headers: {
-						'Content-Type': 'text/plain',
-					},
-				},
 			);
-		}),
-	];
+	});
 }
 
 export default handler;

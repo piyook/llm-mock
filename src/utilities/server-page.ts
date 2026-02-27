@@ -1,11 +1,10 @@
 import '@dotenvx/dotenvx';
-import { http, HttpResponse } from 'msw';
+import type { FastifyInstance } from 'fastify';
 import { db } from '../models/db.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 
-const homePage = (apiPaths: string[]) => {
-	const htmlString = (dbEntries: number) => `
+const htmlString = (dbEntries: number) => `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -321,7 +320,7 @@ const homePage = (apiPaths: string[]) => {
             <section>
                 <div style="margin-bottom: 8px; font-size: 1.13rem; color: var(--text-muted); font-weight: 600;" cy-data="server_label">API endpoint (GET & POST)</div>
                 <div class="endpoints">
-                    ${apiPaths.map(() => `<a class="endpoint-link" cy-data="endpoint" href="/${prefix}">/${prefix}</a>`).join('')}
+                    <!--ENDPOINT_LINKS_PLACEHOLDER-->
                 </div>
             </section>
             <section>
@@ -394,20 +393,27 @@ const homePage = (apiPaths: string[]) => {
     </html>
     `;
 
-	return [
-		http.get(`/`, () => {
-			const dbEntries = db.llm.getAll()?.length ?? 1;
-			return new HttpResponse(htmlString(dbEntries - 1), {
-				headers: { 'Content-Type': 'text/html' },
-			});
-		}),
-		http.get(`/ping`, () => {
-			return HttpResponse.json(
-				{ response: 'server is running' },
-				{ status: 200 },
-			);
-		}),
-	];
-};
+function serverPage(app: FastifyInstance, apiPaths: string[]) {
+	// Home page route
+	app.get('/', async (request, reply) => {
+		const dbEntries = db.llm.getAll()?.length ?? 1;
+		const endpointLinks = apiPaths
+			.map(
+				() =>
+					`<a class="endpoint-link" cy-data="endpoint" href="/${prefix}">/${prefix}</a>`,
+			)
+			.join('');
+		const htmlContent = htmlString(dbEntries - 1).replace(
+			'<!--ENDPOINT_LINKS_PLACEHOLDER-->',
+			endpointLinks,
+		);
+		return reply.type('text/html').send(htmlContent);
+	});
 
-export default homePage;
+	// Ping endpoint for status check
+	app.get('/ping', async (request, reply) => {
+		return reply.send({ response: 'server is running' });
+	});
+}
+
+export default serverPage;

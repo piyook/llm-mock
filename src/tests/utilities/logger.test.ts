@@ -1,6 +1,5 @@
 /* eslint-disable  @typescript-eslint/naming-convention */
 import { expect, test, describe, vi, afterEach } from 'vitest';
-import { type DefaultBodyType, type StrictRequest } from 'msw';
 import { validateRequest } from '../../utilities/validate-request.js';
 
 // Mock out imported logger function
@@ -18,22 +17,17 @@ describe('logging works as expected', async () => {
 		// Create instance of mocked logger function imported into validateRequest
 		const logger = await import('../../utilities/logger.js');
 		const request = {
-			async json() {
-				return new Promise((resolve) => {
-					resolve({
-						// Remove model from request to fail validation.
-						temperature: 1,
-						top_p: 1,
-						frequency_penalty: 0,
-						presence_penalty: 0,
-						n: 1,
-						stream: false,
-						// Remove messages from request to fail validation.
-					});
-				});
+			body: {
+				// Remove model from request to fail validation.
+				temperature: 1,
+				top_p: 1,
+				frequency_penalty: 0,
+				presence_penalty: 0,
+				n: 1,
+				stream: false,
+				// Remove messages from request to fail validation.
 			},
-			body: { test: 'dummy body data' },
-		} as unknown as StrictRequest<DefaultBodyType>;
+		} as any;
 
 		const validationResult = await validateRequest(request);
 		// Check mocked logger is called with expected arguments
