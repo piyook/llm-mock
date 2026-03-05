@@ -17,7 +17,7 @@ A quick-to-setup standalone local mock LLM API framework for developing applicat
 - **Full Visibility**: Complete debugging and logging of all LLM requests
 - **Request Validation**: Verify your requests match the expected API format
 - **Realistic Delays**: Simulate production API response times to test loading states and timeout handling
-- **Production-Ready Framework**: Built with [Fastify](https://www.fastify.io/) for high performance and reliability
+- **Robust Local Server Framework**: Built with [Fastify](https://www.fastify.io/) for high performance and reliability
 
 Adapted from the [mock-api-framework-template](https://github.com/piyook/mock-api-framework-template).
 
