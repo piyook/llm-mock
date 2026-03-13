@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { fetchPing, fetchUiMeta, type UiMeta } from './api';
+	import { fetchPing, fetchUiMeta, type UiMeta } from './api.js';
 
 	let meta: UiMeta | null = null;
 	let online: boolean | null = null;
@@ -62,6 +62,10 @@
 			<div class="kv">
 				<span class="muted">LLM Template</span>
 				<span class="badge">{meta?.llmName?.toUpperCase() ?? 'NONE'}</span>
+			</div>
+			<div class="kv">
+				<span class="muted">Model Name</span>
+				<span class="badge">{meta?.llmModel?.toUpperCase() ?? 'NONE'}</span>
 			</div>
 			<div class="kv">
 				<span class="muted">Response Type</span>

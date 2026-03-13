@@ -464,6 +464,7 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 			serverPort: Number(process.env?.SERVER_PORT ?? '') || null,
 			llmUrlEndpoint: process.env?.LLM_URL_ENDPOINT ?? '',
 			llmName: process.env?.LLM_NAME ?? '',
+            llmModel: process.env?.LLM_MODEL ?? 'NONE DEFINED',
 			mockResponseType: process.env?.MOCK_LLM_RESPONSE_TYPE ?? '',
 			maxLoremParas:
 				process.env.MOCK_LLM_RESPONSE_TYPE === 'lorem'
@@ -504,7 +505,7 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 	});
 
 	// Ping endpoint for status check
-	app.get('/ping', async (request, reply) => {
+	app.get('/ping', async (_request, reply) => {
 		return reply.send({ response: 'server is running' });
 	});
 

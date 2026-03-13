@@ -2,6 +2,7 @@ export type UiMeta = {
 	serverPort: number | null;
 	llmUrlEndpoint: string;
 	llmName: string;
+	llmModel: string;
 	mockResponseType: string;
 	maxLoremParas: number | null;
 	storedResponsesCount: number | null;
