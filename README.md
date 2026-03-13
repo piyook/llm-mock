@@ -103,9 +103,44 @@ MOCK_LLM_RESPONSE_TYPE=lorem
 # Maximum sentences for lorem ipsum responses
 MAX_LOREM_PARAS=8
 
+# Streaming mode - enables OpenAI-style SSE streaming
+STREAM=false
+
 # Request validation
 VALIDATE_REQUESTS=true
 LOG_REQUESTS=true
+```
+
+#### Streaming Responses
+
+Enable OpenAI-style Server-Sent Events (SSE) streaming for chat-completion responses:
+
+```bash
+# Enable streaming mode
+STREAM=true
+
+# Disable streaming (default - returns single JSON response)
+STREAM=false
+```
+
+**How Streaming Works:**
+
+- **`STREAM=true`**: Returns OpenAI-style SSE stream with `chat.completion.chunk` events
+- **`STREAM=false`**: Returns standard single JSON response (existing behavior)
+- The same endpoint URL is used in both modes - only the server-side response framing differs
+- Streaming uses the same response template structure as static mode for consistency
+
+**Streaming Response Format:**
+```json
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant"}}]}
+
+data: {"id":"chatcmpl-124","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":"Hello"}}]}
+
+data: {"id":"chatcmpl-125","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":" world"}}]}
+
+data: {"id":"chatcmpl-126","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
 ```
 
 #### Response Delay Simulation
@@ -261,6 +296,48 @@ LLM_URL_ENDPOINT=chatgpt/chat/completions
 ```
 
 This creates the endpoint: `http://localhost:8001/chatgpt/chat/completions`
+
+### Making API Requests
+
+#### Static Mode (STREAM=false)
+
+```bash
+curl -N http://localhost:8001/chatgpt/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{ "model": "gpt-4o-mini", "messages": [{"role": "user","content": "Hello"}], "temperature": 1, "n": 1, "stream": false }'
+```
+
+Returns a single JSON response:
+```json
+{
+  "id": "chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe",
+  "object": "chat.completion", 
+  "created": 1678485525,
+  "model": "gpt-3.5-turbo-0301",
+  "choices": [{"message": {"role": "assistant", "content": "Generated response"}}]
+}
+```
+
+#### Streaming Mode (STREAM=true)
+
+Set `STREAM=true` in your `.env` file, then use the same endpoint:
+
+```bash
+curl -N http://localhost:8001/chatgpt/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{ "model": "gpt-4o-mini", "messages": [{"role": "user","content": "Hello"}], "temperature": 1, "n": 1, "stream": false }'
+```
+
+Returns OpenAI-style SSE stream:
+```
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk",...}
+
+data: {"id":"chatcmpl-124","object":"chat.completion.chunk",...}
+
+data: [DONE]
+```
+
+**Note:** The request payload is identical in both modes. The difference is in the server-side response framing, controlled by the `STREAM` environment variable.
 
 #### Client Configuration
 
@@ -443,13 +520,19 @@ Debug mode displays:
    # Add domain-specific responses to src/data/data.json
    ```
 
-5. **Enable validation** before deploying to production:
+5. **Enable streaming** to test real-time response handling:
+   ```bash
+   STREAM=true
+   # Test your client's streaming response parsing
+   ```
+
+6. **Enable validation** before deploying to production:
    ```bash
    VALIDATE_REQUESTS=true
    LOG_REQUESTS=true
    ```
 
-6. **Test with production LLM** by setting `DEV_MODE=false`
+7. **Test with production LLM** by setting `DEV_MODE=false`
 
 ### Testing Different Scenarios
 
@@ -459,6 +542,7 @@ The mock server enables comprehensive testing:
 - **Timeout handling**: Set high delay values to test timeout logic
 - **Error handling**: Modify response templates to return errors
 - **Variable content**: Use lorem or multiple stored responses
+- **Streaming responses**: Enable `STREAM=true` to test real-time response parsing
 - **Offline development**: Work without internet connectivity
 - **Cost-free prototyping**: Test UI/UX without API charges
 
