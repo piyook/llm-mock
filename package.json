@@ -3,7 +3,7 @@
 	"scripts": {
 		"predev": "npm run compile-ui",
 		"dev": "dotenvx run -f .env -- tsx watch ./src/server.ts",
-		"postinstall": "npm --prefix ui install",
+		"postinstall": "test -d ui && npm --prefix ui install || true",
 		"ui-dev": "npm --prefix ui run dev",
 		"compile-ui": "npm --prefix ui run build",
 		"start": "docker compose up -d --force-recreate",
