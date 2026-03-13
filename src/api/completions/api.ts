@@ -5,8 +5,9 @@ import { db } from '../../models/db.js';
 import { buildResponse } from '../../utilities/build-response.js';
 import { validateRequest } from '../../utilities/validate-request.js';
 import { delay, getDelayConfig } from '../../utilities/delay.js';
+import { generateStreamingChunks, setStreamingHeaders, streamWithDelay } from '../../utilities/build-streaming-response.js';
 
-// Add any http handler here (get, push , delete etc., and middleware as needed)
+// Add any http handler here (get, push ,delete etc., and middleware as needed)
 
 const mockGPTResponse = async () => {
 	let content = '';
@@ -37,8 +38,11 @@ const mockGPTResponse = async () => {
 		}
 	}
 
-	return buildResponse(content);
+	return content;
 };
+
+// Read STREAM env variable at startup
+const isStreamingMode = process.env?.STREAM?.toLowerCase() === 'true';
 
 function handler(app: FastifyInstance, pathName: string) {
 	const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
@@ -52,7 +56,25 @@ function handler(app: FastifyInstance, pathName: string) {
 			await delay(delayConfig.min, delayConfig.max);
 		}
 
-		return reply.send(await mockGPTResponse());
+		// === STATIC MODE ===
+		// Load openai_res.json from src/response-templates, replace DYNAMIC_CONTENT_HERE 
+		// with generated lorem/stored text, return as application/json
+		if (!isStreamingMode) {
+			const content = await mockGPTResponse();
+			const response = await buildResponse(content);
+			return reply.send(response);
+		}
+
+		// === STREAMING MODE ===
+		// Use same generated content as static mode, but emit as OpenAI-style 
+		// chat.completion.chunk events via Server-Sent Events (SSE)
+		const content = await mockGPTResponse();
+		const chunks = await generateStreamingChunks(content);
+		
+		setStreamingHeaders(reply);
+		await streamWithDelay(chunks, reply);
+		
+		return reply;
 	});
 
 	// POST route
@@ -64,7 +86,35 @@ function handler(app: FastifyInstance, pathName: string) {
 				await delay(delayConfig.min, delayConfig.max);
 			}
 
-			return reply.send(await mockGPTResponse());
+			// === STATIC MODE ===
+			// Load openai_res.json from src/response-templates, replace DYNAMIC_CONTENT_HERE 
+			// with generated lorem/stored text, return as application/json
+			if (!isStreamingMode) {
+				const content = await mockGPTResponse();
+				const response = await buildResponse(content);
+				return reply.send(response);
+			}
+
+			// === STREAMING MODE ===
+			// Use same generated content as static mode, but emit as OpenAI-style 
+			// chat.completion.chunk events via Server-Sent Events (SSE)
+			// Streaming format mimics OpenAI chat-completion streaming API
+			try {
+				const content = await mockGPTResponse();
+				const chunks = await generateStreamingChunks(content);
+				
+				setStreamingHeaders(reply);
+				await streamWithDelay(chunks, reply);
+				
+				return reply;
+			} catch (error) {
+				console.error('Streaming error:', error);
+				// Handle streaming errors gracefully - close connection without crashing
+				if (!reply.raw.destroyed) {
+					reply.raw.end();
+				}
+				return;
+			}
 		}
 
 		console.log(
