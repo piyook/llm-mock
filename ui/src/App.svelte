@@ -95,6 +95,10 @@
 				<span class="muted">Delay Status</span>
 				<span class="badge">{meta?.delayStatus ?? 'DISABLED'}</span>
 			</div>
+			<div class="kv">
+				<span class="muted">Streaming Status</span>
+				<span class="badge">{meta?.streamingStatus ?? 'DISABLED'}</span>
+			</div>
 			{#if meta?.mockResponseType === 'lorem'}
 				<div class="kv">
 					<span class="muted">Maximum sentences</span>

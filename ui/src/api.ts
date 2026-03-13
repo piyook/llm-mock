@@ -12,6 +12,7 @@ export type UiMeta = {
 	responseDelayMinMs: number;
 	responseDelayMaxMs: number;
 	delayStatus: 'ENABLED' | 'DISABLED';
+	streamingStatus: 'ENABLED' | 'DISABLED';
 	apiLinks: Array<{ href: string; label: string }>;
 };
 

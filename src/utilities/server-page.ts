@@ -79,10 +79,8 @@ const htmlString = (dbEntries: number) => `
             body {
                 min-height: 100vh;
                 width: 100vw;
-       
             }
             main {
-               
                 padding: 56px 3vw 40px 3vw;
                 width: 95vw;
                 max-width: 800px;
@@ -105,9 +103,7 @@ const htmlString = (dbEntries: number) => `
                 position: sticky;
                 top: 0;
                 z-index: 2;
-              
                 border-radius: 12px;
-             
                 padding: 16px 0 10px 0;
                 margin-bottom: 18px;
                 backdrop-filter: blur(2px);
@@ -131,11 +127,9 @@ const htmlString = (dbEntries: number) => `
                 text-align: left;
                 overflow: hidden;
                 white-space: pre;
-                
             }
             h1 {
                 text-align: center;
-                
             }
             .status-box {
                 display: flex;
@@ -143,20 +137,16 @@ const htmlString = (dbEntries: number) => `
                 align-items: center;
                 margin: 0 auto 0.2em auto;
                 padding-bottom:0.9em;
-               
             }
             .status {
                 display: inline-flex;
                 align-items: center;
-              
-              
             }
             .status-tick {
                 display: inline-block;
                 width: 1.1em;
                 height: 1.1em;
                 padding-right:0.2em;
-          
             }
             .status-online {
                 background: var(--accent);
@@ -164,7 +154,6 @@ const htmlString = (dbEntries: number) => `
             .status-offline {
                 background:rgb(126, 80, 78); /* Red color for offline */
             }
-
             @media (max-width: 700px) {
                 main {
                     max-width: 99vw;
@@ -235,7 +224,6 @@ const htmlString = (dbEntries: number) => `
                 color: #fff;
                 box-shadow: 0 4px 16px rgba(1,25,75,0.14);
                 outline: none;
-                
             }
             h1 {
                 font-size: 2.4rem;
@@ -243,16 +231,14 @@ const htmlString = (dbEntries: number) => `
                 letter-spacing: 1px;
                 text-align: center;
             }
-
             h6 {
-            text-align:right;
-            font-style:italic;
-            font-weight:normal;
-            margin-top:0;
-            margin-right:50px;
-            color:var(--text-muted);
+                text-align:right;
+                font-style:italic;
+                font-weight:normal;
+                margin-top:0;
+                margin-right:50px;
+                color:var(--text-muted);
             }
-
             .status {
                 display: inline-block;
                 color: #fff; /* Removed background here to be set dynamically */
@@ -322,7 +308,6 @@ const htmlString = (dbEntries: number) => `
                 text-decoration: underline;
                 font-weight: 500;
                 transition: color 0.2s;
-                
             }
             .logs-link:hover, .logs-link:focus {
                 color: var(--accent2);
@@ -360,7 +345,8 @@ const htmlString = (dbEntries: number) => `
                     <li><span class="info-label" cy-data="debug">Debug Mode:</span><span class="highlight" cy-data="debug">${process.env.DEBUG === '*' ? 'ON' : 'OFF'}</span></li>
                     <li><span class="info-label">Response Delay Min:</span><span class="highlight">${process.env?.RESPONSE_DELAY_MIN || '0'}ms</span></li>
                     <li><span class="info-label">Response Delay Max:</span><span class="highlight">${process.env?.RESPONSE_DELAY_MAX || '0'}ms</span></li>
-                    <li><span class="info-label">Delay Status:</span><span class="highlight">${parseInt(process.env?.RESPONSE_DELAY_MIN || '0') > 0 || parseInt(process.env?.RESPONSE_DELAY_MAX || '0') > 0 ? 'ENABLED' : 'DISABLED'}</span></li>
+                    <li><span class="info-label">Delay Status:</span><span class="highlight" cy-data="delay_status">${delayStatus}</span></li>
+                    <li><span class="info-label">Streaming Status:</span><span class="highlight" cy-data="streaming_status">${streamingStatus}</span></li>
                 </ul>
             </section>
             <section>
@@ -374,7 +360,7 @@ const htmlString = (dbEntries: number) => `
                 
             </section>
             <div class="note">
-                Modify settings in .env file and restart server.<br/>
+                Modify settings in <code>.env</code> and restart server.<br/>
                 LOG_REQUESTS and VALIDATE_REQUESTS must be 'ON' to log POST requests.
             </div>
         </main>
@@ -454,6 +440,8 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 			responseDelayMinMs > 0 || responseDelayMaxMs > 0
 				? 'ENABLED'
 				: 'DISABLED';
+	const streamingStatus =
+		process.env?.STREAM?.toLowerCase() === 'true' ? 'ENABLED' : 'DISABLED';
 
 		const apiLinks = apiPaths.map(() => ({
 			href: `/${prefix}`,
@@ -477,6 +465,7 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 			responseDelayMinMs,
 			responseDelayMaxMs,
 			delayStatus,
+			streamingStatus,
 			apiLinks,
 		});
 	});
