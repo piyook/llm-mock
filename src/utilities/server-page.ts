@@ -38,7 +38,9 @@ function contentTypeForPath(filePath: string): string {
 	}
 }
 
-function tryReadUiDistFile(relativePath: string): { absPath: string; data: Buffer } | null {
+function tryReadUiDistFile(
+	relativePath: string,
+): { absPath: string; data: Buffer } | null {
 	const absPath = path.resolve(uiDistDir, relativePath.replace(/^\/+/, ''));
 	const rel = path.relative(uiDistDir, absPath);
 	if (rel.startsWith('..') || path.isAbsolute(rel)) return null;
@@ -444,10 +446,14 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 		const storedResponsesCount =
 			process.env.MOCK_LLM_RESPONSE_TYPE === 'stored' ? dbEntries : null;
 
-		const responseDelayMinMs = Number(process.env?.RESPONSE_DELAY_MIN ?? 0) || 0;
-		const responseDelayMaxMs = Number(process.env?.RESPONSE_DELAY_MAX ?? 0) || 0;
+		const responseDelayMinMs =
+			Number(process.env?.RESPONSE_DELAY_MIN ?? 0) || 0;
+		const responseDelayMaxMs =
+			Number(process.env?.RESPONSE_DELAY_MAX ?? 0) || 0;
 		const delayStatus =
-			responseDelayMinMs > 0 || responseDelayMaxMs > 0 ? 'ENABLED' : 'DISABLED';
+			responseDelayMinMs > 0 || responseDelayMaxMs > 0
+				? 'ENABLED'
+				: 'DISABLED';
 
 		const apiLinks = apiPaths.map(() => ({
 			href: `/${prefix}`,
@@ -504,7 +510,8 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 
 	// Serve built Vite assets when present
 	app.get('/assets/*', async (request, reply) => {
-		const star = (request.params as Record<string, string> | undefined)?.['*'] ?? '';
+		const star =
+			(request.params as Record<string, string> | undefined)?.['*'] ?? '';
 		const file = tryReadUiDistFile(path.join('assets', star));
 		if (!file) return reply.code(404).send();
 		return reply.type(contentTypeForPath(file.absPath)).send(file.data);
