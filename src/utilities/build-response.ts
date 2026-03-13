@@ -12,7 +12,7 @@ export const buildResponse = async (content: DynamicContent) => {
 	// eslint-disable-next-line @typescript-eslint/no-implied-eval
 	const responseTemplate = (await import(
 		/* @vite-ignore */
-		`../response-templates/${process.env.LLM_NAME ?? 'chatgpt'}_res.json`,
+		`../response-templates/${process.env.LLM_NAME ?? 'openai'}_res.json`,
 		{ assert: { type: 'json' } }
 	)) as ResponseTemplate;
 

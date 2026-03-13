@@ -1,6 +1,6 @@
 /* eslint-disable  @typescript-eslint/naming-convention */
 import { expect, test, describe } from 'vitest';
-import { type DefaultBodyType, type StrictRequest } from 'msw';
+import type { FastifyRequest } from 'fastify';
 import { buildResponse } from '../../utilities/build-response.js';
 
 describe('build response function works as expected', async () => {
@@ -28,7 +28,7 @@ describe('build response function works as expected', async () => {
 				});
 			},
 			body: { test: 'dummy body data' },
-		} as unknown as StrictRequest<DefaultBodyType>;
+		} as unknown as FastifyRequest;
 
 		const input =
 			'Comminor cicuta comprehendo spes auxilium cavus. Contra supellex vix solvo angustus asporto auctor templum. Carpo appositus voluntarius virgo adstringo utique. Cetera uterque curvo commodi usque advoco voluptate. Candidus crapula vetus video pax. Suscipit ager aperio ulciscor veritas volubilis confero brevis alo studio.';

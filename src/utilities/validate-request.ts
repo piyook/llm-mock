@@ -27,7 +27,7 @@ export const validateRequest = async (request: any) => {
 		// eslint-disable-next-line @typescript-eslint/no-implied-eval
 		requestTemplate = (await import(
 			/* @vite-ignore */
-			`../request-templates/${process.env.LLM_NAME ?? 'chatgpt'}_req.json`,
+			`../request-templates/${process.env.LLM_NAME ?? 'openai'}_req.json`,
 			{
 				assert: { type: 'json' },
 			}

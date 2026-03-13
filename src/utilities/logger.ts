@@ -1,13 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type DefaultBodyType } from 'msw';
+import type { FastifyRequest } from 'fastify';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default function logger(
-	logItem: DefaultBodyType,
+	logItem: FastifyRequest,
 	state = '',
 	reason = '',
 	information = '',
