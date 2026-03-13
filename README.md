@@ -72,6 +72,8 @@ Run directly on your machine without Docker:
 npm run dev
 ```
 
+This starts the mock server locally. For details on the Svelte-based dashboard and UI development workflow, see `UI-Dev.md`.
+
 ## Configuration
 
 ### Environment Variables
