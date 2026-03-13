@@ -17,6 +17,8 @@ A quick-to-setup standalone local mock LLM API framework for developing applicat
 - **Full Visibility**: Complete debugging and logging of all LLM requests
 - **Request Validation**: Verify your requests match the expected API format
 - **Realistic Delays**: Simulate production API response times to test loading states and timeout handling
+- **Streamed or Static Responses**: Choose between streaming Server-Sent Events or static JSON responses to match your target LLM API behavior
+- **OpenAI-Style API Compatibility**: Works with any OpenAI-compatible API including ChatGPT, Grok, Llama, DeepSeek, and more
 - **Robust Local Server Framework**: Built with [Fastify](https://www.fastify.io/) for high performance and reliability
 
 Adapted from the [mock-api-framework-template](https://github.com/piyook/mock-api-framework-template).
@@ -287,9 +289,9 @@ Displays detailed information about each request including headers, body, and va
 
 ## Integration Guide
 
-### Using with LangChain and ChatGPT
+### Using with LangChain and OpenAI-Style APIs
 
-Configure your endpoint to match ChatGPT's format:
+Configure your endpoint to match the OpenAI chat completion format:
 
 ```bash
 LLM_URL_ENDPOINT=chatgpt/chat/completions
@@ -389,23 +391,26 @@ Setting `DEV_MODE` to false will enable real requests to production LLM services
 
 ## Supporting Different LLM Providers
 
-Add support for any LLM by creating request/response templates:
+Add support for any OpenAI-style API by creating request/response templates:
 
-### Included model templates
+### OpenAI-Style API Compatibility
 
-Some common providers are already included:
+This mock server supports any LLM provider that uses the OpenAI chat completion API format, including:
 
-| **Provider** | **LLM_NAME** | **Example `LLM_URL_ENDPOINT`**              | **Request template**                            | **Response template**                               | **Endpoint meta**                            |
-|-------------|--------------|----------------------------------------------|-------------------------------------------------|-----------------------------------------------------|----------------------------------------------|
-| OpenAI ChatGPT | `chatgpt` | `chatgpt/chat/completions`                  | `src/request-templates/chatgpt_req.json`        | `src/response-templates/chatgpt_res.json`           | `src/llm-endpoints/chatgpt_ep.json`          |
-| Google Gemini | `gemini`   | `models/gemini-pro:generateContent`         | `src/request-templates/gemini_req.json`         | `src/response-templates/gemini_res.json`            | `src/llm-endpoints/gemini_ep.json`           |
-| Anthropic Claude | `anthropic` | `anthropic/v1/messages`                 | `src/request-templates/anthropic_req.json`      | `src/response-templates/anthropic_res.json`         | `src/llm-endpoints/anthropic_ep.json`        |
-| Mistral      | `mistral`   | `v1/chat/completions`                       | `src/request-templates/mistral_req.json`        | `src/response-templates/mistral_res.json`           | `src/llm-endpoints/mistral_ep.json`          |
-| Meta Llama   | `llama`     | `v1/chat/completions`                       | `src/request-templates/llama_req.json`          | `src/response-templates/llama_res.json`             | `src/llm-endpoints/llama_ep.json`            |
-| DeepSeek     | `deepseek`  | `v1/chat/completions`                       | `src/request-templates/deepseek_req.json`       | `src/response-templates/deepseek_res.json`          | `src/llm-endpoints/deepseek_ep.json`         |
-| Grok (xAI)   | `grok`      | `v1/chat/completions`                       | `src/request-templates/grok_req.json`           | `src/response-templates/grok_res.json`              | `src/llm-endpoints/grok_ep.json`             |
+- **ChatGPT** (OpenAI)
+- **Grok** (xAI)
+- **Llama** (Meta)
+- **DeepSeek**
+- **Mistral**
+- **Claude** (Anthropic)
+- **Gemini** (Google)
+- And any other OpenAI-compatible API
 
-You can use these as starting points and add your own providers by following the same pattern.
+The default configuration uses the OpenAI chat completion format, which works with most modern LLM providers. You can customize the request/response templates to match specific provider requirements.
+
+### Creating Custom Templates
+
+If you need to support a provider with different request/response formats, create custom templates:
 
 ### Step 1: Create Request Template
 
@@ -470,7 +475,7 @@ VALIDATE_REQUESTS=true
 
 Access at: `http://localhost:8001/models/gemini-pro:generateContent`
 
-Any LLM framework that supports the new model (such as LangChain) can be updated to use this endpoint following the same pattern as the ChatGPT example above.
+Any LLM framework that supports OpenAI-style APIs (such as LangChain) can be updated to use this endpoint following the same pattern as the example above.
 
 ## Debugging
 
@@ -553,16 +558,17 @@ llm-mock/
 ├── src/
 │   ├── data/
 │   │   └── data.json              # Stored responses
-│   ├── request-templates/          # Request format templates
-│   │   ├── chatgpt_req.json
-│   │   └── gemini_req.json
-│   ├── response-templates/         # Response format templates
-│   │   ├── chatgpt_res.json
-│   │   └── gemini_res.json
+│   ├── request-templates/          # OpenAI-style request format templates
+│   │   ├── openai_req.json         # Default OpenAI chat completion format
+│   │   └── gemini_req.json         # Gemini-specific format example
+│   ├── response-templates/         # OpenAI-style response format templates
+│   │   ├── openai_res.json         # Default OpenAI chat completion response
+│   │   └── gemini_res.json         # Gemini-specific response example
 │   └── ...
 ├── .env                            # Configuration
-├── .env.chatgpt                    # ChatGPT preset
+├── .env.chatgpt                    # ChatGPT/OpenAI preset
 ├── .env.gemini                     # Gemini preset
+├── .env.streaming                  # Streaming mode preset
 ├── docker-compose.yml
 └── package.json
 ```
@@ -616,4 +622,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Topics:** mock-server, gemini, llm, chatgpt, langchain, local-development-environment
+**Topics:** mock-server, openai-api, llm, chat-completions, langchain, local-development-environment, streaming-api
