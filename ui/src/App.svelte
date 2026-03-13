@@ -34,11 +34,11 @@
 		<div class="titleRow">
 			<h1>Mock LLM Server</h1>
 			{#if online === null}
-				<div class="statusPill statusOffline">Checking…</div>
+				<div class="statusPill statusOffline" cy-data="server_status">Checking…</div>
 			{:else if online}
-				<div class="statusPill statusOnline">Running</div>
+				<div class="statusPill statusOnline" cy-data="server_status">Running</div>
 			{:else}
-				<div class="statusPill statusOffline">Not Running</div>
+				<div class="statusPill statusOffline" cy-data="server_status">Not Running</div>
 			{/if}
 		</div>
 		<p class="errorLine muted" class:errorVisible={!!error}>{error ?? ''}</p>
