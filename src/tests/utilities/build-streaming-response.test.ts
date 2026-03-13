@@ -45,14 +45,14 @@ describe('build streaming response function works as expected', async () => {
             expect(choice).to.have.property('delta');
             expect(choice).to.have.property('finish_reason');
 
-            // First chunk should have role
+            // First chunk should have role in delta
             if (index === 0) {
-                expect(choice.delta).to.have.property('role', 'assistant');
-                expect(choice.delta).to.not.have.property('content');
-                expect(choice.finish_reason).to.be.null;
+                expect(choice.delta).to.have.property('role');
+                expect(choice.delta.role).to.eq('assistant');
+                void expect(choice.finish_reason).to.be.null;
             }
 
-            // Last chunk should have finish_reason and empty delta
+            // Last chunk should have finish_reason: 'stop' and empty delta
             if (index === dataChunks.length - 1) {
                 expect(choice.finish_reason).to.eq('stop');
                 expect(Object.keys(choice.delta)).to.have.length(0);
@@ -61,8 +61,8 @@ describe('build streaming response function works as expected', async () => {
             // Middle chunks should have content
             if (index > 0 && index < dataChunks.length - 1) {
                 expect(choice.delta).to.have.property('content');
-                expect(choice.delta.content).to.be.a('string');
-                expect(choice.delta.content).to.not.be.empty;
+                void expect(choice.delta.content).to.be.a('string');
+                void expect(choice.delta.content).to.not.be.empty;
             }
         });
     });

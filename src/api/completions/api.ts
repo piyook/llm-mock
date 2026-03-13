@@ -1,122 +1,69 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import type { FastifyInstance } from 'fastify';
-import { faker } from '@faker-js/faker';
-import { db } from '../../models/db.js';
-import { buildResponse } from '../../utilities/build-response.js';
 import { validateRequest } from '../../utilities/validate-request.js';
-import { delay, getDelayConfig } from '../../utilities/delay.js';
-import { generateStreamingChunks, setStreamingHeaders, streamWithDelay } from '../../utilities/build-streaming-response.js';
-
-// Add any http handler here (get, push ,delete etc., and middleware as needed)
-
-const mockGPTResponse = async () => {
-	let content = '';
-
-	switch (process.env?.MOCK_LLM_RESPONSE_TYPE) {
-		case 'lorem': {
-			content = faker.lorem.sentences({
-				min: 1,
-				max: Number.parseInt(process.env?.MAX_LOREM_PARAS ?? '5', 10),
-			});
-			break;
-		}
-
-		case 'stored': {
-			const storedResponses = db.llm.getAll();
-
-			const random = faker.number.int({
-				min: 0,
-				max: storedResponses.length - 1,
-			});
-			content = storedResponses[random].content;
-
-			break;
-		}
-
-		default: {
-			content = faker.lorem.paragraphs({ min: 1, max: 10 });
-		}
-	}
-
-	return content;
-};
+import { 
+	generateResponseContent, 
+	buildStaticResponse, 
+	handleStreamingResponse, 
+	applyResponseDelay 
+} from '../../utilities/response-helpers.js';
 
 // Read STREAM env variable at startup
+// Controls whether responses are sent as static JSON or SSE streams
+// STREAM=true: Returns OpenAI-style Server-Sent Events stream
+// STREAM=false: Returns single static JSON response (default behavior)
 const isStreamingMode = process.env?.STREAM?.toLowerCase() === 'true';
+
+/**
+ * Handles the common request processing logic for both GET and POST routes
+ * Applies delay, generates content, and returns appropriate response format
+ * 
+ * @param reply - Fastify reply object
+ * @returns Promise<void>
+ */
+const handleRequest = async (reply: any) => {
+	// Apply configured response delay for realistic API simulation
+	await applyResponseDelay();
+
+	// Generate mock response content (lorem or stored based on configuration)
+	const content = await generateResponseContent();
+
+	// Route to appropriate response handler based on STREAM environment variable
+	if (!isStreamingMode) {
+		// === STATIC MODE ===
+		// Returns single JSON response matching OpenAI chat.completion format
+		// Uses openai_res.json template with DYNAMIC_CONTENT_HERE replacement
+		const response = await buildStaticResponse(content);
+		return reply.send(response);
+	} else {
+		// === STREAMING MODE ===
+		// Returns OpenAI-style Server-Sent Events stream with chat.completion.chunk events
+		// Streaming format is compatible with OpenAI chat-completions streaming API
+		// Content is split into multiple chunks with proper SSE headers and timing
+		return await handleStreamingResponse(content, reply);
+	}
+};
 
 function handler(app: FastifyInstance, pathName: string) {
 	const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 	const fullPath = prefix || pathName;
 
-	// GET route
+	// GET route - handles chat completion requests via HTTP GET
+	// Supports both static and streaming modes based on STREAM env variable
 	app.get(`/${fullPath}`, async (request, reply) => {
-		// Apply delay if configured
-		const delayConfig = getDelayConfig();
-		if (delayConfig.enabled) {
-			await delay(delayConfig.min, delayConfig.max);
-		}
-
-		// === STATIC MODE ===
-		// Load openai_res.json from src/response-templates, replace DYNAMIC_CONTENT_HERE 
-		// with generated lorem/stored text, return as application/json
-		if (!isStreamingMode) {
-			const content = await mockGPTResponse();
-			const response = await buildResponse(content);
-			return reply.send(response);
-		}
-
-		// === STREAMING MODE ===
-		// Use same generated content as static mode, but emit as OpenAI-style 
-		// chat.completion.chunk events via Server-Sent Events (SSE)
-		const content = await mockGPTResponse();
-		const chunks = await generateStreamingChunks(content);
-		
-		setStreamingHeaders(reply);
-		await streamWithDelay(chunks, reply);
-		
-		return reply;
+		return await handleRequest(reply);
 	});
 
-	// POST route
+	// POST route - handles chat completion requests via HTTP POST
+	// Validates request format against openai_req.json template before processing
+	// Supports both static and streaming modes based on STREAM env variable
 	app.post(`/${fullPath}`, async (request, reply) => {
+		// Validate incoming request against template to ensure API compatibility
 		if (await validateRequest(request)) {
-			// Apply delay if configured
-			const delayConfig = getDelayConfig();
-			if (delayConfig.enabled) {
-				await delay(delayConfig.min, delayConfig.max);
-			}
-
-			// === STATIC MODE ===
-			// Load openai_res.json from src/response-templates, replace DYNAMIC_CONTENT_HERE 
-			// with generated lorem/stored text, return as application/json
-			if (!isStreamingMode) {
-				const content = await mockGPTResponse();
-				const response = await buildResponse(content);
-				return reply.send(response);
-			}
-
-			// === STREAMING MODE ===
-			// Use same generated content as static mode, but emit as OpenAI-style 
-			// chat.completion.chunk events via Server-Sent Events (SSE)
-			// Streaming format mimics OpenAI chat-completion streaming API
-			try {
-				const content = await mockGPTResponse();
-				const chunks = await generateStreamingChunks(content);
-				
-				setStreamingHeaders(reply);
-				await streamWithDelay(chunks, reply);
-				
-				return reply;
-			} catch (error) {
-				console.error('Streaming error:', error);
-				// Handle streaming errors gracefully - close connection without crashing
-				if (!reply.raw.destroyed) {
-					reply.raw.end();
-				}
-				return;
-			}
+			return await handleRequest(reply);
 		}
 
+		// Return detailed error message for invalid requests
 		console.log(
 			`\nREQUEST ERROR: Invalid or missing request format for this LLM Model:${process.env?.LLM_NAME?.toUpperCase()}`,
 		);
