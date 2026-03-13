@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import type { FastifyInstance } from 'fastify';
 import { validateRequest } from '../../utilities/validate-request.js';
-import { 
-	generateResponseContent, 
-	buildStaticResponse, 
-	handleStreamingResponse, 
-	applyResponseDelay 
+import {
+	generateResponseContent,
+	buildStaticResponse,
+	handleStreamingResponse,
+	applyResponseDelay,
 } from '../../utilities/response-helpers.js';
 
 // Read STREAM env variable at startup
@@ -17,7 +17,7 @@ const isStreamingMode = process.env?.STREAM?.toLowerCase() === 'true';
 /**
  * Handles the common request processing logic for both GET and POST routes
  * Applies delay, generates content, and returns appropriate response format
- * 
+ *
  * @param reply - Fastify reply object
  * @returns Promise<void>
  */

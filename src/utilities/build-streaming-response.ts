@@ -19,32 +19,35 @@ export interface StreamingChunk {
 
 /**
  * Convert static response template to streaming chunks
- * 
+ *
  * This function implements OpenAI-compatible streaming format:
  * - Uses the same template structure as static responses for consistency
  * - Splits content into multiple chunks to simulate token-by-token streaming
  * - Follows OpenAI's chat.completion.chunk object structure
  * - Emits proper SSE format with data: prefix and [DONE] sentinel
- * 
+ *
  * OpenAI Compatibility Assumptions:
  * - First chunk contains only the role in delta (no content)
  * - Middle chunks contain incremental content fragments
  * - Final chunk has finish_reason: 'stop' and empty delta
  * - All chunks share the same id prefix with incremental suffixes
  * - Uses same created timestamp and model as static template
- * 
+ *
  * @param content - The full content to be streamed
  * @returns Promise<string[]> Array of SSE-formatted chunks
  */
-export const generateStreamingChunks = async (content: string): Promise<string[]> => {
+export const generateStreamingChunks = async (
+	content: string,
+): Promise<string[]> => {
 	const chunks: string[] = [];
-	
+
 	// Get the static response template to extract id, model, etc.
 	// This ensures streaming responses match static template structure
-	const staticResponse = await buildResponse(content) as any;
-	
+	const staticResponse = (await buildResponse(content)) as any;
+
 	// Extract base properties from the static template for consistency
-	const baseId = staticResponse.id || `chatcmpl-${faker.string.alphanumeric(10)}`;
+	const baseId =
+		staticResponse.id || `chatcmpl-${faker.string.alphanumeric(10)}`;
 	const model = staticResponse.model || (process.env.LLM_MODEL ?? 'gpt-4o');
 	const created = staticResponse.created || Math.floor(Date.now() / 1000);
 
@@ -77,7 +80,7 @@ export const generateStreamingChunks = async (content: string): Promise<string[]
 	for (let i = 0; i < words.length; i += chunkSize) {
 		const chunkWords = words.slice(i, i + chunkSize);
 		const chunkContent = chunkWords.join(' ');
-		
+
 		const chunk: StreamingChunk = {
 			id: `${baseId}-${Math.floor(i / chunkSize) + 1}`,
 			object: 'chat.completion.chunk',
@@ -123,13 +126,13 @@ export const generateStreamingChunks = async (content: string): Promise<string[]
 
 /**
  * Sets proper Server-Sent Events headers for streaming responses
- * 
+ *
  * These headers ensure compatibility with OpenAI's streaming format:
  * - text/event-stream: Indicates SSE content type
  * - no-cache: Prevents caching of streaming responses
  * - keep-alive: Maintains connection for streaming
  * - CORS headers: Allows cross-origin requests
- * 
+ *
  * @param reply - Fastify reply object
  */
 export const setStreamingHeaders = (reply: any) => {
@@ -142,35 +145,38 @@ export const setStreamingHeaders = (reply: any) => {
 
 /**
  * Streams chunks with appropriate timing for realistic simulation
- * 
+ *
  * Distributes configured delay across chunks to simulate natural streaming:
  * - Calculates per-chunk delay from total delay configuration
  * - Ensures minimum delay between chunks for realistic timing
  * - Flushes each chunk immediately for real-time delivery
  * - Handles connection errors gracefully
- * 
+ *
  * @param chunks - Array of SSE-formatted chunks to stream
  * @param reply - Fastify reply object
  * @returns Promise<void>
  */
-export const streamWithDelay = async (chunks: string[], reply: any): Promise<void> => {
+export const streamWithDelay = async (
+	chunks: string[],
+	reply: any,
+): Promise<void> => {
 	const delayConfig = getDelayConfig();
-	
+
 	// Calculate per-chunk delay (distribute total delay across chunks)
 	// This ensures realistic streaming timing regardless of content length
-	const perChunkDelay = delayConfig.enabled 
+	const perChunkDelay = delayConfig.enabled
 		? Math.max(50, (delayConfig.min + delayConfig.max) / 2 / chunks.length)
 		: 50; // Minimum 50ms between chunks for realistic streaming
 
 	for (const chunk of chunks) {
 		reply.raw.write(`${chunk}\n\n`);
-		
+
 		// Apply delay between chunks (except for the last [DONE] message)
 		// This simulates the natural timing of LLM token generation
 		if (chunk !== 'data: [DONE]') {
 			await delay(perChunkDelay, perChunkDelay);
 		}
 	}
-	
+
 	reply.raw.end();
 };
