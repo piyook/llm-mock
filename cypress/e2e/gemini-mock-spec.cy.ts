@@ -190,9 +190,9 @@ describe('Mock LLM Spec for Google Gemini', () => {
             failOnStatusCode: false,
         }).then((response) => {
             expect(response.status).to.eq(400);
-            // expect(response.body).to.contain(
-            //     'Invalid or Missing Request For this LLM Model: GEMINI',
-            // );
+            expect(response.body).to.contain(
+                'Invalid or Missing Request For This LLM Model Template: GEMINI Model:gemini-pro. Please ensure your request adheres to the expected format - see localhost:8001/logs for details of missing parameters or formatting issues.',
+            );
         });
     });
 });

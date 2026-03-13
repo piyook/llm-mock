@@ -75,7 +75,7 @@ function handler(app: FastifyInstance, pathName: string) {
 			.status(400)
 			.type('text/plain')
 			.send(
-				`Invalid or Missing Request For this LLM Model: ${process.env?.LLM_NAME?.toUpperCase()}`,
+				`Invalid or Missing Request For This LLM Model Template: ${process.env?.LLM_NAME?.toUpperCase()} Model:${process.env?.LLM_MODEL ?? 'NO MODEL DEFINED'}. Please ensure your request adheres to the expected format - see localhost:${process.env?.SERVER_PORT ?? '8001'}/logs for details of missing parameters or formatting issues.`,
 			);
 	});
 }
