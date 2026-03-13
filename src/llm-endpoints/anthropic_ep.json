@@ -1,0 +1,7 @@
+{
+	"provider": "anthropic",
+	"description": "Anthropic Claude Messages API style endpoint",
+	"exampleEndpoint": "anthropic/v1/messages",
+	"fullExampleUrl": "http://localhost:8001/anthropic/v1/messages"
+}
+

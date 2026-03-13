@@ -1,0 +1,24 @@
+[
+	{
+		"id": "cmpl-deepseek-123",
+		"object": "chat.completion",
+		"created": 1234567890,
+		"model": "deepseek-chat",
+		"choices": [
+			{
+				"index": 0,
+				"message": {
+					"role": "assistant",
+					"content": "DYNAMIC_CONTENT_HERE"
+				},
+				"finish_reason": "stop"
+			}
+		],
+		"usage": {
+			"prompt_tokens": 28,
+			"completion_tokens": 64,
+			"total_tokens": 92
+		}
+	}
+]
+

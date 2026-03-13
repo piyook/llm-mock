@@ -314,6 +314,22 @@ Setting `DEV_MODE` to false will enable real requests to production LLM services
 
 Add support for any LLM by creating request/response templates:
 
+### Included model templates
+
+Some common providers are already included:
+
+| **Provider** | **LLM_NAME** | **Example `LLM_URL_ENDPOINT`**              | **Request template**                            | **Response template**                               | **Endpoint meta**                            |
+|-------------|--------------|----------------------------------------------|-------------------------------------------------|-----------------------------------------------------|----------------------------------------------|
+| OpenAI ChatGPT | `chatgpt` | `chatgpt/chat/completions`                  | `src/request-templates/chatgpt_req.json`        | `src/response-templates/chatgpt_res.json`           | `src/llm-endpoints/chatgpt_ep.json`          |
+| Google Gemini | `gemini`   | `models/gemini-pro:generateContent`         | `src/request-templates/gemini_req.json`         | `src/response-templates/gemini_res.json`            | `src/llm-endpoints/gemini_ep.json`           |
+| Anthropic Claude | `anthropic` | `anthropic/v1/messages`                 | `src/request-templates/anthropic_req.json`      | `src/response-templates/anthropic_res.json`         | `src/llm-endpoints/anthropic_ep.json`        |
+| Mistral      | `mistral`   | `v1/chat/completions`                       | `src/request-templates/mistral_req.json`        | `src/response-templates/mistral_res.json`           | `src/llm-endpoints/mistral_ep.json`          |
+| Meta Llama   | `llama`     | `v1/chat/completions`                       | `src/request-templates/llama_req.json`          | `src/response-templates/llama_res.json`             | `src/llm-endpoints/llama_ep.json`            |
+| DeepSeek     | `deepseek`  | `v1/chat/completions`                       | `src/request-templates/deepseek_req.json`       | `src/response-templates/deepseek_res.json`          | `src/llm-endpoints/deepseek_ep.json`         |
+| Grok (xAI)   | `grok`      | `v1/chat/completions`                       | `src/request-templates/grok_req.json`           | `src/response-templates/grok_res.json`              | `src/llm-endpoints/grok_ep.json`             |
+
+You can use these as starting points and add your own providers by following the same pattern.
+
 ### Step 1: Create Request Template
 
 Create `request-templates/<LLM_NAME>_req.json` with the expected request format:

@@ -1,0 +1,7 @@
+{
+	"provider": "gemini",
+	"description": "Google Gemini generateContent style endpoint",
+	"exampleEndpoint": "models/gemini-pro:generateContent",
+	"fullExampleUrl": "http://localhost:8001/models/gemini-pro:generateContent"
+}
+

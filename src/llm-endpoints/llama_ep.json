@@ -1,0 +1,7 @@
+{
+	"provider": "llama",
+	"description": "Meta Llama-style chat completions endpoint",
+	"exampleEndpoint": "v1/chat/completions",
+	"fullExampleUrl": "http://localhost:8001/v1/chat/completions"
+}
+

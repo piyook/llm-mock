@@ -1,0 +1,24 @@
+[
+	{
+		"model": "mistral-large-latest",
+		"messages": [
+			{
+				"role": "user",
+				"content": "Explain what this local mock LLM server does."
+			},
+			{
+				"role": "assistant",
+				"content": "It simulates LLM responses so you can develop and test against a local API."
+			},
+			{
+				"role": "user",
+				"content": "List two example use cases."
+			}
+		],
+		"temperature": 0.7,
+		"top_p": 1,
+		"max_tokens": 256,
+		"stream": false
+	}
+]
+
