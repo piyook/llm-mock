@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { delay, getDelayConfig } from './delay.js';
+import { buildResponse } from './build-response.js';
 
 export interface StreamingChunk {
 	id: string;
@@ -16,17 +17,27 @@ export interface StreamingChunk {
 	}>;
 }
 
+/**
+ * Convert static response template to streaming chunks
+ * Reuses openai_res.json structure for id, model, and other fields
+ */
 export const generateStreamingChunks = async (content: string): Promise<string[]> => {
 	const chunks: string[] = [];
-	const model = process.env.LLM_MODEL ?? 'gpt-4o';
-	const baseId = `chatcmpl-${faker.string.alphanumeric(10)}`;
-	const created = Math.floor(Date.now() / 1000);
+	
+	// Get the static response template to extract id, model, etc.
+	const staticResponse = await buildResponse(content) as any;
+	
+	// Extract base properties from the static template
+	const baseId = staticResponse.id || `chatcmpl-${faker.string.alphanumeric(10)}`;
+	const model = staticResponse.model || (process.env.LLM_MODEL ?? 'gpt-4o');
+	const created = staticResponse.created || Math.floor(Date.now() / 1000);
 
 	// Split content into words for realistic streaming
 	const words = content.split(' ');
 	const chunkSize = Math.max(1, Math.floor(words.length / 5)); // Split into ~5 chunks
 
-	// First chunk with role
+	// First chunk with role (extract role from static template or default to assistant)
+	const role = staticResponse.choices?.[0]?.message?.role || 'assistant';
 	const firstChunk: StreamingChunk = {
 		id: `${baseId}-0`,
 		object: 'chat.completion.chunk',
@@ -36,7 +47,7 @@ export const generateStreamingChunks = async (content: string): Promise<string[]
 			{
 				index: 0,
 				delta: {
-					role: 'assistant',
+					role,
 				},
 				finish_reason: null,
 			},
@@ -67,7 +78,8 @@ export const generateStreamingChunks = async (content: string): Promise<string[]
 		chunks.push(`data: ${JSON.stringify(chunk)}`);
 	}
 
-	// Final chunk with finish_reason
+	// Final chunk with finish_reason (extract from static template or default to stop)
+	const finishReason = staticResponse.choices?.[0]?.finish_reason || 'stop';
 	const finalChunk: StreamingChunk = {
 		id: `${baseId}-final`,
 		object: 'chat.completion.chunk',
@@ -77,7 +89,7 @@ export const generateStreamingChunks = async (content: string): Promise<string[]
 			{
 				index: 0,
 				delta: {},
-				finish_reason: 'stop',
+				finish_reason: finishReason as 'stop',
 			},
 		],
 	};
