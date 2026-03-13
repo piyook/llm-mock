@@ -1,0 +1,37 @@
+[
+  {
+    "model": "claude-3-5-sonnet-20240620",
+    "max_tokens": 256,
+    "temperature": 1,
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Who won the world series in 2020?"
+          }
+        ]
+      },
+      {
+        "role": "assistant",
+        "content": [
+          {
+            "type": "text",
+            "text": "The Los Angeles Dodgers won the World Series in 2020."
+          }
+        ]
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Where was it played?"
+          }
+        ]
+      }
+    ],
+    "stream": false
+  }
+]
