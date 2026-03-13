@@ -31,6 +31,9 @@ docker compose down --rmi all --volumes
 
 info "> removing root node_modules"
 rm -rf node_modules
+info "> removing ui node_modules and dist"
+rm -rf ui/node_modules
+rm -rf ui/dist
 info "> cleaning npm cache"
 npm cache clean --force
 
