@@ -55,6 +55,17 @@ h1 {
 	color: var(--text-muted);
 }
 
+.errorLine {
+	margin: 10px 0 0 0;
+	min-height: 1.4em;
+	opacity: 0;
+	transition: opacity 120ms ease-in-out;
+}
+
+.errorVisible {
+	opacity: 1;
+}
+
 .statusPill {
 	display: inline-flex;
 	align-items: center;

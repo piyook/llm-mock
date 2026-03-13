@@ -41,9 +41,7 @@
 				<div class="statusPill statusOffline">Not Running</div>
 			{/if}
 		</div>
-		{#if error}
-			<p class="muted" style="margin: 10px 0 0 0;">{error}</p>
-		{/if}
+		<p class="errorLine muted" class:errorVisible={!!error}>{error ?? ''}</p>
 	</section>
 
 	<section class="card">
