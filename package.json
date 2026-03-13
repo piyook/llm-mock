@@ -26,25 +26,25 @@
 		"validate-branch-name": "bash validate-branch-name.sh"
 	},
 	"dependencies": {
-		"@dotenvx/dotenvx": "^1.52.0",
+		"@dotenvx/dotenvx": "^1.54.1",
 		"@faker-js/faker": "^10.3.0",
 		"@types/chai-json-schema": "^1.4.10",
-		"@types/node": "^25.3.3",
+		"@types/node": "^25.5.0",
 		"chai-json-schema": "^1.5.1",
 		"cypress": "^15.11.0",
-		"fastify": "^5.8.1",
+		"fastify": "^5.8.2",
 		"pretty-print-json": "^3.0.7",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
-		"vitest": "^4.0.18",
+		"vitest": "^4.1.0",
 		"zod": "^4.3.6"
 	},
 	"devDependencies": {
-		"@commitlint/cli": "^20.4.3",
-		"@commitlint/config-conventional": "^20.4.3",
+		"@commitlint/cli": "^20.4.4",
+		"@commitlint/config-conventional": "^20.4.4",
 		"husky": "^9.1.7",
-		"lint-staged": "^16.3.2",
-		"oxlint": "^1.51.0",
+		"lint-staged": "^16.3.3",
+		"oxlint": "^1.55.0",
 		"prettier": "3.8.1",
 		"start-server-and-test": "^2.1.5",
 		"validate-branch-name": "^1.3.2"
