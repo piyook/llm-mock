@@ -464,7 +464,7 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 			serverPort: Number(process.env?.SERVER_PORT ?? '') || null,
 			llmUrlEndpoint: process.env?.LLM_URL_ENDPOINT ?? '',
 			llmName: process.env?.LLM_NAME ?? '',
-            llmModel: process.env?.LLM_MODEL ?? 'NONE DEFINED',
+			llmModel: process.env?.LLM_MODEL ?? 'NONE DEFINED',
 			mockResponseType: process.env?.MOCK_LLM_RESPONSE_TYPE ?? '',
 			maxLoremParas:
 				process.env.MOCK_LLM_RESPONSE_TYPE === 'lorem'
