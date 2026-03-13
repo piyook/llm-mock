@@ -1,8 +1,52 @@
 import '@dotenvx/dotenvx';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../models/db.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uiDistDir = path.resolve(__dirname, '../../ui/dist');
+
+function contentTypeForPath(filePath: string): string {
+	const ext = path.extname(filePath).toLowerCase();
+	switch (ext) {
+		case '.html':
+			return 'text/html; charset=utf-8';
+		case '.js':
+			return 'text/javascript; charset=utf-8';
+		case '.css':
+			return 'text/css; charset=utf-8';
+		case '.json':
+			return 'application/json; charset=utf-8';
+		case '.svg':
+			return 'image/svg+xml';
+		case '.png':
+			return 'image/png';
+		case '.jpg':
+		case '.jpeg':
+			return 'image/jpeg';
+		case '.ico':
+			return 'image/x-icon';
+		case '.map':
+			return 'application/json; charset=utf-8';
+		default:
+			return 'application/octet-stream';
+	}
+}
+
+function tryReadUiDistFile(relativePath: string): { absPath: string; data: Buffer } | null {
+	const absPath = path.resolve(uiDistDir, relativePath.replace(/^\/+/, ''));
+	const rel = path.relative(uiDistDir, absPath);
+	if (rel.startsWith('..') || path.isAbsolute(rel)) return null;
+	if (!fs.existsSync(absPath)) return null;
+	const stat = fs.statSync(absPath);
+	if (!stat.isFile()) return null;
+	return { absPath, data: fs.readFileSync(absPath) };
+}
 
 const htmlString = (dbEntries: number) => `
     <!DOCTYPE html>
@@ -394,8 +438,51 @@ const htmlString = (dbEntries: number) => `
     `;
 
 function serverPage(app: FastifyInstance, apiPaths: string[]) {
+	// UI meta endpoint for the compiled Svelte dashboard
+	app.get('/ui-meta', async (request, reply) => {
+		const dbEntries = db.llm.getAll()?.length ?? 0;
+		const storedResponsesCount =
+			process.env.MOCK_LLM_RESPONSE_TYPE === 'stored' ? dbEntries : null;
+
+		const responseDelayMinMs = Number(process.env?.RESPONSE_DELAY_MIN ?? 0) || 0;
+		const responseDelayMaxMs = Number(process.env?.RESPONSE_DELAY_MAX ?? 0) || 0;
+		const delayStatus =
+			responseDelayMinMs > 0 || responseDelayMaxMs > 0 ? 'ENABLED' : 'DISABLED';
+
+		const apiLinks = apiPaths.map(() => ({
+			href: `/${prefix}`,
+			label: `/${prefix}`,
+		}));
+
+		return reply.send({
+			serverPort: Number(process.env?.SERVER_PORT ?? '') || null,
+			llmUrlEndpoint: process.env?.LLM_URL_ENDPOINT ?? '',
+			llmName: process.env?.LLM_NAME ?? '',
+			mockResponseType: process.env?.MOCK_LLM_RESPONSE_TYPE ?? '',
+			maxLoremParas:
+				process.env.MOCK_LLM_RESPONSE_TYPE === 'lorem'
+					? Number(process.env?.MAX_LOREM_PARAS ?? '') || null
+					: null,
+			storedResponsesCount,
+			validateRequests: process.env?.VALIDATE_REQUESTS ?? '',
+			logRequests: process.env?.LOG_REQUESTS ?? '',
+			debugMode: process.env.DEBUG === '*' ? 'ON' : 'OFF',
+			responseDelayMinMs,
+			responseDelayMaxMs,
+			delayStatus,
+			apiLinks,
+		});
+	});
+
 	// Home page route
 	app.get('/', async (request, reply) => {
+		const uiIndex = tryReadUiDistFile('index.html');
+		if (uiIndex) {
+			return reply
+				.type(contentTypeForPath(uiIndex.absPath))
+				.send(uiIndex.data);
+		}
+
 		const dbEntries = db.llm.getAll()?.length ?? 1;
 		const endpointLinks = apiPaths
 			.map(
@@ -413,6 +500,23 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 	// Ping endpoint for status check
 	app.get('/ping', async (request, reply) => {
 		return reply.send({ response: 'server is running' });
+	});
+
+	// Serve built Vite assets when present
+	app.get('/assets/*', async (request, reply) => {
+		const star = (request.params as Record<string, string> | undefined)?.['*'] ?? '';
+		const file = tryReadUiDistFile(path.join('assets', star));
+		if (!file) return reply.code(404).send();
+		return reply.type(contentTypeForPath(file.absPath)).send(file.data);
+	});
+
+	// Serve any built root-level file (favicon, manifest, etc.)
+	app.get('/:file', async (request, reply) => {
+		const fileName = (request.params as { file: string }).file;
+		if (!fileName.includes('.')) return reply.code(404).send();
+		const file = tryReadUiDistFile(fileName);
+		if (!file) return reply.code(404).send();
+		return reply.type(contentTypeForPath(file.absPath)).send(file.data);
 	});
 }
 

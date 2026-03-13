@@ -1,0 +1,140 @@
+:root {
+	--bg-main: #23272f;
+	--bg-card: #2d333b;
+	--accent: #4f8a8b;
+	--accent2: rgb(1, 25, 75);
+	--text-main: #f9f9f9;
+	--text-muted: #a7a9be;
+	--border-radius: 14px;
+	--shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+	min-height: 100vh;
+	color: var(--text-main);
+	font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+	background: linear-gradient(120deg, #20232a 0%, #23272f 70%, #0d1117 100%);
+}
+
+main {
+	padding: 56px 3vw 40px 3vw;
+	width: 95vw;
+	max-width: 800px;
+	min-width: 320px;
+	margin: 48px auto 32px auto;
+	display: flex;
+	flex-direction: column;
+	align-items: stretch;
+	gap: 24px;
+}
+
+.card {
+	background: var(--bg-card);
+	border-radius: var(--border-radius);
+	box-shadow: var(--shadow);
+	padding: 18px 18px;
+}
+
+.titleRow {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+h1 {
+	margin: 0;
+	font-size: 2.2rem;
+	letter-spacing: 1px;
+}
+
+.muted {
+	color: var(--text-muted);
+}
+
+.statusPill {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	border-radius: 10px;
+	padding: 8px 12px;
+	font-weight: 700;
+	letter-spacing: 0.3px;
+}
+
+.statusOnline {
+	background: var(--accent);
+}
+
+.statusOffline {
+	background: rgb(126, 80, 78);
+}
+
+.grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+}
+
+@media (max-width: 700px) {
+	.grid {
+		grid-template-columns: 1fr;
+	}
+
+	h1 {
+		font-size: 1.6rem;
+	}
+}
+
+.kv {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	align-items: center;
+	padding: 10px 12px;
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.badge {
+	background: var(--accent2);
+	padding: 4px 10px;
+	border-radius: 8px;
+	color: #fff;
+	font-weight: 800;
+}
+
+.endpoints {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.endpointLink {
+	display: block;
+	background: #5b8ca6;
+	color: #fff;
+	text-decoration: none;
+	padding: 12px 0;
+	border-radius: 10px;
+	font-weight: 650;
+	border: 1.5px solid #446a7c;
+	text-align: center;
+}
+
+.endpointLink:hover,
+.endpointLink:focus {
+	background: #22496a;
+	outline: none;
+}
+
+.footerNote {
+	text-align: center;
+	font-size: 0.95rem;
+	color: var(--text-muted);
+	line-height: 1.4;
+}
+
