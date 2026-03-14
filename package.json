@@ -24,7 +24,7 @@
 		"test:chatgpt": "start-server-and-test serve:chatgpt tcp:8001 'cypress run --spec cypress/e2e/gpt-mock-spec.cy.ts'",
 		"test:gemini": "start-server-and-test serve:gemini tcp:8001 'cypress run --spec cypress/e2e/gemini-mock-spec.cy.ts'",
 		"test:streaming": "start-server-and-test serve:streaming tcp:8001 'cypress run --spec cypress/e2e/streaming-only-spec.cy.ts'",
-		"test:e2e": "npm run test:chatgpt && npm run test:gemini && npm run test:streaming",
+		"test:e2e": "npm run compile-ui && npm run test:chatgpt && npm run test:gemini && npm run test:streaming",
 		"validate-branch-name": "bash validate-branch-name.sh"
 	},
 	"dependencies": {
