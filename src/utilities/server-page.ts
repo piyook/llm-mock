@@ -118,7 +118,7 @@ const fallbackHtmlString = `
     </html>
     `;
 
-function serverPage(app: FastifyInstance, apiPaths: string[]) {
+function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	// UI meta endpoint for the compiled Svelte dashboard
 	app.get('/ui-meta', async (_request, reply) => {
 		const dbEntries = db.llm.getAll()?.length ?? 0;
@@ -138,9 +138,26 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 				? 'ENABLED'
 				: 'DISABLED';
 
-		const apiLinks = apiPaths.map(() => ({
-			href: `/${prefix}`,
-			label: `/${prefix}`,
+		const embeddingsEnabled =
+			process.env?.ENABLE_EMBEDDINGS_MOCK?.toLowerCase() !== 'false';
+		const embeddingDimension =
+			Number(process.env?.EMBEDDING_DIMENSION) || 128;
+
+		// Create unique API links to avoid Svelte duplicate key errors
+		const apiLinksSet = new Set<string>();
+
+		// Add main API endpoint
+		apiLinksSet.add(`/${prefix}`);
+
+		// Add embeddings endpoint link if enabled
+		if (embeddingsEnabled) {
+			apiLinksSet.add('/v1/embeddings');
+		}
+
+		// Convert Set to array of objects
+		const apiLinks = Array.from(apiLinksSet).map((href) => ({
+			href: href,
+			label: href,
 		}));
 
 		return reply.send({
@@ -161,6 +178,8 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 			responseDelayMaxMs,
 			delayStatus,
 			streamingStatus,
+			embeddingsEnabled: embeddingsEnabled ? 'ENABLED' : 'DISABLED',
+			embeddingDimension,
 			apiLinks,
 		});
 	});

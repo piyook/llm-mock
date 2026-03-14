@@ -1,0 +1,17 @@
+[
+    {
+        "object": "list",
+        "data": [
+            {
+                "object": "embedding",
+                "index": 0,
+                "embedding": "DYNAMIC_CONTENT_HERE"
+            }
+        ],
+        "model": "DYNAMIC_CONTENT_HERE",
+        "usage": {
+            "prompt_tokens": "DYNAMIC_CONTENT_HERE",
+            "total_tokens": "DYNAMIC_CONTENT_HERE"
+        }
+    }
+]

@@ -8,6 +8,40 @@
 
 A quick-to-setup standalone local mock LLM API framework for developing applications with Large Language Models like ChatGPT. This project provides a local server running on localhost that simulates LLM endpoints, enabling efficient frontend development and testing without the costs and complexity of production LLM services.
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Why Use LLM Mock?](#why-use-llm-mock)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Server Status Dashboard](#server-status-dashboard)
+- [Configuration](#configuration)
+  - [Environment Variables](#environment-variables)
+  - [Embeddings Configuration](#embeddings-configuration)
+  - [Streaming Responses](#streaming-responses)
+  - [Response Delay Simulation](#response-delay-simulation)
+  - [Custom API Paths](#custom-api-paths)
+- [Features](#features)
+  - [Available Endpoints](#available-endpoints)
+  - [Response Types](#response-types)
+  - [Request Validation](#request-validation)
+  - [Request Logging](#request-logging)
+- [Integration Guide](#integration-guide)
+  - [Using with LangChain and OpenAI-Style APIs](#using-with-langchain-and-openai-style-apis)
+  - [Making API Requests](#making-api-requests)
+  - [Embeddings API](#embeddings-api)
+  - [Client Configuration](#client-configuration)
+- [Supporting Different LLM Providers](#supporting-different-llm-providers)
+  - [OpenAI-Style API Compatibility](#openai-style-api-compatibility)
+  - [Creating Custom Templates](#creating-custom-templates)
+- [Debugging](#debugging)
+- [Development Workflow](#development-workflow)
+- [Project Structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+
 ### Why Use LLM Mock?
 
 - **Free and Fast**: No API costs, instant responses for rapid prototyping
@@ -19,6 +53,7 @@ A quick-to-setup standalone local mock LLM API framework for developing applicat
 - **Realistic Delays**: Simulate production API response times to test loading states and timeout handling
 - **Streamed or Static Responses**: Choose between streaming Server-Sent Events or static JSON responses to match your target LLM API behavior
 - **OpenAI-Style API Compatibility**: Works with any OpenAI-compatible API including ChatGPT, Grok, Llama, DeepSeek, and more
+- **Mock Embeddings Support**: Generate deterministic mock embeddings for testing vector search, RAG systems, and semantic similarity applications without actual embedding model costs
 - **Robust Local Server Framework**: Built with [Fastify](https://www.fastify.io/) for high performance and reliability
 
 Adapted from the [mock-api-framework-template](https://github.com/piyook/mock-api-framework-template).
@@ -40,8 +75,6 @@ npm install
 ```
 
 ## Quick Start
-
-![LLM Mock Server Page](images/server-page.png)
 
 ### Using Docker (Recommended)
 
@@ -75,6 +108,35 @@ npm run dev
 ```
 
 This starts the mock server locally. For details on the Svelte-based dashboard and UI development workflow, see `UI-Dev.md`.
+
+## Server Status Dashboard   
+
+Once the server is running, navigate to **`http://localhost:8001`** to access the interactive server status dashboard. This web interface provides real-time visibility into your mock server configuration and activity. 
+   
+     
+![LLM Mock Server Page](images/server-page.png)
+
+### Dashboard Features
+
+- **Server Status**: Real-time indicator showing if the server is running and accessible
+- **Configuration Display**: Shows all current environment variables and settings including:
+  - Server port and URL
+  - LLM model and template configuration
+  - Response type (Lorem Ipsum vs Stored)
+  - Request validation and logging status
+  - Streaming mode configuration
+  - Response delay settings
+  - **Embeddings endpoint status** and dimensions
+- **API Endpoints**: Direct links to all available endpoints (chat completions, embeddings, etc.)
+- **Request Logs**: Access to detailed request logs at `/logs` for debugging
+
+### Navigation
+
+1. **Main Dashboard**: `http://localhost:8001` - Overview and configuration
+2. **Request Logs**: `http://localhost:8001/logs` - Detailed API request history
+3. **Health Check**: `http://localhost:8001/ping` - Simple server status check
+
+The dashboard updates automatically every 2 seconds to reflect real-time changes in server configuration and status.
 
 ## Configuration
 
@@ -111,6 +173,18 @@ STREAM=false
 # Request validation
 VALIDATE_REQUESTS=true
 LOG_REQUESTS=true
+```
+
+#### Embeddings Configuration
+
+Enable and configure the mock embeddings endpoint:
+
+```bash
+# Enable embeddings endpoint (default: true)
+ENABLE_EMBEDDINGS_MOCK=true
+
+# Default embedding dimensions (default: 128)
+EMBEDDING_DIMENSION=128
 ```
 
 #### Streaming Responses
@@ -214,6 +288,11 @@ LLM_URL_ENDPOINT=models/gemini-pro:generateContent
 ## Features
 
 ### Available Endpoints
+
+The mock server provides the following OpenAI-style endpoints:
+
+- **Chat Completions**: `/chatgpt/chat/completions` (configurable via `LLM_URL_ENDPOINT`)
+- **Embeddings**: `/v1/embeddings` (OpenAI-compatible embeddings endpoint)
 
 View all available endpoints by visiting:
 
@@ -347,6 +426,59 @@ data: [DONE]
 
 **Note:** The request payload is identical in both modes. The difference is in the server-side response framing, controlled by the `STREAM` environment variable.
 
+### Embeddings API
+
+The mock server also provides an OpenAI-style embeddings endpoint at `/v1/embeddings`:
+
+```bash
+curl http://localhost:8001/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-3-small",
+    "input": "Your text string goes here"
+  }'
+```
+
+**Response Format:**
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "index": 0,
+      "embedding": [0.1234, -0.5678, 0.9012, ...]
+    }
+  ],
+  "model": "text-embedding-3-small",
+  "usage": {
+    "prompt_tokens": 6,
+    "total_tokens": 6
+  }
+}
+```
+
+**Key Features:**
+- **Deterministic**: Same input always produces identical embeddings
+- **Multiple Inputs**: Supports arrays of strings with proper indexing
+- **Configurable Dimensions**: Set via `EMBEDDING_DIMENSION` env var or request parameter
+- **Model-Sensitive**: Different models produce different embeddings for same input
+- **OpenAI Compatible**: Response shape matches OpenAI embeddings API exactly
+
+**Multiple Inputs Example:**
+```bash
+curl http://localhost:8001/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-ada-002",
+    "input": ["First text", "Second text", "Third text"]
+  }'
+```
+
+Returns multiple embeddings with indices 0, 1, 2 respectively.
+
+**Note**: The embedding vectors are mock data (deterministic pseudo-random values) that provide the correct shape and behavior for development, but are not real semantic embeddings.
+
 #### Client Configuration
 
 Update your LangChain configuration to use the mock server in development:
@@ -371,9 +503,16 @@ const chatModel = new ChatOpenAI({
 let embeddings;
 
 if (process.env.DEV_MODE === 'true') {
-  embeddings = new FakeEmbeddings();
+  // Use the mock embeddings endpoint for development
+  embeddings = new OpenAIEmbeddings({
+    openAIApiKey: 'sk-mock-key', // Mock key for development
+    modelName: 'text-embedding-ada-002',
+    configuration: {
+      baseURL: process.env.DEV_BASE_URL, // http://localhost:8001
+    },
+  });
   console.log(
-    `WARNING: DEV MODE IS ON. Using fake embeddings and localhost mock server on ${process.env?.DEV_BASE_URL}`
+    `WARNING: DEV MODE IS ON. Using mock embeddings server on ${process.env?.DEV_BASE_URL}/v1/embeddings`
   );
 } else {
   embeddings = new OpenAIEmbeddings({
@@ -387,13 +526,15 @@ if (process.env.DEV_MODE === 'true') {
 ```bash
 # Development mode
 DEV_MODE=true
-DEV_BASE_URL=http://localhost:8001/chatgpt
+DEV_BASE_URL=http://localhost:8001
 
 # Production mode
 DEV_MODE=false
 ```
 
 Setting `DEV_MODE` to false will enable real requests to production LLM services.
+
+**Embeddings Integration**: When `DEV_MODE=true`, the OpenAIEmbeddings client will automatically use the mock `/v1/embeddings` endpoint, providing deterministic mock embeddings for development and testing.
 
 ## Supporting Different LLM Providers
 

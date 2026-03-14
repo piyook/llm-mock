@@ -99,6 +99,14 @@
 				<span class="muted">Streaming Status</span>
 				<span class="badge">{meta?.streamingStatus ?? 'DISABLED'}</span>
 			</div>
+			<div class="kv">
+				<span class="muted">Embeddings Status</span>
+				<span class="badge">{meta?.embeddingsEnabled ?? 'DISABLED'}</span>
+			</div>
+			<div class="kv">
+				<span class="muted">Embedding Dimensions</span>
+				<span class="badge">{meta?.embeddingDimension ?? 128}</span>
+			</div>
 			{#if meta?.mockResponseType === 'lorem'}
 				<div class="kv">
 					<span class="muted">Maximum sentences</span>

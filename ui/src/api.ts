@@ -13,6 +13,8 @@ export type UiMeta = {
 	responseDelayMaxMs: number;
 	delayStatus: 'ENABLED' | 'DISABLED';
 	streamingStatus: 'ENABLED' | 'DISABLED';
+	embeddingsEnabled: 'ENABLED' | 'DISABLED';
+	embeddingDimension: number;
 	apiLinks: Array<{ href: string; label: string }>;
 };
 
