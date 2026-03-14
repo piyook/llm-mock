@@ -4,10 +4,6 @@
 [![tests workflow](https://github.com/piyook/llm-mock/actions/workflows/tests.yaml/badge.svg)](https://github.com/piyook/llm-mock/actions/workflows/tests.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Overview
-
-A quick-to-setup standalone local mock LLM API framework for developing applications with Large Language Models like ChatGPT. This project provides a local server running on localhost that simulates LLM endpoints, enabling efficient frontend development and testing without the costs and complexity of production LLM services.
-
 ## Table of Contents
 
 - [Overview](#overview)
@@ -41,6 +37,26 @@ A quick-to-setup standalone local mock LLM API framework for developing applicat
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Overview
+
+The Local Mock LLM API Framework is a lightweight, standalone server that simulates Large Language Model APIs for development and testing purposes. It provides a complete mock environment that mimics the behavior of popular LLM services like OpenAI's ChatGPT, enabling developers to build, test, and prototype AI-powered applications without incurring API costs or requiring internet connectivity.
+
+### Key Capabilities
+
+- **OpenAI-Style API Compatibility**: Implements the same request/response formats as popular LLM providers
+- **Multiple Response Types**: Supports both dynamic lorem ipsum generation and stored response templates
+- **Streaming Support**: Simulates real-time streaming responses for chat applications
+- **Mock Embeddings**: Provides deterministic embedding vectors for testing vector search and RAG systems
+- **Request Validation**: Validates incoming requests against configurable templates
+- **Interactive Dashboard**: Web-based interface for monitoring server status and API requests
+- **Flexible Configuration**: Extensive environment variable support for customizing behavior
+
+### Architecture
+
+The framework uses a template-based approach where request/response pairs are defined as JSON templates, allowing for easy customization and support for different LLM providers. The server is built with Fastify and provides a RESTful API that can be seamlessly integrated into existing development workflows.
+
+Perfect for frontend developers, QA engineers, and teams looking to accelerate AI application development without the overhead of managing real LLM services.
 
 ### Why Use LLM Mock?
 
