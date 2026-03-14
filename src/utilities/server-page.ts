@@ -173,14 +173,6 @@ function serverPage(app: FastifyInstance, apiPaths: string[]) {
 				.type(contentTypeForPath(uiIndex.absPath))
 				.send(uiIndex.data);
 		}
-
-		const dbEntries = db.llm.getAll()?.length ?? 1;
-		const endpointLinks = apiPaths
-			.map(
-				() =>
-					`<a class="endpoint-link" cy-data="endpoint" href="/${prefix}">/${prefix}</a>`,
-			)
-			.join('');
 		return reply.type('text/html').send(fallbackHtmlString);
 	});
 
