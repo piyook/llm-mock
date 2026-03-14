@@ -1,10 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import type { FastifyInstance } from 'fastify';
-import { validateRequest } from '../../utilities/validate-request.js';
-import {
-	generateMockEmbeddings,
-	applyResponseDelay,
-} from '../../utilities/response-helpers.js';
+import { generateMockEmbeddings } from '../../utilities/response-helpers.js';
+import { applyResponseDelay } from '../../utilities/response-helpers.js';
 
 // Import the default dimensions constant
 const DEFAULT_EMBEDDING_DIMENSIONS =
@@ -82,7 +79,7 @@ const handleEmbeddingsRequest = async (request: any, reply: any) => {
 	return reply.send(embeddingsResponse);
 };
 
-function handler(app: FastifyInstance, pathName: string) {
+function handler(app: FastifyInstance, _pathName: string) {
 	// Check if embeddings mock is enabled
 	const embeddingsEnabled =
 		process.env?.ENABLE_EMBEDDINGS_MOCK?.toLowerCase() !== 'false';

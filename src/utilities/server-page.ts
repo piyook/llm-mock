@@ -118,7 +118,7 @@ const fallbackHtmlString = `
     </html>
     `;
 
-function serverPage(app: FastifyInstance, apiPaths: string[]) {
+function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	// UI meta endpoint for the compiled Svelte dashboard
 	app.get('/ui-meta', async (_request, reply) => {
 		const dbEntries = db.llm.getAll()?.length ?? 0;
