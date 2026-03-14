@@ -1,0 +1,9 @@
+[
+    {
+        "model": "text-embedding-ada-002",
+        "input": "The quick brown fox jumps over the lazy dog",
+        "encoding_format": "float",
+        "dimensions": 1536,
+        "user": "user-123"
+    }
+]

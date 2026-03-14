@@ -113,6 +113,18 @@ VALIDATE_REQUESTS=true
 LOG_REQUESTS=true
 ```
 
+#### Embeddings Configuration
+
+Enable and configure the mock embeddings endpoint:
+
+```bash
+# Enable embeddings endpoint (default: true)
+ENABLE_EMBEDDINGS_MOCK=true
+
+# Default embedding dimensions (default: 128)
+EMBEDDING_DIMENSION=128
+```
+
 #### Streaming Responses
 
 Enable OpenAI-style Server-Sent Events (SSE) streaming for chat-completion responses:
@@ -214,6 +226,11 @@ LLM_URL_ENDPOINT=models/gemini-pro:generateContent
 ## Features
 
 ### Available Endpoints
+
+The mock server provides the following OpenAI-style endpoints:
+
+- **Chat Completions**: `/chatgpt/chat/completions` (configurable via `LLM_URL_ENDPOINT`)
+- **Embeddings**: `/v1/embeddings` (OpenAI-compatible embeddings endpoint)
 
 View all available endpoints by visiting:
 
@@ -347,6 +364,59 @@ data: [DONE]
 
 **Note:** The request payload is identical in both modes. The difference is in the server-side response framing, controlled by the `STREAM` environment variable.
 
+### Embeddings API
+
+The mock server also provides an OpenAI-style embeddings endpoint at `/v1/embeddings`:
+
+```bash
+curl http://localhost:8001/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-3-small",
+    "input": "Your text string goes here"
+  }'
+```
+
+**Response Format:**
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "index": 0,
+      "embedding": [0.1234, -0.5678, 0.9012, ...]
+    }
+  ],
+  "model": "text-embedding-3-small",
+  "usage": {
+    "prompt_tokens": 6,
+    "total_tokens": 6
+  }
+}
+```
+
+**Key Features:**
+- **Deterministic**: Same input always produces identical embeddings
+- **Multiple Inputs**: Supports arrays of strings with proper indexing
+- **Configurable Dimensions**: Set via `EMBEDDING_DIMENSION` env var or request parameter
+- **Model-Sensitive**: Different models produce different embeddings for same input
+- **OpenAI Compatible**: Response shape matches OpenAI embeddings API exactly
+
+**Multiple Inputs Example:**
+```bash
+curl http://localhost:8001/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-ada-002",
+    "input": ["First text", "Second text", "Third text"]
+  }'
+```
+
+Returns multiple embeddings with indices 0, 1, 2 respectively.
+
+**Note**: The embedding vectors are mock data (deterministic pseudo-random values) that provide the correct shape and behavior for development, but are not real semantic embeddings.
+
 #### Client Configuration
 
 Update your LangChain configuration to use the mock server in development:
@@ -371,9 +441,16 @@ const chatModel = new ChatOpenAI({
 let embeddings;
 
 if (process.env.DEV_MODE === 'true') {
-  embeddings = new FakeEmbeddings();
+  // Use the mock embeddings endpoint for development
+  embeddings = new OpenAIEmbeddings({
+    openAIApiKey: 'sk-mock-key', // Mock key for development
+    modelName: 'text-embedding-ada-002',
+    configuration: {
+      baseURL: process.env.DEV_BASE_URL, // http://localhost:8001
+    },
+  });
   console.log(
-    `WARNING: DEV MODE IS ON. Using fake embeddings and localhost mock server on ${process.env?.DEV_BASE_URL}`
+    `WARNING: DEV MODE IS ON. Using mock embeddings server on ${process.env?.DEV_BASE_URL}/v1/embeddings`
   );
 } else {
   embeddings = new OpenAIEmbeddings({
@@ -387,13 +464,15 @@ if (process.env.DEV_MODE === 'true') {
 ```bash
 # Development mode
 DEV_MODE=true
-DEV_BASE_URL=http://localhost:8001/chatgpt
+DEV_BASE_URL=http://localhost:8001
 
 # Production mode
 DEV_MODE=false
 ```
 
 Setting `DEV_MODE` to false will enable real requests to production LLM services.
+
+**Embeddings Integration**: When `DEV_MODE=true`, the OpenAIEmbeddings client will automatically use the mock `/v1/embeddings` endpoint, providing deterministic mock embeddings for development and testing.
 
 ## Supporting Different LLM Providers
 
