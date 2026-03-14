@@ -145,6 +145,12 @@ data: {"id":"chatcmpl-126","object":"chat.completion.chunk","created":1234567890
 data: [DONE]
 ```
 
+**Initial Chunk Behavior:**
+- The first few chunks (typically 3-4) are sent immediately without delay
+- This mimics real LLM API behavior where initial tokens arrive faster
+- Subsequent chunks follow the configured `RESPONSE_DELAY_*` timing
+- This provides realistic streaming simulation and better user experience
+
 #### Response Delay Simulation
 
 Simulate realistic API response times to test how your application handles network latency, loading states, and timeouts:
