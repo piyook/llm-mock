@@ -3,3 +3,5 @@ node_modules
 /src/logs/*.json
 cypress/screenshots
 cypress/videos
+ui/node_modules
+ui/dist

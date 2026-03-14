@@ -4,9 +4,59 @@
 [![tests workflow](https://github.com/piyook/llm-mock/actions/workflows/tests.yaml/badge.svg)](https://github.com/piyook/llm-mock/actions/workflows/tests.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Why Use LLM Mock?](#why-use-llm-mock)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Server Status Dashboard](#server-status-dashboard)
+- [Configuration](#configuration)
+  - [Environment Variables](#environment-variables)
+  - [Embeddings Configuration](#embeddings-configuration)
+  - [Streaming Responses](#streaming-responses)
+  - [Response Delay Simulation](#response-delay-simulation)
+  - [Custom API Paths](#custom-api-paths)
+- [Features](#features)
+  - [Available Endpoints](#available-endpoints)
+  - [Response Types](#response-types)
+  - [Request Validation](#request-validation)
+  - [Request Logging](#request-logging)
+- [Integration Guide](#integration-guide)
+  - [Using with LangChain and OpenAI-Style APIs](#using-with-langchain-and-openai-style-apis)
+  - [Making API Requests](#making-api-requests)
+  - [Embeddings API](#embeddings-api)
+  - [Client Configuration](#client-configuration)
+- [Supporting Different LLM Providers](#supporting-different-llm-providers)
+  - [OpenAI-Style API Compatibility](#openai-style-api-compatibility)
+  - [Creating Custom Templates](#creating-custom-templates)
+- [Debugging](#debugging)
+- [Development Workflow](#development-workflow)
+- [Project Structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
+
 ## Overview
 
-A quick-to-setup standalone local mock LLM API framework for developing applications with Large Language Models like ChatGPT. This project provides a local server running on localhost that simulates LLM endpoints, enabling efficient frontend development and testing without the costs and complexity of production LLM services.
+The Local Mock LLM API Framework is a lightweight, standalone server that simulates Large Language Model APIs for development and testing purposes. It provides a complete mock environment that mimics the behavior of popular LLM services like OpenAI's ChatGPT, enabling developers to build, test, and prototype AI-powered applications without incurring API costs or requiring internet connectivity.
+
+### Key Capabilities
+
+- **OpenAI-Style API Compatibility**: Implements the same request/response formats as popular LLM providers
+- **Multiple Response Types**: Supports both dynamic lorem ipsum generation and stored response templates
+- **Streaming Support**: Simulates real-time streaming responses for chat applications
+- **Mock Embeddings**: Provides deterministic embedding vectors for testing vector search and RAG systems
+- **Request Validation**: Validates incoming requests against configurable templates
+- **Interactive Dashboard**: Web-based interface for monitoring server status and API requests
+- **Flexible Configuration**: Extensive environment variable support for customizing behavior
+
+### Architecture
+
+The framework uses a template-based approach where request/response pairs are defined as JSON templates, allowing for easy customization and support for different LLM providers. The server is built with Fastify and provides a RESTful API that can be seamlessly integrated into existing development workflows.
+
+Perfect for frontend developers, QA engineers, and teams looking to accelerate AI application development without the overhead of managing real LLM services.
 
 ### Why Use LLM Mock?
 
@@ -17,6 +67,9 @@ A quick-to-setup standalone local mock LLM API framework for developing applicat
 - **Full Visibility**: Complete debugging and logging of all LLM requests
 - **Request Validation**: Verify your requests match the expected API format
 - **Realistic Delays**: Simulate production API response times to test loading states and timeout handling
+- **Streamed or Static Responses**: Choose between streaming Server-Sent Events or static JSON responses to match your target LLM API behavior
+- **OpenAI-Style API Compatibility**: Works with any OpenAI-compatible API including ChatGPT, Grok, Llama, DeepSeek, and more
+- **Mock Embeddings Support**: Generate deterministic mock embeddings for testing vector search, RAG systems, and semantic similarity applications without actual embedding model costs
 - **Robust Local Server Framework**: Built with [Fastify](https://www.fastify.io/) for high performance and reliability
 
 Adapted from the [mock-api-framework-template](https://github.com/piyook/mock-api-framework-template).
@@ -38,8 +91,6 @@ npm install
 ```
 
 ## Quick Start
-
-![LLM Mock Server Page](images/server-page.png)
 
 ### Using Docker (Recommended)
 
@@ -72,6 +123,37 @@ Run directly on your machine without Docker:
 npm run dev
 ```
 
+This starts the mock server locally. For details on the Svelte-based dashboard and UI development workflow, see `UI-Dev.md`.
+
+## Server Status Dashboard   
+
+Once the server is running, navigate to **`http://localhost:8001`** to access the interactive server status dashboard. This web interface provides real-time visibility into your mock server configuration and activity. 
+   
+     
+![LLM Mock Server Page](images/server-page.png)
+
+### Dashboard Features
+
+- **Server Status**: Real-time indicator showing if the server is running and accessible
+- **Configuration Display**: Shows all current environment variables and settings including:
+  - Server port and URL
+  - LLM model and template configuration
+  - Response type (Lorem Ipsum vs Stored)
+  - Request validation and logging status
+  - Streaming mode configuration
+  - Response delay settings
+  - **Embeddings endpoint status** and dimensions
+- **API Endpoints**: Direct links to all available endpoints (chat completions, embeddings, etc.)
+- **Request Logs**: Access to detailed request logs at `/logs` for debugging
+
+### Navigation
+
+1. **Main Dashboard**: `http://localhost:8001` - Overview and configuration
+2. **Request Logs**: `http://localhost:8001/logs` - Detailed API request history
+3. **Health Check**: `http://localhost:8001/ping` - Simple server status check
+
+The dashboard updates automatically every 2 seconds to reflect real-time changes in server configuration and status.
+
 ## Configuration
 
 ### Environment Variables
@@ -101,10 +183,63 @@ MOCK_LLM_RESPONSE_TYPE=lorem
 # Maximum sentences for lorem ipsum responses
 MAX_LOREM_PARAS=8
 
+# Streaming mode - enables OpenAI-style SSE streaming
+STREAM=false
+
 # Request validation
 VALIDATE_REQUESTS=true
 LOG_REQUESTS=true
 ```
+
+#### Embeddings Configuration
+
+Enable and configure the mock embeddings endpoint:
+
+```bash
+# Enable embeddings endpoint (default: true)
+ENABLE_EMBEDDINGS_MOCK=true
+
+# Default embedding dimensions (default: 128)
+EMBEDDING_DIMENSION=128
+```
+
+#### Streaming Responses
+
+Enable OpenAI-style Server-Sent Events (SSE) streaming for chat-completion responses:
+
+```bash
+# Enable streaming mode
+STREAM=true
+
+# Disable streaming (default - returns single JSON response)
+STREAM=false
+```
+
+**How Streaming Works:**
+
+- **`STREAM=true`**: Returns OpenAI-style SSE stream with `chat.completion.chunk` events
+- **`STREAM=false`**: Returns standard single JSON response (existing behavior)
+- The same endpoint URL is used in both modes - only the server-side response framing differs
+- Streaming uses the same response template structure as static mode for consistency
+
+**Streaming Response Format:**
+```json
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant"}}]}
+
+data: {"id":"chatcmpl-124","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":"Hello"}}]}
+
+data: {"id":"chatcmpl-125","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":" world"}}]}
+
+data: {"id":"chatcmpl-126","object":"chat.completion.chunk","created":1234567890,"model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+```
+
+**Initial Chunk Behavior:**
+- The first few chunks (typically 3-4) are sent immediately without delay
+- This mimics real LLM API behavior where initial tokens arrive faster
+- Subsequent chunks follow the configured `RESPONSE_DELAY_*` timing
+- This provides realistic streaming simulation and better user experience
 
 #### Response Delay Simulation
 
@@ -169,6 +304,11 @@ LLM_URL_ENDPOINT=models/gemini-pro:generateContent
 ## Features
 
 ### Available Endpoints
+
+The mock server provides the following OpenAI-style endpoints:
+
+- **Chat Completions**: `/chatgpt/chat/completions` (configurable via `LLM_URL_ENDPOINT`)
+- **Embeddings**: `/v1/embeddings` (OpenAI-compatible embeddings endpoint)
 
 View all available endpoints by visiting:
 
@@ -250,15 +390,110 @@ Displays detailed information about each request including headers, body, and va
 
 ## Integration Guide
 
-### Using with LangChain and ChatGPT
+### Using with LangChain and OpenAI-Style APIs
 
-Configure your endpoint to match ChatGPT's format:
+Configure your endpoint to match the OpenAI chat completion format:
 
 ```bash
 LLM_URL_ENDPOINT=chatgpt/chat/completions
 ```
 
 This creates the endpoint: `http://localhost:8001/chatgpt/chat/completions`
+
+### Making API Requests
+
+#### Static Mode (STREAM=false)
+
+```bash
+curl -N http://localhost:8001/chatgpt/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{ "model": "gpt-4o-mini", "messages": [{"role": "user","content": "Hello"}], "temperature": 1, "n": 1, "stream": false }'
+```
+
+Returns a single JSON response:
+```json
+{
+  "id": "chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe",
+  "object": "chat.completion", 
+  "created": 1678485525,
+  "model": "gpt-3.5-turbo-0301",
+  "choices": [{"message": {"role": "assistant", "content": "Generated response"}}]
+}
+```
+
+#### Streaming Mode (STREAM=true)
+
+Set `STREAM=true` in your `.env` file, then use the same endpoint:
+
+```bash
+curl -N http://localhost:8001/chatgpt/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{ "model": "gpt-4o-mini", "messages": [{"role": "user","content": "Hello"}], "temperature": 1, "n": 1, "stream": false }'
+```
+
+Returns OpenAI-style SSE stream:
+```
+data: {"id":"chatcmpl-123","object":"chat.completion.chunk",...}
+
+data: {"id":"chatcmpl-124","object":"chat.completion.chunk",...}
+
+data: [DONE]
+```
+
+**Note:** The request payload is identical in both modes. The difference is in the server-side response framing, controlled by the `STREAM` environment variable.
+
+### Embeddings API
+
+The mock server also provides an OpenAI-style embeddings endpoint at `/v1/embeddings`:
+
+```bash
+curl http://localhost:8001/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-3-small",
+    "input": "Your text string goes here"
+  }'
+```
+
+**Response Format:**
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "object": "embedding",
+      "index": 0,
+      "embedding": [0.1234, -0.5678, 0.9012, ...]
+    }
+  ],
+  "model": "text-embedding-3-small",
+  "usage": {
+    "prompt_tokens": 6,
+    "total_tokens": 6
+  }
+}
+```
+
+**Key Features:**
+- **Deterministic**: Same input always produces identical embeddings
+- **Multiple Inputs**: Supports arrays of strings with proper indexing
+- **Configurable Dimensions**: Set via `EMBEDDING_DIMENSION` env var or request parameter
+- **Model-Sensitive**: Different models produce different embeddings for same input
+- **OpenAI Compatible**: Response shape matches OpenAI embeddings API exactly
+
+**Multiple Inputs Example:**
+```bash
+curl http://localhost:8001/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "text-embedding-ada-002",
+    "input": ["First text", "Second text", "Third text"]
+  }'
+```
+
+Returns multiple embeddings with indices 0, 1, 2 respectively.
+
+**Note**: The embedding vectors are mock data (deterministic pseudo-random values) that provide the correct shape and behavior for development, but are not real semantic embeddings.
 
 #### Client Configuration
 
@@ -284,9 +519,16 @@ const chatModel = new ChatOpenAI({
 let embeddings;
 
 if (process.env.DEV_MODE === 'true') {
-  embeddings = new FakeEmbeddings();
+  // Use the mock embeddings endpoint for development
+  embeddings = new OpenAIEmbeddings({
+    openAIApiKey: 'sk-mock-key', // Mock key for development
+    modelName: 'text-embedding-ada-002',
+    configuration: {
+      baseURL: process.env.DEV_BASE_URL, // http://localhost:8001
+    },
+  });
   console.log(
-    `WARNING: DEV MODE IS ON. Using fake embeddings and localhost mock server on ${process.env?.DEV_BASE_URL}`
+    `WARNING: DEV MODE IS ON. Using mock embeddings server on ${process.env?.DEV_BASE_URL}/v1/embeddings`
   );
 } else {
   embeddings = new OpenAIEmbeddings({
@@ -300,7 +542,7 @@ if (process.env.DEV_MODE === 'true') {
 ```bash
 # Development mode
 DEV_MODE=true
-DEV_BASE_URL=http://localhost:8001/chatgpt
+DEV_BASE_URL=http://localhost:8001
 
 # Production mode
 DEV_MODE=false
@@ -308,9 +550,30 @@ DEV_MODE=false
 
 Setting `DEV_MODE` to false will enable real requests to production LLM services.
 
+**Embeddings Integration**: When `DEV_MODE=true`, the OpenAIEmbeddings client will automatically use the mock `/v1/embeddings` endpoint, providing deterministic mock embeddings for development and testing.
+
 ## Supporting Different LLM Providers
 
-Add support for any LLM by creating request/response templates:
+Add support for any OpenAI-style API by creating request/response templates:
+
+### OpenAI-Style API Compatibility
+
+This mock server supports any LLM provider that uses the OpenAI chat completion API format, including:
+
+- **ChatGPT** (OpenAI)
+- **Grok** (xAI)
+- **Llama** (Meta)
+- **DeepSeek**
+- **Mistral**
+- **Claude** (Anthropic)
+- **Gemini** (Google)
+- And any other OpenAI-compatible API
+
+The default configuration uses the OpenAI chat completion format, which works with most modern LLM providers. You can customize the request/response templates to match specific provider requirements.
+
+### Creating Custom Templates
+
+If you need to support a provider with different request/response formats, create custom templates:
 
 ### Step 1: Create Request Template
 
@@ -375,7 +638,7 @@ VALIDATE_REQUESTS=true
 
 Access at: `http://localhost:8001/models/gemini-pro:generateContent`
 
-Any LLM framework that supports the new model (such as LangChain) can be updated to use this endpoint following the same pattern as the ChatGPT example above.
+Any LLM framework that supports OpenAI-style APIs (such as LangChain) can be updated to use this endpoint following the same pattern as the example above.
 
 ## Debugging
 
@@ -425,13 +688,19 @@ Debug mode displays:
    # Add domain-specific responses to src/data/data.json
    ```
 
-5. **Enable validation** before deploying to production:
+5. **Enable streaming** to test real-time response handling:
+   ```bash
+   STREAM=true
+   # Test your client's streaming response parsing
+   ```
+
+6. **Enable validation** before deploying to production:
    ```bash
    VALIDATE_REQUESTS=true
    LOG_REQUESTS=true
    ```
 
-6. **Test with production LLM** by setting `DEV_MODE=false`
+7. **Test with production LLM** by setting `DEV_MODE=false`
 
 ### Testing Different Scenarios
 
@@ -441,6 +710,7 @@ The mock server enables comprehensive testing:
 - **Timeout handling**: Set high delay values to test timeout logic
 - **Error handling**: Modify response templates to return errors
 - **Variable content**: Use lorem or multiple stored responses
+- **Streaming responses**: Enable `STREAM=true` to test real-time response parsing
 - **Offline development**: Work without internet connectivity
 - **Cost-free prototyping**: Test UI/UX without API charges
 
@@ -451,16 +721,17 @@ llm-mock/
 ├── src/
 │   ├── data/
 │   │   └── data.json              # Stored responses
-│   ├── request-templates/          # Request format templates
-│   │   ├── chatgpt_req.json
-│   │   └── gemini_req.json
-│   ├── response-templates/         # Response format templates
-│   │   ├── chatgpt_res.json
-│   │   └── gemini_res.json
+│   ├── request-templates/          # OpenAI-style request format templates
+│   │   ├── openai_req.json         # Default OpenAI chat completion format
+│   │   └── gemini_req.json         # Gemini-specific format example
+│   ├── response-templates/         # OpenAI-style response format templates
+│   │   ├── openai_res.json         # Default OpenAI chat completion response
+│   │   └── gemini_res.json         # Gemini-specific response example
 │   └── ...
 ├── .env                            # Configuration
-├── .env.chatgpt                    # ChatGPT preset
+├── .env.chatgpt                    # ChatGPT/OpenAI preset
 ├── .env.gemini                     # Gemini preset
+├── .env.streaming                  # Streaming mode preset
 ├── docker-compose.yml
 └── package.json
 ```
@@ -514,4 +785,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Topics:** mock-server, gemini, llm, chatgpt, langchain, local-development-environment
+**Topics:** mock-server, openai-api, llm, chat-completions, langchain, local-development-environment, streaming-api

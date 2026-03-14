@@ -1,0 +1,7 @@
+{
+	"provider": "chatgpt",
+	"description": "OpenAI Chat Completions style endpoint",
+	"exampleEndpoint": "chatgpt/chat/completions",
+	"fullExampleUrl": "http://localhost:8001/chatgpt/chat/completions"
+}
+

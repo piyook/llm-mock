@@ -68,7 +68,7 @@ describe('Mock LLM Spec for chatGPT', () => {
     process.env.LLM_URL_ENDPOINT = 'chatgpt/chat/completions';
 
     const requestData = {
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o',
         temperature: 1,
         n: 1,
         stream: false,
@@ -128,7 +128,7 @@ describe('Mock LLM Spec for chatGPT', () => {
         }).then((response) => {
             expect(response.status).to.eq(400);
             expect(response.body).to.contain(
-                'Invalid or Missing Request For this LLM Model: CHATGPT',
+                'Invalid or Missing Request For This LLM Model Template: OPENAI Model:gpt-4o. Please ensure your request adheres to the expected format - see localhost:8001/logs for details of missing parameters or formatting issues.',
             );
         });
     });
