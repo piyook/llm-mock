@@ -562,7 +562,7 @@ const chatModel = new ChatOpenAI({
     if (process.env.DEV_MODE === 'true') {
         embeddings = new FakeEmbeddingsAPI();
         console.log(
-            `WARNING: DEV MODE IS ON. Using fake embeddings API on http://localhost:8001/v1/embeddings and localhost mock server on ${process.env.DEV_BASE_URL}`,
+            `WARNING: DEV MODE IS ON. Using fake embeddings API on ${process.env.DEV_EMBEDDING_URL} and localhost mock server on ${process.env.DEV_BASE_URL}`,
         );
     } else {
         embeddings = new OpenAIEmbeddings({
@@ -577,7 +577,7 @@ then continue to chatbot implementation as normal ...
 ```bash
 # Development mode
 DEV_MODE=true
-DEV_BASE_URL=http://localhost:8001
+DEV_BASE_URL=http://localhost:8001/chatgpt
 DEV_EMBEDDING_URL=http://localhost:8001/v1/embeddings
 
 # Production mode
