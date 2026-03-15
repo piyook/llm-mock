@@ -495,13 +495,53 @@ Returns multiple embeddings with indices 0, 1, 2 respectively.
 
 **Note**: The embedding vectors are mock data (deterministic pseudo-random values) that provide the correct shape and behavior for development, but are not real semantic embeddings.
 
-#### Client Configuration
+### Client Configuration Example  
 
-Update your LangChain configuration to use the mock server in development:
+If using LangChain (for example), you can either use the inbuilt fake embeddings object:
+
+```javascript
+import { FakeEmbeddings } from 'langchain/embeddings/fake';
+```
+
+OR you can use the mock server embeddings during development work.  For example using code such as:
 
 ```javascript
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
-import { FakeEmbeddings } from 'langchain/embeddings/fake';
+
+// Custom embeddings class that calls the fake embedding API
+class FakeEmbeddingsAPI {
+    async embedDocuments(texts: string[]): Promise<number[][]> {
+        const embeddings = await Promise.all(
+            texts.map(text => this.embedQuery(text))
+        );
+        return embeddings;
+    }
+// Custom embeddings class that calls the fake embedding API
+    async embedQuery(text: string): Promise<number[]> {
+        try {
+            const response = await fetch(`${process.env.DEV_EMBEDDING_URL}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    input: text,
+                    model: 'text-embedding-ada-002'
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.data[0].embedding;
+        } catch (error) {
+            console.error('Error calling fake embedding API:', error);
+            throw new Error(`Failed to get embeddings from fake API: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+}
 
 // Configure model with conditional baseURL
 const chatModel = new ChatOpenAI({
@@ -515,34 +555,30 @@ const chatModel = new ChatOpenAI({
       : {},
 });
 
-// Configure embeddings
-let embeddings;
+// Create embeddings object and use a fake one if dev mode is set to true to prevent cost of using OpenAI
 
-if (process.env.DEV_MODE === 'true') {
-  // Use the mock embeddings endpoint for development
-  embeddings = new OpenAIEmbeddings({
-    openAIApiKey: 'sk-mock-key', // Mock key for development
-    modelName: 'text-embedding-ada-002',
-    configuration: {
-      baseURL: process.env.DEV_BASE_URL, // http://localhost:8001
-    },
-  });
-  console.log(
-    `WARNING: DEV MODE IS ON. Using mock embeddings server on ${process.env?.DEV_BASE_URL}/v1/embeddings`
-  );
-} else {
-  embeddings = new OpenAIEmbeddings({
-    openAIApiKey: process.env.OPENAI_API_KEY,
-  });
-}
+    let embeddings;
+
+    if (process.env.DEV_MODE === 'true') {
+        embeddings = new FakeEmbeddingsAPI();
+        console.log(
+            `WARNING: DEV MODE IS ON. Using fake embeddings API on ${process.env.DEV_EMBEDDING_URL} and localhost mock server on ${process.env.DEV_BASE_URL}`,
+        );
+    } else {
+        embeddings = new OpenAIEmbeddings({
+            openAIApiKey: process.env.OPENAI_API_KEY,
+        });
+    }
 ```
+then continue to chatbot implementation as normal ...
 
 #### Environment Variables
 
 ```bash
 # Development mode
 DEV_MODE=true
-DEV_BASE_URL=http://localhost:8001
+DEV_BASE_URL=http://localhost:8001/chatgpt
+DEV_EMBEDDING_URL=http://localhost:8001/v1/embeddings
 
 # Production mode
 DEV_MODE=false
