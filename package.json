@@ -35,7 +35,7 @@
 		"@types/chai-json-schema": "^1.4.10",
 		"@types/node": "^25.5.0",
 		"chai-json-schema": "^1.5.1",
-		"fastify": "^5.8.2",
+		"fastify": "^5.8.3",
 		"pretty-print-json": "^3.0.7",
 		"tsx": "^4.21.0",
 		"typescript": "^5.9.3",
