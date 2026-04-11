@@ -16,8 +16,8 @@
 		"pretty": "prettier 'src/**/*.{js,jsx,ts,tsx,css,scss,md}' --check",
 		"pretty-fix": "prettier 'src/**/*.{js,jsx,ts,tsx,css,scss,md}' --write",
 		"test:unit": "vitest run",
-		"torch": "torch",
-		"torch:test": "torch --test",
+		"torch": "torch-it",
+		"torch:test": "torch-it --test",
 		"cypress:open": "cypress open",
 		"serve:chatgpt": "dotenvx run -f .env.chatgpt -- tsx watch ./src/server.ts",
 		"serve:gemini": "dotenvx run -f .env.gemini -- tsx watch ./src/server.ts",
@@ -51,8 +51,8 @@
 		"lint-staged": "^16.4.0",
 		"oxlint": "^1.59.0",
 		"prettier": "3.8.2",
-		"start-server-and-test": "^3.0.0",
-		"torch-it": "^0.2.1",
+		"start-server-and-test": "^3.0.2",
+		"torch-it": "^2.0.0",
 		"validate-branch-name": "^1.3.2"
 	},
 	"lint-staged": {
