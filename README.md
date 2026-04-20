@@ -112,7 +112,7 @@ npm stop
 npm run rebuild
 
 # Complete cleanup (removes node_modules, caches, and all Docker resources)
-npm run nuke
+npm run torch
 ```
 
 ### Running Locally
@@ -801,7 +801,7 @@ SERVER_PORT=8002
 **Docker issues:**
 ```bash
 # Complete cleanup and rebuild
-npm run nuke
+npm run torch
 npm install
 npm start
 ```
