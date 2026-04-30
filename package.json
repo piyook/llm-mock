@@ -1,6 +1,6 @@
 {
 	"name": "llmock",
-	"version": "0.2.1",
+	"version": "0.2.2",
 	"description": "A configurable mock LLM API server for testing and development",
 	"main": "./src/server.ts",
 	"type": "module",
