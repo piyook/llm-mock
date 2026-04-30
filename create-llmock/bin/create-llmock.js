@@ -135,7 +135,7 @@ async function createRequestsAndResponses(targetDir) {
     try {
       const content = await fs.readFile(templatePath, 'utf-8');
       await fs.writeFile(targetPath, content);
-    } catch (error) {
+    } catch {
       // If template doesn't exist, create a basic example
       if (example.dir === 'requests') {
         const basicRequest = createBasicRequest(example.file);
