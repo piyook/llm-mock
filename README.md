@@ -8,10 +8,11 @@
 ## Table of Contents
 
 - [Overview](#overview)
-- [Why Use LLM Mock?](#why-use-llmock)
+- [Why Use LLM Mock?](#why-use-llm)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Project Scaffolding](#project-scaffolding)
 - [Server Status Dashboard](#server-status-dashboard)
 - [Configuration](#configuration)
   - [Environment Variables](#environment-variables)
@@ -79,6 +80,28 @@ Adapted from the [mock-api-framework-template](https://github.com/piyook/mock-ap
 - npm or compatible package manager
 
 ## Installation
+
+### Option 1: Create a New Project (Recommended)
+
+Create a new LLMock project with our scaffolding tool:
+
+```bash
+# Create a new project
+npm create llmock@latest my-project
+
+# Navigate to your project
+cd my-project
+
+# Install dependencies
+npm install
+
+# Start the mock server
+npm run llmock:start
+```
+
+This creates a complete project structure with configuration files and example templates.
+
+### Option 2: Install to Existing Project
 
 Install the package globally or locally in your project:
 
@@ -200,6 +223,76 @@ llmock start --port=3000 --debug=true
 - **embeddings**: Optimized for embeddings testing with minimal delays
 
 This starts the mock server locally with the built-in web dashboard.
+
+## Project Scaffolding
+
+The `create-llmock` scaffolding tool provides the fastest way to set up a new LLMock project with all necessary files and configuration.
+
+### Quick Project Setup
+
+```bash
+# Create a new project
+npm create llmock@latest my-project
+
+# Navigate to your project
+cd my-project
+
+# Install dependencies
+npm install
+
+# Start the mock server
+npm run llmock:start
+```
+
+### What's Included
+
+The scaffolding tool creates a complete project structure:
+
+```
+my-project/
+├── package.json          # Dependencies and npm scripts
+├── .llmockrc.json        # LLMock configuration
+├── README.md            # Project documentation
+├── requests/            # Request templates
+│   ├── openai-chat.json
+│   └── gemini-chat.json
+└── responses/           # Response templates
+    ├── openai-chat-response.json
+    └── gemini-chat-response.json
+```
+
+### Available NPM Scripts
+
+The generated project includes convenient npm scripts:
+
+- `npm run llmock:start` - Start the LLMock server
+- `npm run llmock:stop` - Stop the LLMock server
+- `npm run llmock:chatgpt` - Run with ChatGPT model
+- `npm run llmock:gemini` - Run with Gemini model
+- `npm run llmock:streaming` - Run with streaming responses
+- `npm run llmock:embeddings` - Run with embeddings model
+
+### Customization
+
+After scaffolding, you can:
+
+1. **Edit configuration** in `.llmockrc.json`
+2. **Modify request templates** in the `requests/` directory
+3. **Update response templates** in the `responses/` directory
+4. **Add new models** by creating additional template files
+
+### Alternative Usage
+
+You can also use the scaffolding tool directly:
+
+```bash
+# Using npx
+npx create-llmock my-project
+
+# Or install globally first
+npm install -g create-llmock
+create-llmock my-project
+```
 
 ## Server Status Dashboard   
 

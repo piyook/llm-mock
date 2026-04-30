@@ -1,0 +1,37 @@
+{
+  "server": {
+    "host": "localhost",
+    "port": 3000
+  },
+  "logging": {
+    "enabled": true,
+    "level": "info",
+    "file": "logs/llmock.log"
+  },
+  "delay": {
+    "enabled": false,
+    "min": 100,
+    "max": 500
+  },
+  "endpoints": {
+    "openai": {
+      "enabled": true,
+      "path": "/v1/chat/completions",
+      "method": "POST"
+    },
+    "gemini": {
+      "enabled": true,
+      "path": "/v1/models/gemini-pro:generateContent",
+      "method": "POST"
+    },
+    "embeddings": {
+      "enabled": true,
+      "path": "/v1/embeddings",
+      "method": "POST"
+    }
+  },
+  "directories": {
+    "requests": "./requests",
+    "responses": "./responses"
+  }
+}

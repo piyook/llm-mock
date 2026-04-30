@@ -1,0 +1,24 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "version": "1.0.0",
+  "description": "LLMock project for testing LLM APIs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "llmock:start": "llmock start",
+    "llmock:stop": "llmock stop",
+    "llmock:chatgpt": "llmock --model=chatgpt",
+    "llmock:gemini": "llmock --model=gemini",
+    "llmock:streaming": "llmock --model=streaming",
+    "llmock:embeddings": "llmock --model=embeddings"
+  },
+  "dependencies": {
+    "llmock": "^0.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
