@@ -108,46 +108,84 @@ The framework includes several pre-configured model presets:
 
 #### Using CLI (Recommended)
 
-Start with default model (chatgpt):
+The LLM Mock Server can be used as an npm package that works both locally and globally. When installed globally, it provides sensible defaults and works without any configuration file.
+
+##### Installation
 
 ```bash
-npm run llm-mock
+# Install globally
+npm install -g llm-mock
+
+# Install locally in your project
+npm install llm-mock
 ```
 
-Start with specific model:
+##### Basic Usage
 
 ```bash
-npm run llm-mock -- --model=gemini
-npm run llm-mock -- --model=streaming
-npm run llm-mock -- --model=embeddings
+# Start with default settings (chatgpt model, port 8001)
+llm-mock
+
+# Use specific model preset
+llm-mock --model=gemini
+llm-mock --model=streaming
+llm-mock --model=embeddings
 ```
 
-#### Using NPM Scripts
+##### Command Line Options
+
+All options support both `--key=value` and `--key value` formats:
 
 ```bash
-# Start with chatgpt model
-npm run serve:chatgpt
+# Server Configuration
+llm-mock --port=3000 --host=localhost
+llm-mock --endpoint=custom/path
 
-# Start with gemini model
-npm run serve:gemini
+# Model Settings
+llm-mock --responseType=static --maxLoremParas=12
 
-# Start with streaming enabled
-npm run serve:streaming
+# Feature Flags
+llm-mock --debug=true --stream=true
+llm-mock --validateRequests=false --logRequests=true
 
-# Start optimized for embeddings
-npm run serve:embeddings
+# Response Timing
+llm-mock --delayMin=1000 --delayMax=2000
 
-# Development mode (chatgpt model)
+# Embeddings
+llm-mock --embeddings=true --embeddingDimensions=256
+```
+
+##### Help and Configuration
+
+```bash
+# Show all available options
+llm-mock --help
+
+# Show current configuration including custom settings
+llm-mock --config
+
+# Combine multiple options
+llm-mock --model=gemini --port=3000 --debug=true --stream=true
+```
+
+##### Local Development
+
+When developing locally or when a `.llm-mock-rc.json` file is present:
+
+```bash
+# Use configuration file with CLI overrides
+npm run llm-mock -- --port=3000 --debug=true
+
+# Development mode with hot reload
 npm run dev
 ```
 
-#### Running Locally
+#### Available Model Presets
 
-Run directly on your machine:
-
-```bash
-npm run dev
-```
+- **chatgpt**: OpenAI ChatGPT-style API (default)
+- **gemini**: Google Gemini API format  
+- **streaming**: OpenAI-style with streaming responses enabled
+- **embeddings**: Optimized for embeddings testing with minimal delays
 
 This starts the mock server locally. For details on the Svelte-based dashboard and UI development workflow, see `UI-Dev.md`.
 
@@ -179,6 +217,16 @@ Once the server is running, navigate to **`http://localhost:8001`** to access th
 3. **Health Check**: `http://localhost:8001/ping` - Simple server status check
 
 The dashboard updates automatically every 2 seconds to reflect real-time changes in server configuration and status.
+
+## Request Logging
+
+When logging is enabled (`--logRequests=true`), API requests are automatically saved to your system's standard log location:
+
+- **Windows**: `C:\Users\{name}\AppData\Local\llm-mock-nodejs\Log\`
+- **macOS**: `~/Library/Logs/llm-mock-nodejs/`
+- **Linux**: `~/.local/share/llm-mock-nodejs/log/`
+
+View logs in real-time at `http://localhost:8001/logs` or find the `api_request_log.json` file in the locations above.
 
 ## Configuration
 

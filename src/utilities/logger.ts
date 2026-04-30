@@ -1,10 +1,20 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import envPaths from 'env-paths';
 import type { FastifyRequest } from 'fastify';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Get OS-appropriate log directory
+const paths = envPaths('llm-mock');
+const logFolder = paths.log;
+
+// Ensure log directory exists
+if (!fs.existsSync(logFolder)) {
+	fs.mkdirSync(logFolder, { recursive: true });
+}
 
 export default function logger(
 	logItem: FastifyRequest,
@@ -14,7 +24,6 @@ export default function logger(
 ) {
 	if (process.env?.LOG_REQUESTS?.toUpperCase() !== 'ON') return;
 
-	const logFolder = `${__dirname}/../logs`;
 	const logPath = path.join(logFolder, 'api_request_log.json');
 
 	// Convert the object to a string

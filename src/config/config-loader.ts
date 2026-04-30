@@ -84,31 +84,31 @@ export function setEnvironmentFromConfig(modelName?: string): void {
 	const modelConfig = getModelConfig(modelName);
 	const config = loadConfig();
 
-	// Server settings
-	process.env.SERVER_PORT = config.server.port.toString();
-	process.env.LLM_URL_ENDPOINT = modelConfig.endpoint;
+	// Server settings - only set if not already set by CLI
+	process.env.SERVER_PORT = process.env.SERVER_PORT || config.server.port.toString();
+	process.env.LLM_URL_ENDPOINT = process.env.LLM_URL_ENDPOINT || modelConfig.endpoint;
 
 	// LLM settings
-	process.env.LLM_NAME = modelConfig.name;
-	process.env.LLM_MODEL = modelConfig.model;
-	process.env.MOCK_LLM_RESPONSE_TYPE = modelConfig.responseType;
-	process.env.MAX_LOREM_PARAS = modelConfig.maxLoremParas.toString();
+	process.env.LLM_NAME = process.env.LLM_NAME || modelConfig.name;
+	process.env.LLM_MODEL = process.env.LLM_MODEL || modelConfig.model;
+	process.env.MOCK_LLM_RESPONSE_TYPE = process.env.MOCK_LLM_RESPONSE_TYPE || modelConfig.responseType;
+	process.env.MAX_LOREM_PARAS = process.env.MAX_LOREM_PARAS || modelConfig.maxLoremParas.toString();
 
-	// Feature flags
-	process.env.VALIDATE_REQUESTS = modelConfig.validateRequests ? 'ON' : 'OFF';
-	process.env.LOG_REQUESTS = modelConfig.logRequests ? 'ON' : 'OFF';
-	process.env.DEBUG = modelConfig.debug ? '*' : 'OFF';
-	process.env.STREAM = modelConfig.stream ? 'true' : 'false';
+	// Feature flags - only set if not already set by CLI
+	process.env.VALIDATE_REQUESTS = process.env.VALIDATE_REQUESTS || (modelConfig.validateRequests ? 'ON' : 'OFF');
+	process.env.LOG_REQUESTS = process.env.LOG_REQUESTS || (modelConfig.logRequests ? 'ON' : 'OFF');
+	process.env.DEBUG = process.env.DEBUG || (modelConfig.debug ? '*' : 'OFF');
+	process.env.STREAM = process.env.STREAM || (modelConfig.stream ? 'true' : 'false');
 
-	// Response delays
-	process.env.RESPONSE_DELAY_MIN = modelConfig.responseDelay.min.toString();
-	process.env.RESPONSE_DELAY_MAX = modelConfig.responseDelay.max.toString();
+	// Response delays - only set if not already set by CLI
+	process.env.RESPONSE_DELAY_MIN = process.env.RESPONSE_DELAY_MIN || modelConfig.responseDelay.min.toString();
+	process.env.RESPONSE_DELAY_MAX = process.env.RESPONSE_DELAY_MAX || modelConfig.responseDelay.max.toString();
 
-	// Embeddings
-	process.env.ENABLE_EMBEDDINGS_MOCK = modelConfig.embeddings.enabled
+	// Embeddings - only set if not already set by CLI
+	process.env.ENABLE_EMBEDDINGS_MOCK = process.env.ENABLE_EMBEDDINGS_MOCK || (modelConfig.embeddings.enabled
 		? 'true'
-		: 'false';
-	process.env.EMBEDDING_DIMENSION =
+		: 'false');
+	process.env.EMBEDDING_DIMENSION = process.env.EMBEDDING_DIMENSION ||
 		modelConfig.embeddings.dimensions.toString();
 }
 
