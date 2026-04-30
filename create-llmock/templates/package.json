@@ -1,6 +1,6 @@
 {
   "name": "{{PROJECT_NAME}}",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "LLMock project for testing LLM APIs",
   "private": true,
   "type": "module",
@@ -10,10 +10,11 @@
     "llmock:chatgpt": "llmock --model=chatgpt",
     "llmock:gemini": "llmock --model=gemini",
     "llmock:streaming": "llmock --model=streaming",
-    "llmock:embeddings": "llmock --model=embeddings"
+    "llmock:embeddings": "llmock --model=embeddings",
+    "compile-ui": "npm --prefix ../ui run build"
   },
   "dependencies": {
-    "llmock": "^0.3.2"
+    "llmock": "^0.3.3"
   },
   "devDependencies": {
     "@types/node": "^20.0.0"

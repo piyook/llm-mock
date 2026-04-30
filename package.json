@@ -1,6 +1,6 @@
 {
 	"name": "llmock",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"description": "A configurable mock LLM API server for testing and development",
 	"main": "./src/server.ts",
 	"type": "module",
@@ -47,6 +47,7 @@
 		"postinstall": "node scripts/postinstall.mjs",
     	"ui-dev": "npm --prefix ui run dev",
     	"compile-ui": "npm --prefix ui run build",
+    	"prep": "npm run compile-ui && npm pack",
     	"prepare": "husky || true",
     	"lint": "oxlint",
     	"lint-fix": "oxlint --fix",
