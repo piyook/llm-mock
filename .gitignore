@@ -134,3 +134,6 @@ scripts/dev-*
 # Backup files
 *.bak
 *.backup
+
+# local trial folders
+trial/*

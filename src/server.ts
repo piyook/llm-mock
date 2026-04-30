@@ -10,8 +10,10 @@ import {
 	loadConfig,
 } from './config/config-loader.js';
 
-// Initialize configuration from .llm-mock-rc.json
-const config = loadConfig();
+// Initialize configuration from .llmockrc.json
+// Use config path from CLI if available, otherwise look in current working directory
+const configPath = process.env.CONFIG_PATH;
+const config = loadConfig(configPath);
 const modelName = process.env.LLM_MODEL_NAME || config.defaultModel;
 setEnvironmentFromConfig(modelName);
 

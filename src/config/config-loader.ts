@@ -44,7 +44,7 @@ export function loadConfig(configPath?: string): LlmMockConfig {
 		return configCache;
 	}
 
-	const path = configPath || resolve(process.cwd(), '.llm-mock-rc.json');
+	const path = configPath || resolve(process.cwd(), '.llmockrc.json');
 
 	if (!existsSync(path)) {
 		throw new Error(`Configuration file not found: ${path}`);

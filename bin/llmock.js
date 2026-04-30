@@ -261,7 +261,7 @@ function getDefaultConfig() {
     },
     server: {
       port: 8001,
-      host: "0.0.0.0"
+      host: "127.0.0.1"
     }
   };
 }
@@ -269,7 +269,7 @@ function getDefaultConfig() {
 // Load configuration
 async function loadConfig() {
   let config;
-  let configPath = resolve(process.cwd(), '.llm-mock-rc.json');
+  let configPath = resolve(process.cwd(), '.llmockrc.json');
   
   // Try to load local config file first
   if (existsSync(configPath)) {
@@ -277,13 +277,13 @@ async function loadConfig() {
       const fs = await import('fs');
       config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
     } catch (error) {
-      console.error('Error parsing .llm-mock-rc.json:', error.message);
+      console.error('Error parsing .llmockrc.json:', error.message);
       process.exit(1);
     }
   } else {
     // Use default configuration for global installation
     config = getDefaultConfig();
-    console.log('Using default configuration (no .llm-mock-rc.json found)');
+    console.log('Using default configuration (no .llmockrc.json found)');
   }
   
   // Validate model exists
@@ -297,12 +297,13 @@ async function loadConfig() {
 }
 
 // Set environment variables based on configuration
-function setEnvironmentVariables(config, modelName) {
+function setEnvironmentVariables(config, modelName, configPath) {
   const modelConfig = config.models[modelName];
   const serverConfig = config.server;
 
-  // Pass the selected model name to the server
+  // Pass the selected model name and config path to the server
   process.env.LLM_MODEL_NAME = modelName;
+  process.env.CONFIG_PATH = configPath;
 
   // Server settings (with custom overrides)
   process.env.SERVER_PORT = customSettings.port || serverConfig.port.toString();
@@ -359,7 +360,8 @@ async function main() {
     // Handle start command (default)
     if (command === 'start') {
       const { config, modelName: selectedModel } = await loadConfig();
-      setEnvironmentVariables(config, selectedModel);
+      const configPath = resolve(process.cwd(), '.llmockrc.json');
+      setEnvironmentVariables(config, selectedModel, configPath);
     
       console.log(`Starting LLM Mock Server with model: ${selectedModel}`);
       console.log(`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);

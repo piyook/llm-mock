@@ -94,7 +94,7 @@ npm install llmock
 
 ### Configuration System
 
-The LLM Mock Framework uses a centralized configuration file `.llm-mock-rc.json` to manage all model presets and settings.
+The LLM Mock Framework uses a centralized configuration file `.llmockrc.json` to manage all model presets and settings.
 
 #### Available Models
 
@@ -185,7 +185,7 @@ llmock start --model=gemini --port=3000 --debug=true --stream=true
 
 ##### Configuration File
 
-For advanced configuration, you can create a `.llmock-rc.json` file in your project directory:
+For advanced configuration, you can create a `.llmockrc.json` file in your project directory:
 
 ```bash
 # Use configuration file with CLI overrides
@@ -247,9 +247,9 @@ View logs in real-time at `http://localhost:8001/logs` or find the `api_request_
 
 ## Configuration
 
-### Configuration File (.llmock-rc.json)
+### Configuration File (.llmockrc.json)
 
-The LLM Mock Framework uses a centralized configuration file `.llmock-rc.json` to manage all settings and model presets. This approach replaces the previous multiple `.env` files system.
+The LLM Mock Framework uses a centralized configuration file `.llmockrc.json` to manage all settings and model presets.
 
 #### Configuration Structure
 
@@ -804,11 +804,30 @@ The default configuration uses the OpenAI chat completion format, which works wi
 
 ### Creating Custom Templates
 
-If you need to support a provider with different request/response formats, create custom templates:
+The LLM Mock Framework automatically searches for templates in two locations:
+1. **Current working directory** (where you run `llmock`) - `./request-templates/` and `./response-templates/`
+2. **Default source directory** - `src/request-templates/` and `src/response-templates/`
+
+This allows you to create project-specific templates without modifying the core framework.
+
+#### Local Template Setup (Recommended)
+
+Create custom templates in your project directory:
+
+```
+your-project/
+├── .llmockrc.json           # Your configuration
+├── request-templates/       # Custom request templates
+│   ├── mymodel_req.json
+│   └── another_req.json
+└── response-templates/      # Custom response templates
+    ├── mymodel_res.json
+    └── another_res.json
+```
 
 ### Step 1: Create Request Template
 
-Create `request-templates/<LLM_NAME>_req.json` with the expected request format:
+Create `request-templates/<LLM_NAME>_req.json` in your project directory with the expected request format:
 
 ```json
 {
@@ -824,7 +843,7 @@ Create `request-templates/<LLM_NAME>_req.json` with the expected request format:
 
 ### Step 2: Create Response Template
 
-Create `response-templates/<LLM_NAME>_res.json` with the response structure. Use `DYNAMIC_CONTENT_HERE` as a placeholder for generated content:
+Create `response-templates/<LLM_NAME>_res.json` in your project directory with the response structure. Use `DYNAMIC_CONTENT_HERE` as a placeholder for generated content:
 
 ```json
 {
@@ -847,14 +866,174 @@ Create `response-templates/<LLM_NAME>_res.json` with the response structure. Use
 
 The `DYNAMIC_CONTENT_HERE` placeholder is where lorem ipsum or stored responses will be injected into the response object.
 
-### Step 3: Configure Environment
+### Step 3: Configure Model
 
-Update `.env` with your LLM name and endpoint:
+Add your custom model to `.llmockrc.json`:
+
+```json
+{
+  "defaultModel": "mymodel",
+  "models": {
+    "mymodel": {
+      "name": "mymodel",
+      "model": "my-custom-model-v1",
+      "endpoint": "api/v1/chat/completions",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": true,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 1000,
+        "max": 2000
+      },
+      "embeddings": {
+        "enabled": true,
+        "dimensions": 128
+      }
+    }
+  },
+  "server": {
+    "port": 8001,
+    "host": "0.0.0.0"
+  }
+}
+```
+
+### Step 4: Start Server
+
+Run llmock from your project directory:
 
 ```bash
-LLM_URL_ENDPOINT=models/gemini-pro:generateContent
-LLM_NAME=gemini
-VALIDATE_REQUESTS=true
+# Start with your custom model
+llmock start --model=mymodel
+
+# Or use CLI overrides
+llmock start --model=mymodel --port=3000 --debug=true
+```
+
+### Complete Example: Custom Model Setup
+
+Here's a complete example of setting up a custom model called "myllm":
+
+#### Directory Structure:
+```
+trial/
+├── .llmockrc.json
+├── request-templates/
+│   └── myllm_req.json
+└── response-templates/
+    └── myllm_res.json
+```
+
+#### Configuration (.llmockrc.json):
+```json
+{
+  "defaultModel": "chatgpt",
+  "models": {
+    "chatgpt": { /* ... */ },
+    "myllm": {
+      "name": "myllm",
+      "model": "myllm-1-0",
+      "endpoint": "myllm/chat/completions",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": true,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 1000,
+        "max": 2000
+      },
+      "embeddings": {
+        "enabled": true,
+        "dimensions": 128
+      }
+    }
+  },
+  "server": {
+    "port": 8001,
+    "host": "0.0.0.0"
+  }
+}
+```
+
+#### Request Template (request-templates/myllm_req.json):
+```json
+[
+  {
+    "model": "myllm-1-0",
+    "max_tokens": 256,
+    "temperature": 1,
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Your message here"
+          }
+        ]
+      }
+    ],
+    "stream": false
+  }
+]
+```
+
+#### Response Template (response-templates/myllm_res.json):
+```json
+[
+  {
+    "id": "msg_01JABCDEFG23456789XYZ",
+    "type": "message",
+    "model": "myllm-3-5-sonnet-20240620",
+    "role": "assistant",
+    "created_at": "2024-06-20T12:34:56Z",
+    "usage": {
+      "input_tokens": 12,
+      "output_tokens": 99
+    },
+    "content": [
+      {
+        "type": "text",
+        "text": "DYNAMIC_CONTENT_HERE"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "stop_sequence": null
+  }
+]
+```
+
+#### Usage:
+```bash
+# Run from the trial/ directory
+cd trial
+llmock start --model=myllm
+
+# Make requests matching the template
+curl -N http://localhost:8001/chatgpt/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "myllm-3-5-sonnet-20240620",
+    "max_tokens": 256,
+    "temperature": 1,
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Hello!"
+          }
+        ]
+      }
+    ],
+    "stream": false
+  }'
 ```
 
 ### Example: Google Gemini
@@ -931,7 +1110,7 @@ The mock server enables comprehensive testing scenarios:
 The server can be configured using:
 
 1. **Command line options** - Quick overrides for common settings
-2. **Configuration file** - `.llmock-rc.json` for persistent settings
+2. **Configuration file** - `.llmockrc.json` for persistent settings
 3. **Environment variables** - For CI/CD and automation
 
 ### Quick Configuration Examples
@@ -956,13 +1135,13 @@ llmock start --port=3000 --host=localhost
 
 **Server not responding:**
 
-Check server is up and running on correct port configured in `.llmock-rc.json` E.g http://localhost:8001
+Check server is up and running on correct port configured in `.llmockrc.json` E.g http://localhost:8001
 
 ![LLM Mock Server Page](images/server-page-err.png)
 
 **Port already in use:**
 ```json
-// Change port in .llmock-rc.json
+// Change port in .llmockrc.json
 {
   "server": {
     "port": 8002

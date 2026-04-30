@@ -6,7 +6,7 @@ if (existsSync('ui') && existsSync('package.json')) {
   console.log(' Installing UI dependencies...');
   try {
     execSync('npm --prefix ui install', { stdio: 'inherit' });
-  } catch (error) {
+  } catch {
     console.log(' UI install failed, continuing...');
   }
 } else {
