@@ -19,9 +19,10 @@ for (const { start, spec } of suites) {
     await sleep(3000);
     cypress(spec);
   } catch (e) {
+    console.error(`>>> Suite FAILED: ${start}`, e.message);
     failed = true;
   } finally {
-    try { npmRun("llm-mock:stop"); } catch (_) { /* ignore stop errors */ }
+    try { npmRun("llm-mock:stop"); } catch { /* ignore stop errors */ }
   }
 }
 
