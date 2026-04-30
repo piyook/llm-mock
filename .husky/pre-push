@@ -3,4 +3,7 @@ npm run pretty
 npm run lint
 npm audit --omit=dev
 npm run test:unit
-npm run test:e2e
+npm run test:chatgpt
+npm run test:gemini
+npm run test:streaming
+npm run test:embeddings

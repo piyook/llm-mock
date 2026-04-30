@@ -66,4 +66,7 @@ jobs:
                   node-version: '20'
                   cache: 'npm'
             - run: npm ci
-            - run: npm run test:e2e
+            - run: npm run test:chatgpt
+            - run: npm run test:gemini
+            - run: npm run test:streaming
+            - run: npm run test:embeddings
