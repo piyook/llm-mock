@@ -133,6 +133,7 @@ llm-mock start --model=embeddings
 
 # Stop the server
 llm-mock stop
+llm-mock stop --port=3000  # Stop server on specific port
 
 # Show help
 llm-mock help
@@ -149,6 +150,10 @@ All options support both `--key=value` and `--key value` formats:
 # Server Configuration
 llm-mock start --port=3000 --host=localhost
 llm-mock start --endpoint=custom/path
+
+# Stop Command
+llm-mock stop --port=3000  # Stop server on specific port
+llm-mock stop --port 8080   # Alternative format
 
 # Model Settings
 llm-mock start --responseType=static --maxLoremParas=12
@@ -240,6 +245,7 @@ View logs in real-time at `http://localhost:8001/logs` or find the `api_request_
 **Quick Commands:**
 - `llm-mock start --logRequests=true` - Start server with logging enabled
 - `llm-mock stop` - Stop the server
+- `llm-mock stop --port=3000` - Stop server on specific port
 
 ## Configuration
 

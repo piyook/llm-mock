@@ -14,6 +14,7 @@ let modelName = 'chatgpt'; // default model
 let showHelp = false;
 let showConfig = false;
 let customSettings = {};
+let stopPort = 8001; // default port for stop command
 
 // Parse command (first argument)
 if (args.length > 0) {
@@ -33,7 +34,7 @@ if (args.length > 0) {
 }
 
 // Parse options (remaining arguments)
-const optionsToParse = showHelp || showConfig || command === 'stop' ? [] : args.slice(1);
+const optionsToParse = showHelp || showConfig ? [] : args.slice(1);
 for (let i = 0; i < optionsToParse.length; i++) {
   const arg = optionsToParse[i];
   
@@ -41,6 +42,21 @@ for (let i = 0; i < optionsToParse.length; i++) {
     modelName = arg.split('=')[1];
   } else if (arg === '--model' && i + 1 < optionsToParse.length) {
     modelName = optionsToParse[i + 1];
+    i++; // Skip next argument
+  } else if (arg.startsWith('--port=')) {
+    const portValue = arg.split('=')[1];
+    if (command === 'stop') {
+      stopPort = parseInt(portValue, 10);
+    } else {
+      customSettings.port = portValue;
+    }
+  } else if (arg === '--port' && i + 1 < optionsToParse.length) {
+    const portValue = optionsToParse[i + 1];
+    if (command === 'stop') {
+      stopPort = parseInt(portValue, 10);
+    } else {
+      customSettings.port = portValue;
+    }
     i++; // Skip next argument
   } else if (arg.startsWith('--')) {
     // Parse --key=value format
@@ -94,7 +110,8 @@ EXAMPLES:
   llm-mock start --port=3000 --host=localhost # Custom server settings
   llm-mock start --debug=true --stream=true   # Enable debug and streaming
   llm-mock start --delayMin=1000 --delayMax=2000 # Custom response delays
-  llm-mock stop                               # Stop running server
+  llm-mock stop                               # Stop running server on default port
+  llm-mock stop --port=3000                   # Stop server on port 3000
   llm-mock config                              # Show current configuration
 
 For more information, visit: https://github.com/piyook/llm-mock
@@ -328,7 +345,7 @@ async function main() {
     
     // Handle stop command
     if (command === 'stop') {
-      await stopServer();
+      await stopServer(stopPort);
       return;
     }
     
