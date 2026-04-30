@@ -1,4 +1,4 @@
-import { readFileSync, existsSync, copyFileSync, unlinkSync } from 'fs';
+import { existsSync, copyFileSync, unlinkSync } from 'fs';
 import { resolve } from 'path';
 import {
 	setEnvironmentFromConfig,
@@ -21,7 +21,7 @@ export function setupTestConfig(modelName: string = 'chatgpt') {
 	}
 
 	// Load and apply test configuration
-	const config = loadConfig();
+	loadConfig();
 	setEnvironmentFromConfig(modelName);
 }
 
