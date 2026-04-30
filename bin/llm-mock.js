@@ -102,11 +102,13 @@ async function main() {
     
     // Handle process exit
     serverProcess.on('exit', (code) => {
+      console.log(`Server process exited with code: ${code}`);
       process.exit(code || 0);
     });
     
     serverProcess.on('error', (error) => {
       console.error('Failed to start server process:', error.message);
+      console.error('Full error:', error);
       process.exit(1);
     });
     

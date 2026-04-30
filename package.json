@@ -48,6 +48,8 @@
 	"devDependencies": {
 		"@commitlint/cli": "^20.5.0",
 		"@commitlint/config-conventional": "^20.5.0",
+		"@types/chai-json-schema": "^1.4.10",
+		"chai-json-schema": "^1.5.1",
 		"cypress": "^15.13.1",
 		"husky": "^9.1.7",
 		"lint-staged": "^16.4.0",

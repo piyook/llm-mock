@@ -55,6 +55,11 @@ try {
 	console.log(`USING MODEL: ${currentModel?.toUpperCase() || 'CHATGPT'}`);
 	console.log('*****************************************************');
 } catch (error) {
+	console.error('Server startup error:', error);
+	if (error instanceof Error) {
+		console.error('Error details:', error.message);
+		console.error('Error stack:', error.stack);
+	}
 	app.log.error(error);
 	process.exit(1);
 }
