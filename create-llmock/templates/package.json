@@ -1,6 +1,6 @@
 {
   "name": "{{PROJECT_NAME}}",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "LLMock project for testing LLM APIs",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "llmock:embeddings": "llmock --model=embeddings"
   },
   "dependencies": {
-    "llmock": "^0.3.0"
+    "llmock": "^0.3.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0"
