@@ -336,29 +336,55 @@ async function main() {
       console.log(`Starting LLM Mock Server with model: ${selectedModel}`);
       console.log(`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
       
-      // Import and start the server using tsx for TypeScript support
-      const { exec } = await import('child_process');
+      // Import and start the server using spawn for better process control
+      const { spawn } = await import('child_process');
       
       const serverPath = resolve(__dirname, '../src/server.ts');
       const packageDir = resolve(__dirname, '..');
       
-      // Use tsx to run TypeScript server
-      // Set cwd to package directory so TypeScript files can be found
-      const serverProcess = exec(`npx tsx "${serverPath}"`, {
-        stdio: 'inherit',
-        cwd: packageDir
-      });
+      // Use spawn to run TypeScript server with proper detachment
+      // On Windows, we need to handle this differently
+      const isWindows = process.platform === 'win32';
+      let serverProcess;
       
-      // Handle process exit
-      serverProcess.on('exit', (code) => {
-        console.log(`Server process exited with code: ${code}`);
-        process.exit(code || 0);
-      });
+      if (isWindows) {
+        // On Windows, use shell but properly escape the command
+        const escapedPath = serverPath.replace(/"/g, '\\"');
+        const command = `npx tsx "${escapedPath}"`;
+        serverProcess = spawn(command, [], {
+          cwd: packageDir,
+          stdio: 'ignore',
+          shell: true,
+          detached: false
+        });
+      } else {
+        // On Unix systems, use direct spawn without shell
+        serverProcess = spawn('npx', ['tsx', serverPath], {
+          cwd: packageDir,
+          stdio: 'pipe',
+          detached: true
+        });
+      }
+      
+      // Detach from the server process (non-Windows)
+      if (!isWindows) {
+        serverProcess.unref();
+      }
+      
+      // Show success message and exit CLI
+      console.log(`Server started successfully!`);
+      console.log(`Server is running at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
+      console.log(`Use 'llm-mock stop' to stop the server.`);
       
       serverProcess.on('error', (error) => {
         console.error('Failed to start server process:', error.message);
         process.exit(1);
       });
+      
+      // Give the server a moment to start, then exit CLI
+      setTimeout(() => {
+        process.exit(0);
+      }, 1000);
     }
     
   } catch (error) {
