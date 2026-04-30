@@ -32,11 +32,9 @@
 - [Supporting Different LLM Providers](#supporting-different-llm-providers)
   - [OpenAI-Style API Compatibility](#openai-style-api-compatibility)
   - [Creating Custom Templates](#creating-custom-templates)
-- [Debugging](#debugging)
-- [Development Workflow](#development-workflow)
-- [Project Structure](#project-structure)
+- [Usage Examples](#usage-examples)
+- [Configuration](#configuration-1)
 - [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
 - [License](#license)
 
 ## Overview
@@ -55,7 +53,7 @@ The Local Mock LLM API Framework is a lightweight, standalone server that simula
 
 ### Architecture
 
-The framework uses a template-based approach where request/response pairs are defined as JSON templates, allowing for easy customization and support for different LLM providers. The server is built with Fastify and provides a RESTful API that can be seamlessly integrated into existing development workflows.
+The framework uses a template-based approach where request/response pairs are defined as JSON templates, allowing for easy customization and support for different LLM providers. The server is built with Fastify and provides a RESTful API that can be seamlessly integrated into existing applications.
 
 Perfect for frontend developers, QA engineers, and teams looking to accelerate AI application development without the overhead of managing real LLM services.
 
@@ -82,12 +80,14 @@ Adapted from the [mock-api-framework-template](https://github.com/piyook/mock-ap
 
 ## Installation
 
-Clone the repository and install dependencies:
+Install the package globally or locally in your project:
 
 ```bash
-git clone https://github.com/piyook/llmock.git
-cd llmock
-npm install
+# Install globally for system-wide usage
+npm install -g llmock
+
+# Install locally in your project
+npm install llmock
 ```
 
 ## Quick Start
@@ -183,16 +183,13 @@ llmock config
 llmock start --model=gemini --port=3000 --debug=true --stream=true
 ```
 
-##### Local Development
+##### Configuration File
 
-When developing locally or when a `.llmock-rc.json` file is present:
+For advanced configuration, you can create a `.llmock-rc.json` file in your project directory:
 
 ```bash
 # Use configuration file with CLI overrides
 llmock start --port=3000 --debug=true
-
-# Development mode with hot reload
-npm run dev
 ```
 
 #### Available Model Presets
@@ -202,7 +199,7 @@ npm run dev
 - **streaming**: OpenAI-style with streaming responses enabled
 - **embeddings**: Optimized for embeddings testing with minimal delays
 
-This starts the mock server locally. For details on the Svelte-based dashboard and UI development workflow, see `UI-Dev.md`.
+This starts the mock server locally with the built-in web dashboard.
 
 ## Server Status Dashboard   
 
@@ -692,7 +689,7 @@ curl http://localhost:8001/v1/embeddings \
 
 Returns multiple embeddings with indices 0, 1, 2 respectively.
 
-**Note**: The embedding vectors are mock data (deterministic pseudo-random values) that provide the correct shape and behavior for development, but are not real semantic embeddings.
+**Note**: The embedding vectors are mock data (deterministic pseudo-random values) that provide the correct shape and behavior for testing, but are not real semantic embeddings.
 
 ### Client Configuration Example  
 
@@ -702,7 +699,7 @@ If using LangChain (for example), you can either use the inbuilt fake embeddings
 import { FakeEmbeddings } from 'langchain/embeddings/fake';
 ```
 
-OR you can use the mock server embeddings during development work.  For example using code such as:
+Alternatively, you can use the mock server embeddings for testing. For example:
 
 ```javascript
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
@@ -747,21 +744,21 @@ const chatModel = new ChatOpenAI({
   openAIApiKey: process.env.OPENAI_API_KEY,
   modelName: 'gpt-3.5-turbo',
   configuration:
-    process.env.DEV_MODE === 'true'
+    process.env.TEST_MODE === 'true'
       ? {
-          baseURL: process.env.DEV_BASE_URL, // http://localhost:8001/chatgpt
+          baseURL: process.env.TEST_BASE_URL, // http://localhost:8001/chatgpt
         }
       : {},
 });
 
-// Create embeddings object and use a fake one if dev mode is set to true to prevent cost of using OpenAI
+// Create embeddings object and use a fake one if test mode is set to true to prevent cost of using OpenAI
 
     let embeddings;
 
-    if (process.env.DEV_MODE === 'true') {
+    if (process.env.TEST_MODE === 'true') {
         embeddings = new FakeEmbeddingsAPI();
         console.log(
-            `WARNING: DEV MODE IS ON. Using fake embeddings API on ${process.env.DEV_EMBEDDING_URL} and localhost mock server on ${process.env.DEV_BASE_URL}`,
+            `WARNING: TEST MODE IS ON. Using fake embeddings API on ${process.env.TEST_EMBEDDING_URL} and localhost mock server on ${process.env.TEST_BASE_URL}`,
         );
     } else {
         embeddings = new OpenAIEmbeddings({
@@ -774,18 +771,17 @@ then continue to chatbot implementation as normal ...
 #### Environment Variables
 
 ```bash
-# Development mode
-DEV_MODE=true
-DEV_BASE_URL=http://localhost:8001/chatgpt
-DEV_EMBEDDING_URL=http://localhost:8001/v1/embeddings
+# Testing mode (using mock server)
+TEST_MODE=true
+TEST_BASE_URL=http://localhost:8001/chatgpt
+TEST_EMBEDDING_URL=http://localhost:8001/v1/embeddings
 
-# Production mode
-DEV_MODE=false
-```
+# Production mode (using real LLM services)
+TEST_MODE=false
 
-Setting `DEV_MODE` to false will enable real requests to production LLM services.
+Setting `TEST_MODE` to false will enable real requests to production LLM services.
 
-**Embeddings Integration**: When `DEV_MODE=true`, the OpenAIEmbeddings client will automatically use the mock `/v1/embeddings` endpoint, providing deterministic mock embeddings for development and testing.
+**Embeddings Integration**: When `TEST_MODE=true`, the OpenAIEmbeddings client will automatically use the mock `/v1/embeddings` endpoint, providing deterministic mock embeddings for testing.
 
 ## Supporting Different LLM Providers
 
@@ -863,7 +859,7 @@ VALIDATE_REQUESTS=true
 
 ### Example: Google Gemini
 
-Example configuration files for Gemini are included in the repository. Set up with:
+For Gemini support, configure your settings as follows:
 
 ```bash
 LLM_URL_ENDPOINT=models/gemini-pro:generateContent
@@ -894,87 +890,64 @@ Debug mode displays:
 - Timing information
 - Applied response delays
 
-## Development Workflow
+## Usage Examples
 
-### Recommended Development Flow
+### Basic Testing Workflow
 
-1. **Start with lorem responses and no delays** for rapid UI development:
-   ```json
-   {
-     "responseType": "lorem",
-     "responseDelay": { "min": 0, "max": 0 }
-   }
+1. **Start with instant responses** for rapid UI development:
+   ```bash
+   llmock start --delayMin=0 --delayMax=0
    ```
 
-2. **Add response delays** to test loading states and spinners:
-   ```json
-   {
-     "responseDelay": { "min": 500, "max": 1500 }
-   }
+2. **Add realistic delays** to test loading states:
+   ```bash
+   llmock start --delayMin=500 --delayMax=1500
    ```
 
-3. **Test with varied latency** to ensure robust error handling:
-   ```json
-   {
-     "responseDelay": { "min": 100, "max": 5000 }
-   }
+3. **Test streaming responses** for real-time applications:
+   ```bash
+   llmock start --model=streaming
    ```
 
-4. **Switch to stored responses** for realistic content testing:
-   ```json
-   {
-     "responseType": "stored"
-   }
-   ```
-   Add domain-specific responses to `src/data/data.json`
-
-5. **Enable streaming** to test real-time response handling:
-   ```json
-   {
-     "stream": true
-   }
-   ```
-   Test your client's streaming response parsing
-
-6. **Enable validation** before deploying to production:
-   ```json
-   {
-     "validateRequests": true,
-     "logRequests": true
-   }
+4. **Test embeddings** for vector search applications:
+   ```bash
+   llmock start --model=embeddings
    ```
 
-7. **Test with production LLM** by setting `DEV_MODE=false`
+### Advanced Testing
 
-### Testing Different Scenarios
-
-The mock server enables comprehensive testing:
+The mock server enables comprehensive testing scenarios:
 
 - **Loading indicators**: Use response delays to test loading states
 - **Timeout handling**: Set high delay values to test timeout logic
-- **Error handling**: Modify response templates to return errors
+- **Error handling**: Modify response templates to simulate errors
 - **Variable content**: Use lorem or multiple stored responses
-- **Streaming responses**: Enable `"stream": true` to test real-time response parsing
-- **Offline development**: Work without internet connectivity
+- **Streaming responses**: Enable streaming to test real-time response parsing
+- **Offline testing**: Work without internet connectivity
 - **Cost-free prototyping**: Test UI/UX without API charges
 
-## Project Structure
+## Configuration
 
-```
-llmock/
-|-- src/
-|   |-- data/
-|   |   |   -- data.json              # Stored responses
-|   |-- request-templates/          # OpenAI-style request format templates
-|   |   |-- openai_req.json         # Default OpenAI chat completion format
-|   |   |   -- gemini_req.json         # Gemini-specific format example
-|   |-- response-templates/         # OpenAI-style response format templates
-|   |   |-- openai_res.json         # Default OpenAI chat completion response
-|   |   |   -- gemini_res.json         # Gemini-specific response example
-|   |   -- ...
-|-- .llmock-rc.json               # Main configuration file
-|-- .llmock-rc.test.json          # Test configuration
-|-- package.json
+The server can be configured using:
+
+1. **Command line options** - Quick overrides for common settings
+2. **Configuration file** - `.llmock-rc.json` for persistent settings
+3. **Environment variables** - For CI/CD and automation
+
+### Quick Configuration Examples
+
+```bash
+# Fast responses for development
+llmock start --delayMin=0 --delayMax=0
+
+# Realistic API timing
+llmock start --delayMin=800 --delayMax=2500
+
+# Enable request logging
+llmock start --logRequests=true
+
+# Custom port and host
+llmock start --port=3000 --host=localhost
 ```
 
 ## Troubleshooting

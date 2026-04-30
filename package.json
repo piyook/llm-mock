@@ -1,6 +1,6 @@
 {
 	"name": "llmock",
-	"version": "0.1.0",
+	"version": "0.2.1",
 	"description": "A configurable mock LLM API server for testing and development",
 	"main": "./src/server.ts",
 	"type": "module",
@@ -35,6 +35,7 @@
 	"files": [
 		"bin/**/*",
 		"src/**/*",
+		"scripts/**/*",
 		"ui/dist/**/*",
 		"src/request-templates/**/*",
 		"src/response-templates/**/*",
