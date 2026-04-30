@@ -39,6 +39,71 @@ export interface LlmMockConfig {
 let configCache: LlmMockConfig | null = null;
 let currentModelCache: string | null = null;
 
+// Default configuration for global installation
+function getDefaultConfig(): LlmMockConfig {
+	return {
+		defaultModel: 'chatgpt',
+		models: {
+			chatgpt: {
+				name: 'openai',
+				model: 'gpt-4o',
+				endpoint: 'chatgpt/chat/completions',
+				responseType: 'lorem',
+				maxLoremParas: 8,
+				validateRequests: true,
+				logRequests: true,
+				debug: false,
+				stream: false,
+				responseDelay: { min: 3000, max: 5000 },
+				embeddings: { enabled: true, dimensions: 128 },
+			},
+			gemini: {
+				name: 'gemini',
+				model: 'gemini-pro',
+				endpoint: 'models/gemini-pro:generateContent',
+				responseType: 'lorem',
+				maxLoremParas: 8,
+				validateRequests: true,
+				logRequests: true,
+				debug: false,
+				stream: false,
+				responseDelay: { min: 3000, max: 5000 },
+				embeddings: { enabled: true, dimensions: 128 },
+			},
+			streaming: {
+				name: 'openai',
+				model: 'gpt-4o',
+				endpoint: 'chatgpt/chat/completions',
+				responseType: 'lorem',
+				maxLoremParas: 8,
+				validateRequests: true,
+				logRequests: true,
+				debug: false,
+				stream: true,
+				responseDelay: { min: 3000, max: 5000 },
+				embeddings: { enabled: true, dimensions: 128 },
+			},
+			embeddings: {
+				name: 'openai',
+				model: 'text-embedding-3-small',
+				endpoint: 'chatgpt/chat/completions',
+				responseType: 'lorem',
+				maxLoremParas: 8,
+				validateRequests: true,
+				logRequests: true,
+				debug: false,
+				stream: false,
+				responseDelay: { min: 0, max: 0 },
+				embeddings: { enabled: true, dimensions: 128 },
+			},
+		},
+		server: {
+			port: 8001,
+			host: '127.0.0.1',
+		},
+	};
+}
+
 export function loadConfig(configPath?: string): LlmMockConfig {
 	if (configCache) {
 		return configCache;
@@ -47,7 +112,8 @@ export function loadConfig(configPath?: string): LlmMockConfig {
 	const path = configPath || resolve(process.cwd(), '.llmockrc.json');
 
 	if (!existsSync(path)) {
-		throw new Error(`Configuration file not found: ${path}`);
+		// For global usage, provide default configuration when no config file exists
+		return getDefaultConfig();
 	}
 
 	try {
