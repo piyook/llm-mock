@@ -1,12 +1,15 @@
 /* eslint-disable  @typescript-eslint/naming-convention */
-import { expect, test, describe } from 'vitest';
+import { expect, test, describe, beforeEach, afterEach } from 'vitest';
 import type { FastifyRequest } from 'fastify';
 import { buildResponse } from '../../utilities/build-response.js';
+import { setTestEnvironmentVariables } from '../test-config-helper.js';
 
 describe('build response function works as expected', async () => {
+	beforeEach(() => {
+		setTestEnvironmentVariables();
+	});
+
 	test('provides correct response with correct request', async () => {
-		process.env.VALIDATE_REQUESTS = 'ON';
-		process.env.LOG_REQUESTS = 'OFF';
 		const _request = {
 			async json() {
 				return new Promise((resolve) => {

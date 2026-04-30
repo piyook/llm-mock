@@ -1,8 +1,11 @@
 {
 	"type": "module",
+	"bin": {
+		"llm-mock": "./bin/llm-mock.js"
+	},
 	"scripts": {
 		"predev": "npm run compile-ui",
-		"dev": "dotenvx run -f .env -- tsx watch ./src/server.ts",
+		"dev": "node bin/llm-mock.js --model=chatgpt",
 		"postinstall": "test -d ui && npm --prefix ui install || true",
 		"ui-dev": "npm --prefix ui run dev",
 		"compile-ui": "npm --prefix ui run build",
@@ -19,23 +22,22 @@
 		"torch": "torch-it",
 		"torch:test": "torch-it --test",
 		"cypress:open": "cypress open",
-		"serve:chatgpt": "dotenvx run -f .env.chatgpt -- tsx watch ./src/server.ts",
-		"serve:gemini": "dotenvx run -f .env.gemini -- tsx watch ./src/server.ts",
-		"serve:streaming": "dotenvx run -f .env.streaming -- tsx watch ./src/server.ts",
-		"serve:embeddings": "dotenvx run -f .env.embeddings -- tsx watch ./src/server.ts",
+		"serve:chatgpt": "node bin/llm-mock.js --model=chatgpt",
+		"serve:gemini": "node bin/llm-mock.js --model=gemini",
+		"serve:streaming": "node bin/llm-mock.js --model=streaming",
+		"serve:embeddings": "node bin/llm-mock.js --model=embeddings",
 		"test:chatgpt": "start-server-and-test serve:chatgpt tcp:8001 'cypress run --spec cypress/e2e/gpt-mock-spec.cy.ts'",
 		"test:gemini": "start-server-and-test serve:gemini tcp:8001 'cypress run --spec cypress/e2e/gemini-mock-spec.cy.ts'",
 		"test:streaming": "start-server-and-test serve:streaming tcp:8001 'cypress run --spec cypress/e2e/streaming-only-spec.cy.ts'",
 		"test:embeddings": "start-server-and-test serve:embeddings tcp:8001 'cypress run --spec cypress/e2e/embeddings-spec.cy.ts'",
 		"test:e2e": "npm run compile-ui && npm run test:chatgpt && npm run test:gemini && npm run test:streaming && npm run test:embeddings",
-		"validate-branch-name": "bash validate-branch-name.sh"
+		"validate-branch-name": "bash validate-branch-name.sh",
+		"llm-mock": "node bin/llm-mock.js",
+		"llm-mock:dev": "node bin/llm-mock.js --model=chatgpt"
 	},
 	"dependencies": {
-		"@dotenvx/dotenvx": "^1.61.0",
 		"@faker-js/faker": "^10.4.0",
-		"@types/chai-json-schema": "^1.4.10",
 		"@types/node": "^25.6.0",
-		"chai-json-schema": "^1.5.1",
 		"fastify": "^5.8.5",
 		"pretty-print-json": "^3.0.7",
 		"tsx": "^4.21.0",

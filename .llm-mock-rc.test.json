@@ -1,0 +1,47 @@
+{
+  "defaultModel": "chatgpt",
+  "models": {
+    "chatgpt": {
+      "name": "openai",
+      "model": "gpt-4o",
+      "endpoint": "chatgpt/chat/completions",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": false,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 0,
+        "max": 0
+      },
+      "embeddings": {
+        "enabled": true,
+        "dimensions": 128
+      }
+    },
+    "test": {
+      "name": "openai",
+      "model": "gpt-3.5-turbo",
+      "endpoint": "chatgpt/chat/completions",
+      "responseType": "lorem",
+      "maxLoremParas": 5,
+      "validateRequests": true,
+      "logRequests": false,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 100,
+        "max": 200
+      },
+      "embeddings": {
+        "enabled": true,
+        "dimensions": 64
+      }
+    }
+  },
+  "server": {
+    "port": 8001,
+    "host": "0.0.0.0"
+  }
+}

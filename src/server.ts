@@ -1,10 +1,15 @@
-import '@dotenvx/dotenvx';
 import fastify from 'fastify';
 import * as seeders from './seeders/index.js';
 import getApiRoutes from './utilities/file-scan.js';
 import serverPage from './utilities/server-page.js';
 import logPage from './utilities/log-page.js';
 import { dbLoadFromDisk } from './models/db.js';
+import { setEnvironmentFromConfig, getCurrentModel, loadConfig } from './config/config-loader.js';
+
+// Initialize configuration from .llm-mock-rc.json
+const config = loadConfig();
+const modelName = process.env.LLM_MODEL_NAME || config.defaultModel;
+setEnvironmentFromConfig(modelName);
 
 const app = fastify({ logger: false });
 
@@ -38,6 +43,7 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 try {
+	const currentModel = getCurrentModel();
 	await app.listen({
 		port: Number(process.env?.SERVER_PORT ?? 8000),
 		host: '0.0.0.0',
@@ -46,6 +52,7 @@ try {
 	console.log(
 		`SERVER UP AND RUNNING ON LOCALHOST:${process.env?.SERVER_PORT ?? 8000}`,
 	);
+	console.log(`USING MODEL: ${currentModel?.toUpperCase() || 'CHATGPT'}`);
 	console.log('*****************************************************');
 } catch (error) {
 	app.log.error(error);

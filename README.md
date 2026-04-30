@@ -92,7 +92,59 @@ npm install
 
 ## Quick Start
 
-### Using Docker (Recommended)
+### Configuration System
+
+The LLM Mock Framework now uses a centralized configuration file `.llm-mock-rc.json` to manage all model presets and settings. This replaces the previous multiple `.env` files approach.
+
+#### Available Models
+
+The framework includes several pre-configured model presets:
+
+- **chatgpt**: OpenAI ChatGPT-style API (default)
+- **gemini**: Google Gemini API format
+- **streaming**: OpenAI-style with streaming responses enabled
+- **embeddings**: Optimized for embeddings testing with minimal delays
+
+### Starting the Server
+
+#### Using CLI (Recommended)
+
+Start with default model (chatgpt):
+
+```bash
+node bin/llm-mock.js
+# or
+npm run llm-mock
+```
+
+Start with specific model:
+
+```bash
+node bin/llm-mock.js --model=gemini
+node bin/llm-mock.js --model=streaming
+node bin/llm-mock.js --model=embeddings
+```
+
+#### Using NPM Scripts
+
+```bash
+# Start with chatgpt model
+npm run serve:chatgpt
+
+# Start with gemini model
+npm run serve:gemini
+
+# Start with streaming enabled
+npm run serve:streaming
+
+# Start optimized for embeddings
+npm run serve:embeddings
+
+# Development mode (chatgpt model)
+npm run dev
+```
+
+#### Using Docker (Recommended)
 
 Start the server in Docker containers:
 
@@ -115,7 +167,7 @@ npm run rebuild
 npm run torch
 ```
 
-### Running Locally
+#### Running Locally
 
 Run directly on your machine without Docker:
 
@@ -156,69 +208,126 @@ The dashboard updates automatically every 2 seconds to reflect real-time changes
 
 ## Configuration
 
-### Environment Variables
+### Configuration File (.llm-mock-rc.json)
 
-Configure the mock server by editing the `.env` file:
+The LLM Mock Framework uses a centralized configuration file `.llm-mock-rc.json` to manage all settings and model presets. This approach replaces the previous multiple `.env` files system.
 
-#### Server Settings
+#### Configuration Structure
 
-```bash
-# Server port (default: 8001)
-SERVER_PORT=8001
-
-# API URL prefix (default: 'api')
-# Set to blank for no prefix, or customize as needed
-LLM_URL_ENDPOINT=api
-
-# Debug mode - shows detailed request/response info in terminal
-DEBUG=*  # Set to FALSE to disable
+```json
+{
+  "defaultModel": "chatgpt",
+  "models": {
+    "chatgpt": {
+      "name": "openai",
+      "model": "gpt-4o",
+      "endpoint": "chatgpt/chat/completions",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": true,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 3000,
+        "max": 5000
+      },
+      "embeddings": {
+        "enabled": true,
+        "dimensions": 128
+      }
+    }
+  },
+  "server": {
+    "port": 8001,
+    "host": "0.0.0.0"
+  }
+}
 ```
 
-#### Response Configuration
+#### Configuration Options
+
+**Server Settings:**
+- `port`: Server port (default: 8001)
+- `host`: Server host (default: "0.0.0.0")
+
+**Model Settings:**
+- `name`: LLM provider name (used for template loading)
+- `model`: Model identifier (e.g., "gpt-4o", "gemini-pro")
+- `endpoint`: API endpoint path
+- `responseType`: "lorem" or "stored"
+- `maxLoremParas`: Maximum sentences for lorem ipsum responses
+- `validateRequests`: Enable request validation
+- `logRequests`: Enable request logging
+- `debug`: Enable debug logging
+- `stream`: Enable streaming responses
+- `responseDelay.min/max`: Response delay range in milliseconds
+- `embeddings.enabled`: Enable embeddings endpoint
+- `embeddings.dimensions`: Embedding vector dimensions
+
+#### Adding Custom Models
+
+You can add new model presets by extending the `models` object:
+
+```json
+{
+  "models": {
+    "my-custom-model": {
+      "name": "openai",
+      "model": "gpt-3.5-turbo",
+      "endpoint": "api/v1/chat/completions",
+      "responseType": "stored",
+      "maxLoremParas": 5,
+      "validateRequests": true,
+      "logRequests": false,
+      "debug": true,
+      "stream": false,
+      "responseDelay": {
+        "min": 1000,
+        "max": 2000
+      },
+      "embeddings": {
+        "enabled": false,
+        "dimensions": 64
+      }
+    }
+  }
+}
+```
+
+Then start the server with your custom model:
 
 ```bash
-# Response type: 'lorem' or 'stored'
-MOCK_LLM_RESPONSE_TYPE=lorem
-
-# Maximum sentences for lorem ipsum responses
-MAX_LOREM_PARAS=8
-
-# Streaming mode - enables OpenAI-style SSE streaming
-STREAM=false
-
-# Request validation
-VALIDATE_REQUESTS=true
-LOG_REQUESTS=true
+node bin/llm-mock.js --model=my-custom-model
 ```
 
 #### Embeddings Configuration
 
-Enable and configure the mock embeddings endpoint:
+Enable and configure the mock embeddings endpoint in your model configuration:
 
-```bash
-# Enable embeddings endpoint (default: true)
-ENABLE_EMBEDDINGS_MOCK=true
-
-# Default embedding dimensions (default: 128)
-EMBEDDING_DIMENSION=128
+```json
+{
+  "embeddings": {
+    "enabled": true,
+    "dimensions": 128
+  }
+}
 ```
 
 #### Streaming Responses
 
 Enable OpenAI-style Server-Sent Events (SSE) streaming for chat-completion responses:
 
-```bash
-# Enable streaming mode
-STREAM=true
-
-# Disable streaming (default - returns single JSON response)
-STREAM=false
+```json
+{
+  "stream": true
+}
 ```
 
 **How Streaming Works:**
 
-- **`STREAM=true`**: Returns OpenAI-style SSE stream with `chat.completion.chunk` events
-- **`STREAM=false`**: Returns standard single JSON response (existing behavior)
+- **`stream: true`**: Returns OpenAI-style SSE stream with `chat.completion.chunk` events
+- **`stream: false`**: Returns standard single JSON response (existing behavior)
 - The same endpoint URL is used in both modes - only the server-side response framing differs
 - Streaming uses the same response template structure as static mode for consistency
 
@@ -245,61 +354,93 @@ data: [DONE]
 
 Simulate realistic API response times to test how your application handles network latency, loading states, and timeouts:
 
-```bash
-# Minimum delay in milliseconds (default: 0)
-RESPONSE_DELAY_MIN=500
-
-# Maximum delay in milliseconds (default: 0)
-RESPONSE_DELAY_MAX=2000
+```json
+{
+  "responseDelay": {
+    "min": 500,
+    "max": 2000
+  }
+}
 ```
 
 **How Response Delays Work:**
 
-- The mock server randomly selects a delay between `RESPONSE_DELAY_MIN` and `RESPONSE_DELAY_MAX` for each request
-- Delays are applied to both GET and POST endpoints in the completions API
-- When both values are `0` or unset, responses are returned immediately (backward compatible with previous versions)
+- The mock server randomly selects a delay between `min` and `max` for each request
+- Delays are applied to both GET and POST endpoints in completions API
+- When both values are `0`, responses are returned immediately (backward compatible with previous versions)
 - Helps test loading indicators, timeout handling, and user experience with real-world latency
 
 **Delay Configuration Examples:**
 
-```bash
-# No delay - instant responses (default)
-RESPONSE_DELAY_MIN=0
-RESPONSE_DELAY_MAX=0
+```json
+// No delay - instant responses
+{
+  "responseDelay": {
+    "min": 0,
+    "max": 0
+  }
+}
 
-# Fast responses (for rapid development)
-RESPONSE_DELAY_MIN=100
-RESPONSE_DELAY_MAX=300
+// Fast responses (for rapid development)
+{
+  "responseDelay": {
+    "min": 100,
+    "max": 300
+  }
+}
 
-# Realistic production-like latency
-RESPONSE_DELAY_MIN=800
-RESPONSE_DELAY_MAX=2500
+// Realistic production-like latency
+{
+  "responseDelay": {
+    "min": 800,
+    "max": 2500
+  }
+}
 
-# Test slow network conditions
-RESPONSE_DELAY_MIN=3000
-RESPONSE_DELAY_MAX=8000
+// Test slow network conditions
+{
+  "responseDelay": {
+    "min": 3000,
+    "max": 8000
+  }
+}
 
-# Fixed delay (same min/max)
-RESPONSE_DELAY_MIN=1000
-RESPONSE_DELAY_MAX=1000
+// Fixed delay (same min/max)
+{
+  "responseDelay": {
+    "min": 1000,
+    "max": 1000
+  }
+}
 ```
 
 ### Custom API Paths
 
-You can customize endpoints this to match your LLM provider's path structure:
+You can customize endpoints in your model configuration to match your LLM provider's path structure:
 
-```bash
-# ChatGPT format: http://localhost:8001/chatgpt/chat/completions
-LLM_URL_ENDPOINT=chatgpt/chat/completions
-
+```json
+{
+  "endpoint": "chatgpt/chat/completions"
+}
 ```
 
-![LLM Mock Server Page](images/image2.png)
+**Example Configurations:**
 
-```bash
-# Gemini format: http://localhost:8001/models/gemini-pro:generateContent
-LLM_URL_ENDPOINT=models/gemini-pro:generateContent
+**ChatGPT Format:**
+```json
+{
+  "endpoint": "chatgpt/chat/completions"
+}
 ```
+Access at: `http://localhost:8001/chatgpt/chat/completions`
+
+**Gemini Format:**
+```json
+{
+  "endpoint": "models/gemini-pro:generateContent"
+}
+```
+Access at: `http://localhost:8001/models/gemini-pro:generateContent`
 
 ## Features
 
@@ -307,7 +448,7 @@ LLM_URL_ENDPOINT=models/gemini-pro:generateContent
 
 The mock server provides the following OpenAI-style endpoints:
 
-- **Chat Completions**: `/chatgpt/chat/completions` (configurable via `LLM_URL_ENDPOINT`)
+- **Chat Completions**: Configurable endpoint path (default: `/chatgpt/chat/completions`)
 - **Embeddings**: `/v1/embeddings` (OpenAI-compatible embeddings endpoint)
 
 View all available endpoints by visiting:
@@ -322,21 +463,23 @@ http://localhost:8001
 
 Generate random placeholder text for testing:
 
-```bash
-MOCK_LLM_RESPONSE_TYPE=lorem
-MAX_LOREM_PARAS=8
+```json
+{
+  "responseType": "lorem",
+  "maxLoremParas": 8
+}
 ```
 
 Generates up to 8 random sentences per response. Perfect for testing UI rendering with variable content lengths.
-
-https://github.com/user-attachments/assets/d36651ac-d7fa-41ad-b8d8-cd23812ae45a
 
 #### 2. Stored Responses
 
 Use predefined responses from `src/data/data.json`:
 
-```bash
-MOCK_LLM_RESPONSE_TYPE=stored
+```json
+{
+  "responseType": "stored"
+}
 ```
 
 Add your custom responses to the JSON file:
