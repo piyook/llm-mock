@@ -137,36 +137,47 @@ Available models: ${Object.keys(config.models).join(', ')}
 }
 
 // Stop running llm-mock server
-async function stopServer() {
+async function stopServer(port = 8001) {
   const { exec } = await import('child_process');
   
-  return new Promise((resolve, reject) => {
-    // Check if any node processes are running (simpler approach)
-    const checkCommand = process.platform === 'win32' 
-      ? 'tasklist /fi "imagename eq node.exe" /fo csv'
-      : 'ps aux | grep node | grep -v grep';
-    
-    exec(checkCommand, (error, stdout, _stderr) => {
+  const isWindows = process.platform === 'win32';
+
+  return new Promise((resolve) => {
+    const findCommand = isWindows
+      ? `netstat -ano | findstr :${port}`
+      : `lsof -ti tcp:${port}`;
+
+    exec(findCommand, (error, stdout) => {
       if (error || !stdout.trim()) {
-        console.log('No running llm-mock server found.');
+        console.log(`No running llm-mock server found on port ${port}.`);
         resolve();
         return;
       }
-      
-      // Kill all node processes (will stop llm-mock server)
-      const killCommand = process.platform === 'win32'
-        ? 'taskkill /F /IM node.exe'
-        : 'pkill -f node';
-      
-      exec(killCommand, (killError, _killStdout, _killStderr) => {
-        // Ignore "no process found" errors
-        if (killError && !(killError.message.includes('not found') || killError.message.includes('no process'))) {
-          console.error('Error stopping server:', killError.message);
-          reject(killError);
-          return;
-        }
-        
-        console.log('llm-mock server stopped successfully.');
+
+      let pids = [];
+
+      if (isWindows) {
+        pids = [...new Set(
+          stdout.trim().split('\n')
+            .map(line => line.trim().split(/\s+/).at(-1))
+            .filter(pid => pid && /^\d+$/.test(pid))
+        )];
+      } else {
+        pids = stdout.trim().split('\n').filter(Boolean);
+      }
+
+      if (pids.length === 0) {
+        console.log(`No process found on port ${port}.`);
+        resolve();
+        return;
+      }
+
+      const killCommand = isWindows
+        ? pids.map(pid => `taskkill /PID ${pid} /F`).join(' && ')
+        : `kill -9 ${pids.join(' ')}`;
+
+      exec(killCommand, () => {
+        console.log(`llm-mock server stopped successfully on port ${port}.`);
         resolve();
       });
     });
