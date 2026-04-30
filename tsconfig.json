@@ -107,8 +107,7 @@
 
         /* Completeness */
         // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
-        "skipLibCheck": true /* Skip type checking all .d.ts files. */,
-        "ignoreDeprecations": "6.0" /* Need due to CYPRESS issue - needs to be temporarily ignored until CYPRESS fixes the issue with TS6 compatibility. */
+        "skipLibCheck": true /* Skip type checking all .d.ts files. */
     },
     "include": ["./src/**/*", "**/*.ts"],
     "exclude": ["node_modules"]
