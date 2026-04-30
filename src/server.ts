@@ -4,7 +4,11 @@ import getApiRoutes from './utilities/file-scan.js';
 import serverPage from './utilities/server-page.js';
 import logPage from './utilities/log-page.js';
 import { dbLoadFromDisk } from './models/db.js';
-import { setEnvironmentFromConfig, getCurrentModel, loadConfig } from './config/config-loader.js';
+import {
+	setEnvironmentFromConfig,
+	getCurrentModel,
+	loadConfig,
+} from './config/config-loader.js';
 
 // Initialize configuration from .llm-mock-rc.json
 const config = loadConfig();

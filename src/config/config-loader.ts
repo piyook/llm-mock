@@ -2,127 +2,136 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
 export interface ResponseDelay {
-  min: number;
-  max: number;
+	min: number;
+	max: number;
 }
 
 export interface EmbeddingsConfig {
-  enabled: boolean;
-  dimensions: number;
+	enabled: boolean;
+	dimensions: number;
 }
 
 export interface ModelConfig {
-  name: string;
-  model: string;
-  endpoint: string;
-  responseType: 'lorem' | 'stored';
-  maxLoremParas: number;
-  validateRequests: boolean;
-  logRequests: boolean;
-  debug: boolean;
-  stream: boolean;
-  responseDelay: ResponseDelay;
-  embeddings: EmbeddingsConfig;
+	name: string;
+	model: string;
+	endpoint: string;
+	responseType: 'lorem' | 'stored';
+	maxLoremParas: number;
+	validateRequests: boolean;
+	logRequests: boolean;
+	debug: boolean;
+	stream: boolean;
+	responseDelay: ResponseDelay;
+	embeddings: EmbeddingsConfig;
 }
 
 export interface ServerConfig {
-  port: number;
-  host: string;
+	port: number;
+	host: string;
 }
 
 export interface LlmMockConfig {
-  defaultModel: string;
-  models: Record<string, ModelConfig>;
-  server: ServerConfig;
+	defaultModel: string;
+	models: Record<string, ModelConfig>;
+	server: ServerConfig;
 }
 
 let configCache: LlmMockConfig | null = null;
 let currentModelCache: string | null = null;
 
 export function loadConfig(configPath?: string): LlmMockConfig {
-  if (configCache) {
-    return configCache;
-  }
+	if (configCache) {
+		return configCache;
+	}
 
-  const path = configPath || resolve(process.cwd(), '.llm-mock-rc.json');
-  
-  if (!existsSync(path)) {
-    throw new Error(`Configuration file not found: ${path}`);
-  }
+	const path = configPath || resolve(process.cwd(), '.llm-mock-rc.json');
 
-  try {
-    const configData = readFileSync(path, 'utf8');
-    configCache = JSON.parse(configData) as LlmMockConfig;
-    return configCache;
-  } catch (error) {
-    throw new Error(`Failed to parse configuration file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
+	if (!existsSync(path)) {
+		throw new Error(`Configuration file not found: ${path}`);
+	}
+
+	try {
+		const configData = readFileSync(path, 'utf8');
+		configCache = JSON.parse(configData) as LlmMockConfig;
+		return configCache;
+	} catch (error) {
+		throw new Error(
+			`Failed to parse configuration file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+		);
+	}
 }
 
 export function getModelConfig(modelName?: string): ModelConfig {
-  const config = loadConfig();
-  const selectedModel = modelName || config.defaultModel || 'chatgpt';
-  
-  if (!config.models[selectedModel]) {
-    const availableModels = Object.keys(config.models);
-    throw new Error(`Model "${selectedModel}" not found. Available models: ${availableModels.join(', ')}`);
-  }
+	const config = loadConfig();
+	const selectedModel = modelName || config.defaultModel || 'chatgpt';
 
-  currentModelCache = selectedModel;
-  return config.models[selectedModel];
+	if (!config.models[selectedModel]) {
+		const availableModels = Object.keys(config.models);
+		throw new Error(
+			`Model "${selectedModel}" not found. Available models: ${availableModels.join(', ')}`,
+		);
+	}
+
+	currentModelCache = selectedModel;
+	return config.models[selectedModel];
 }
 
 export function getCurrentModel(): string | null {
-  return currentModelCache;
+	return currentModelCache;
 }
 
 export function setEnvironmentFromConfig(modelName?: string): void {
-  const modelConfig = getModelConfig(modelName);
-  const config = loadConfig();
+	const modelConfig = getModelConfig(modelName);
+	const config = loadConfig();
 
-  // Server settings
-  process.env.SERVER_PORT = config.server.port.toString();
-  process.env.LLM_URL_ENDPOINT = modelConfig.endpoint;
-  
-  // LLM settings
-  process.env.LLM_NAME = modelConfig.name;
-  process.env.LLM_MODEL = modelConfig.model;
-  process.env.MOCK_LLM_RESPONSE_TYPE = modelConfig.responseType;
-  process.env.MAX_LOREM_PARAS = modelConfig.maxLoremParas.toString();
-  
-  // Feature flags
-  process.env.VALIDATE_REQUESTS = modelConfig.validateRequests ? 'ON' : 'OFF';
-  process.env.LOG_REQUESTS = modelConfig.logRequests ? 'ON' : 'OFF';
-  process.env.DEBUG = modelConfig.debug ? '*' : 'OFF';
-  process.env.STREAM = modelConfig.stream ? 'true' : 'false';
-  
-  // Response delays
-  process.env.RESPONSE_DELAY_MIN = modelConfig.responseDelay.min.toString();
-  process.env.RESPONSE_DELAY_MAX = modelConfig.responseDelay.max.toString();
-  
-  // Embeddings
-  process.env.ENABLE_EMBEDDINGS_MOCK = modelConfig.embeddings.enabled ? 'true' : 'false';
-  process.env.EMBEDDING_DIMENSION = modelConfig.embeddings.dimensions.toString();
+	// Server settings
+	process.env.SERVER_PORT = config.server.port.toString();
+	process.env.LLM_URL_ENDPOINT = modelConfig.endpoint;
+
+	// LLM settings
+	process.env.LLM_NAME = modelConfig.name;
+	process.env.LLM_MODEL = modelConfig.model;
+	process.env.MOCK_LLM_RESPONSE_TYPE = modelConfig.responseType;
+	process.env.MAX_LOREM_PARAS = modelConfig.maxLoremParas.toString();
+
+	// Feature flags
+	process.env.VALIDATE_REQUESTS = modelConfig.validateRequests ? 'ON' : 'OFF';
+	process.env.LOG_REQUESTS = modelConfig.logRequests ? 'ON' : 'OFF';
+	process.env.DEBUG = modelConfig.debug ? '*' : 'OFF';
+	process.env.STREAM = modelConfig.stream ? 'true' : 'false';
+
+	// Response delays
+	process.env.RESPONSE_DELAY_MIN = modelConfig.responseDelay.min.toString();
+	process.env.RESPONSE_DELAY_MAX = modelConfig.responseDelay.max.toString();
+
+	// Embeddings
+	process.env.ENABLE_EMBEDDINGS_MOCK = modelConfig.embeddings.enabled
+		? 'true'
+		: 'false';
+	process.env.EMBEDDING_DIMENSION =
+		modelConfig.embeddings.dimensions.toString();
 }
 
 export function getAvailableModels(): string[] {
-  const config = loadConfig();
-  return Object.keys(config.models);
+	const config = loadConfig();
+	return Object.keys(config.models);
 }
 
 export function validateConfig(config: any): LlmMockConfig {
-  // Basic validation - can be expanded
-  if (!config.models || typeof config.models !== 'object') {
-    throw new Error('Configuration must contain a "models" object');
-  }
+	// Basic validation - can be expanded
+	if (!config.models || typeof config.models !== 'object') {
+		throw new Error('Configuration must contain a "models" object');
+	}
 
-  if (!config.server || typeof config.server !== 'object') {
-    throw new Error('Configuration must contain a "server" object');
-  }
+	if (!config.server || typeof config.server !== 'object') {
+		throw new Error('Configuration must contain a "server" object');
+	}
 
-  if (!config.server.port || typeof config.server.port !== 'number') {
-    throw new Error('Server configuration must contain a valid "port" number');
-  }
+	if (!config.server.port || typeof config.server.port !== 'number') {
+		throw new Error(
+			'Server configuration must contain a valid "port" number',
+		);
+	}
 
-  return config as LlmMockConfig;
+	return config as LlmMockConfig;
 }
