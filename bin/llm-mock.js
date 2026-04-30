@@ -9,41 +9,38 @@ const __dirname = dirname(__filename);
 
 // Parse command line arguments
 const args = process.argv.slice(2);
+let command = 'start'; // default command
 let modelName = 'chatgpt'; // default model
 let showHelp = false;
 let showConfig = false;
 let customSettings = {};
 
-// Available command line options
-const availableOptions = {
-  'model': 'Model preset to use (chatgpt, gemini, streaming, embeddings)',
-  'port': 'Server port (default: 8001)',
-  'host': 'Server host (default: 0.0.0.0)',
-  'endpoint': 'LLM endpoint path',
-  'responseType': 'Response type (lorem, static)',
-  'maxLoremParas': 'Maximum lorem ipsum paragraphs',
-  'validateRequests': 'Validate incoming requests (true/false)',
-  'logRequests': 'Log incoming requests (true/false)',
-  'debug': 'Enable debug mode (true/false)',
-  'stream': 'Enable streaming responses (true/false)',
-  'delayMin': 'Minimum response delay in milliseconds',
-  'delayMax': 'Maximum response delay in milliseconds',
-  'embeddings': 'Enable embeddings mock (true/false)',
-  'embeddingDimensions': 'Embedding vector dimensions'
-};
-
-// Parse command line arguments
-for (let i = 0; i < args.length; i++) {
-  const arg = args[i];
-  
-  if (arg === '--help' || arg === '-h') {
+// Parse command (first argument)
+if (args.length > 0) {
+  const firstArg = args[0];
+  if (firstArg === 'help' || firstArg === '--help' || firstArg === '-h') {
     showHelp = true;
-  } else if (arg === '--config' || arg === '-c') {
+  } else if (firstArg === 'config' || firstArg === '--config' || firstArg === '-c') {
     showConfig = true;
-  } else if (arg.startsWith('--model=')) {
+  } else if (firstArg === 'stop') {
+    command = 'stop';
+  } else if (firstArg === 'start') {
+    command = 'start';
+  } else if (firstArg.startsWith('--')) {
+    // If no command specified, default to start and parse options
+    command = 'start';
+  }
+}
+
+// Parse options (remaining arguments)
+const optionsToParse = showHelp || showConfig || command === 'stop' ? [] : args.slice(1);
+for (let i = 0; i < optionsToParse.length; i++) {
+  const arg = optionsToParse[i];
+  
+  if (arg.startsWith('--model=')) {
     modelName = arg.split('=')[1];
-  } else if (arg === '--model' && i + 1 < args.length) {
-    modelName = args[i + 1];
+  } else if (arg === '--model' && i + 1 < optionsToParse.length) {
+    modelName = optionsToParse[i + 1];
     i++; // Skip next argument
   } else if (arg.startsWith('--')) {
     // Parse --key=value format
@@ -52,10 +49,10 @@ for (let i = 0; i < args.length; i++) {
       const key = arg.substring(2, equalIndex);
       const value = arg.substring(equalIndex + 1);
       customSettings[key] = value;
-    } else if (i + 1 < args.length) {
+    } else if (i + 1 < optionsToParse.length) {
       // Parse --key value format
       const key = arg.substring(2);
-      customSettings[key] = args[i + 1];
+      customSettings[key] = optionsToParse[i + 1];
       i++; // Skip next argument
     }
   }
@@ -67,11 +64,15 @@ function showHelpInfo() {
 LLM Mock Server - A configurable mock LLM API server
 
 USAGE:
-  llm-mock [options]
+  llm-mock <command> [options]
+
+COMMANDS:
+  start                   Start the mock server (default)
+  stop                    Stop running mock server
+  help                    Show this help message
+  config                  Show current configuration settings
 
 OPTIONS:
-  --help, -h              Show this help message
-  --config, -c            Show current configuration settings
   --model=<name>          Model preset to use (chatgpt, gemini, streaming, embeddings)
   --port=<number>         Server port (default: 8001)
   --host=<address>        Server host (default: 0.0.0.0)
@@ -88,11 +89,13 @@ OPTIONS:
   --embeddingDimensions=<num> Embedding vector dimensions
 
 EXAMPLES:
-  llm-mock                                    # Start with default chatgpt model
-  llm-mock --model=gemini                     # Use gemini model preset
-  llm-mock --port=3000 --host=localhost       # Custom server settings
-  llm-mock --debug=true --stream=true         # Enable debug and streaming
-  llm-mock --delayMin=1000 --delayMax=2000    # Custom response delays
+  llm-mock start                              # Start with default chatgpt model
+  llm-mock start --model=gemini              # Use gemini model preset
+  llm-mock start --port=3000 --host=localhost # Custom server settings
+  llm-mock start --debug=true --stream=true   # Enable debug and streaming
+  llm-mock start --delayMin=1000 --delayMax=2000 # Custom response delays
+  llm-mock stop                               # Stop running server
+  llm-mock config                              # Show current configuration
 
 For more information, visit: https://github.com/piyook/llm-mock
 `);
@@ -131,6 +134,43 @@ ${Object.keys(customSettings).length > 0 ?
 
 Available models: ${Object.keys(config.models).join(', ')}
 `);
+}
+
+// Stop running llm-mock server
+async function stopServer() {
+  const { exec } = await import('child_process');
+  
+  return new Promise((resolve, reject) => {
+    // Check if any node processes are running (simpler approach)
+    const checkCommand = process.platform === 'win32' 
+      ? 'tasklist /fi "imagename eq node.exe" /fo csv'
+      : 'ps aux | grep node | grep -v grep';
+    
+    exec(checkCommand, (error, stdout, stderr) => {
+      if (error || !stdout.trim()) {
+        console.log('No running llm-mock server found.');
+        resolve();
+        return;
+      }
+      
+      // Kill all node processes (will stop llm-mock server)
+      const killCommand = process.platform === 'win32'
+        ? 'taskkill /F /IM node.exe'
+        : 'pkill -f node';
+      
+      exec(killCommand, (killError, killStdout, killStderr) => {
+        // Ignore "no process found" errors
+        if (killError && !(killError.message.includes('not found') || killError.message.includes('no process'))) {
+          console.error('Error stopping server:', killError.message);
+          reject(killError);
+          return;
+        }
+        
+        console.log('llm-mock server stopped successfully.');
+        resolve();
+      });
+    });
+  });
 }
 
 // Default configuration for global installation
@@ -275,42 +315,51 @@ async function main() {
       return;
     }
     
-    const { config, modelName: selectedModel } = await loadConfig();
+    // Handle stop command
+    if (command === 'stop') {
+      await stopServer();
+      return;
+    }
     
     // Handle config command
     if (showConfig) {
+      const { config, modelName: selectedModel } = await loadConfig();
       showCurrentConfig(config, selectedModel);
       return;
     }
     
-    setEnvironmentVariables(config, selectedModel);
+    // Handle start command (default)
+    if (command === 'start') {
+      const { config, modelName: selectedModel } = await loadConfig();
+      setEnvironmentVariables(config, selectedModel);
     
-    console.log(`Starting LLM Mock Server with model: ${selectedModel}`);
-    console.log(`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
-    
-    // Import and start the server using tsx for TypeScript support
-    const { exec } = await import('child_process');
-    
-    const serverPath = resolve(__dirname, '../src/server.ts');
-    const packageDir = resolve(__dirname, '..');
-    
-    // Use tsx to run TypeScript server
-    // Set cwd to package directory so TypeScript files can be found
-    const serverProcess = exec(`npx tsx "${serverPath}"`, {
-      stdio: 'inherit',
-      cwd: packageDir
-    });
-    
-    // Handle process exit
-    serverProcess.on('exit', (code) => {
-      console.log(`Server process exited with code: ${code}`);
-      process.exit(code || 0);
-    });
-    
-    serverProcess.on('error', (error) => {
-      console.error('Failed to start server process:', error.message);
-      process.exit(1);
-    });
+      console.log(`Starting LLM Mock Server with model: ${selectedModel}`);
+      console.log(`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
+      
+      // Import and start the server using tsx for TypeScript support
+      const { exec } = await import('child_process');
+      
+      const serverPath = resolve(__dirname, '../src/server.ts');
+      const packageDir = resolve(__dirname, '..');
+      
+      // Use tsx to run TypeScript server
+      // Set cwd to package directory so TypeScript files can be found
+      const serverProcess = exec(`npx tsx "${serverPath}"`, {
+        stdio: 'inherit',
+        cwd: packageDir
+      });
+      
+      // Handle process exit
+      serverProcess.on('exit', (code) => {
+        console.log(`Server process exited with code: ${code}`);
+        process.exit(code || 0);
+      });
+      
+      serverProcess.on('error', (error) => {
+        console.error('Failed to start server process:', error.message);
+        process.exit(1);
+      });
+    }
     
   } catch (error) {
     console.error('Failed to start server:', error.message);

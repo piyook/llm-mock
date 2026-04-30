@@ -124,12 +124,21 @@ npm install llm-mock
 
 ```bash
 # Start with default settings (chatgpt model, port 8001)
-llm-mock
+llm-mock start
 
 # Use specific model preset
-llm-mock --model=gemini
-llm-mock --model=streaming
-llm-mock --model=embeddings
+llm-mock start --model=gemini
+llm-mock start --model=streaming
+llm-mock start --model=embeddings
+
+# Stop the server
+llm-mock stop
+
+# Show help
+llm-mock help
+
+# Show current configuration
+llm-mock config
 ```
 
 ##### Command Line Options
@@ -138,34 +147,34 @@ All options support both `--key=value` and `--key value` formats:
 
 ```bash
 # Server Configuration
-llm-mock --port=3000 --host=localhost
-llm-mock --endpoint=custom/path
+llm-mock start --port=3000 --host=localhost
+llm-mock start --endpoint=custom/path
 
 # Model Settings
-llm-mock --responseType=static --maxLoremParas=12
+llm-mock start --responseType=static --maxLoremParas=12
 
 # Feature Flags
-llm-mock --debug=true --stream=true
-llm-mock --validateRequests=false --logRequests=true
+llm-mock start --debug=true --stream=true
+llm-mock start --validateRequests=false --logRequests=true
 
 # Response Timing
-llm-mock --delayMin=1000 --delayMax=2000
+llm-mock start --delayMin=1000 --delayMax=2000
 
 # Embeddings
-llm-mock --embeddings=true --embeddingDimensions=256
+llm-mock start --embeddings=true --embeddingDimensions=256
 ```
 
 ##### Help and Configuration
 
 ```bash
 # Show all available options
-llm-mock --help
+llm-mock help
 
 # Show current configuration including custom settings
-llm-mock --config
+llm-mock config
 
 # Combine multiple options
-llm-mock --model=gemini --port=3000 --debug=true --stream=true
+llm-mock start --model=gemini --port=3000 --debug=true --stream=true
 ```
 
 ##### Local Development
@@ -174,7 +183,7 @@ When developing locally or when a `.llm-mock-rc.json` file is present:
 
 ```bash
 # Use configuration file with CLI overrides
-npm run llm-mock -- --port=3000 --debug=true
+llm-mock start --port=3000 --debug=true
 
 # Development mode with hot reload
 npm run dev
@@ -227,6 +236,10 @@ When logging is enabled (`--logRequests=true`), API requests are automatically s
 - **Linux**: `~/.local/share/llm-mock-nodejs/log/`
 
 View logs in real-time at `http://localhost:8001/logs` or find the `api_request_log.json` file in the locations above.
+
+**Quick Commands:**
+- `llm-mock start --logRequests=true` - Start server with logging enabled
+- `llm-mock stop` - Stop the server
 
 ## Configuration
 
