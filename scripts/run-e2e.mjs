@@ -1,10 +1,10 @@
 import { execSync } from "child_process";
 
 const suites = [
-  { start: "llm-mock:start:chatgpt", spec: "cypress/e2e/gpt-mock-spec.cy.ts" },
-  { start: "llm-mock:start:gemini",  spec: "cypress/e2e/gemini-mock-spec.cy.ts" },
-  { start: "llm-mock:start:streaming", spec: "cypress/e2e/streaming-only-spec.cy.ts" },
-  { start: "llm-mock:start:embeddings", spec: "cypress/e2e/embeddings-spec.cy.ts" },
+  { start: "llmock:start:chatgpt", spec: "cypress/e2e/gpt-mock-spec.cy.ts" },
+  { start: "llmock:start:gemini",  spec: "cypress/e2e/gemini-mock-spec.cy.ts" },
+  { start: "llmock:start:streaming", spec: "cypress/e2e/streaming-only-spec.cy.ts" },
+  { start: "llmock:start:embeddings", spec: "cypress/e2e/embeddings-spec.cy.ts" },
 ];
 
 const npmRun = (cmd) => execSync(`npm run ${cmd}`, { stdio: "inherit" });
@@ -22,7 +22,7 @@ for (const { start, spec } of suites) {
     console.error(`>>> Suite FAILED: ${start}`, e.message);
     failed = true;
   } finally {
-    try { npmRun("llm-mock:stop"); } catch { /* ignore stop errors */ }
+    try { npmRun("llmock:stop"); } catch { /* ignore stop errors */ }
   }
 }
 

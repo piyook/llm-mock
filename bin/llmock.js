@@ -80,7 +80,7 @@ function showHelpInfo() {
 LLM Mock Server - A configurable mock LLM API server
 
 USAGE:
-  llm-mock <command> [options]
+  llmock <command> [options]
 
 COMMANDS:
   start                   Start the mock server (default)
@@ -105,16 +105,16 @@ OPTIONS:
   --embeddingDimensions=<num> Embedding vector dimensions
 
 EXAMPLES:
-  llm-mock start                              # Start with default chatgpt model
-  llm-mock start --model=gemini              # Use gemini model preset
-  llm-mock start --port=3000 --host=localhost # Custom server settings
-  llm-mock start --debug=true --stream=true   # Enable debug and streaming
-  llm-mock start --delayMin=1000 --delayMax=2000 # Custom response delays
-  llm-mock stop                               # Stop running server on default port
-  llm-mock stop --port=3000                   # Stop server on port 3000
-  llm-mock config                              # Show current configuration
+  llmock start                              # Start with default chatgpt model
+  llmock start --model=gemini              # Use gemini model preset
+  llmock start --port=3000 --host=localhost # Custom server settings
+  llmock start --debug=true --stream=true   # Enable debug and streaming
+  llmock start --delayMin=1000 --delayMax=2000 # Custom response delays
+  llmock stop                               # Stop running server on default port
+  llmock stop --port=3000                   # Stop server on port 3000
+  llmock config                              # Show current configuration
 
-For more information, visit: https://github.com/piyook/llm-mock
+For more information, visit: https://github.com/piyook/llmock
 `);
 }
 
@@ -166,7 +166,7 @@ async function stopServer(port = 8001) {
 
     exec(findCommand, (error, stdout) => {
       if (error || !stdout.trim()) {
-        console.log(`No running llm-mock server found on port ${port}.`);
+        console.log(`No running llmock server found on port ${port}.`);
         resolve();
         return;
       }
@@ -194,7 +194,7 @@ async function stopServer(port = 8001) {
         : `kill -9 ${pids.join(' ')}`;
 
       exec(killCommand, () => {
-        console.log(`llm-mock server stopped successfully on port ${port}.`);
+        console.log(`llmock server stopped successfully on port ${port}.`);
         resolve();
       });
     });
@@ -402,7 +402,7 @@ async function main() {
       // Show success message and exit CLI
       console.log(`Server started successfully!`);
       console.log(`Server is running at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
-      console.log(`Use 'llm-mock stop' to stop the server.`);
+      console.log(`Use 'llmock stop' to stop the server.`);
       
       serverProcess.on('error', (error) => {
         console.error('Failed to start server process:', error.message);

@@ -1,13 +1,14 @@
 # Local Mock LLM API Framework
 
-[![GitHub Release](https://img.shields.io/github/v/release/piyook/llm-mock)](https://github.com/piyook/llm-mock/releases)
-[![tests workflow](https://github.com/piyook/llm-mock/actions/workflows/tests.yaml/badge.svg)](https://github.com/piyook/llm-mock/actions/workflows/tests.yaml)
+[![GitHub Release](https://img.shields.io/github/v/release/piyook/llmock)](https://github.com/piyook/llmock/releases)
+[![tests workflow](https://github.com/piyook/llmock/actions/workflows/tests.yaml/badge.svg)](https://github.com/piyook/llmock/actions/workflows/tests.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![npm version](https://img.shields.io/npm/v/llmock)](https://www.npmjs.com/package/llmock)
 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Why Use LLM Mock?](#why-use-llm-mock)
+- [Why Use LLM Mock?](#why-use-llmock)
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -84,8 +85,8 @@ Adapted from the [mock-api-framework-template](https://github.com/piyook/mock-ap
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/piyook/llm-mock.git
-cd llm-mock
+git clone https://github.com/piyook/llmock.git
+cd llmock
 npm install
 ```
 
@@ -114,32 +115,32 @@ The LLM Mock Server can be used as an npm package that works both locally and gl
 
 ```bash
 # Install globally
-npm install -g llm-mock
+npm install -g llmock
 
 # Install locally in your project
-npm install llm-mock
+npm install llmock
 ```
 
 ##### Basic Usage
 
 ```bash
 # Start with default settings (chatgpt model, port 8001)
-llm-mock start
+llmock start
 
 # Use specific model preset
-llm-mock start --model=gemini
-llm-mock start --model=streaming
-llm-mock start --model=embeddings
+llmock start --model=gemini
+llmock start --model=streaming
+llmock start --model=embeddings
 
 # Stop the server
-llm-mock stop
-llm-mock stop --port=3000  # Stop server on specific port
+llmock stop
+llmock stop --port=3000  # Stop server on specific port
 
 # Show help
-llm-mock help
+llmock help
 
 # Show current configuration
-llm-mock config
+llmock config
 ```
 
 ##### Command Line Options
@@ -148,47 +149,47 @@ All options support both `--key=value` and `--key value` formats:
 
 ```bash
 # Server Configuration
-llm-mock start --port=3000 --host=localhost
-llm-mock start --endpoint=custom/path
+llmock start --port=3000 --host=localhost
+llmock start --endpoint=custom/path
 
 # Stop Command
-llm-mock stop --port=3000  # Stop server on specific port
-llm-mock stop --port 8080   # Alternative format
+llmock stop --port=3000  # Stop server on specific port
+llmock stop --port 8080   # Alternative format
 
 # Model Settings
-llm-mock start --responseType=static --maxLoremParas=12
+llmock start --responseType=static --maxLoremParas=12
 
 # Feature Flags
-llm-mock start --debug=true --stream=true
-llm-mock start --validateRequests=false --logRequests=true
+llmock start --debug=true --stream=true
+llmock start --validateRequests=false --logRequests=true
 
 # Response Timing
-llm-mock start --delayMin=1000 --delayMax=2000
+llmock start --delayMin=1000 --delayMax=2000
 
 # Embeddings
-llm-mock start --embeddings=true --embeddingDimensions=256
+llmock start --embeddings=true --embeddingDimensions=256
 ```
 
 ##### Help and Configuration
 
 ```bash
 # Show all available options
-llm-mock help
+llmock help
 
 # Show current configuration including custom settings
-llm-mock config
+llmock config
 
 # Combine multiple options
-llm-mock start --model=gemini --port=3000 --debug=true --stream=true
+llmock start --model=gemini --port=3000 --debug=true --stream=true
 ```
 
 ##### Local Development
 
-When developing locally or when a `.llm-mock-rc.json` file is present:
+When developing locally or when a `.llmock-rc.json` file is present:
 
 ```bash
 # Use configuration file with CLI overrides
-llm-mock start --port=3000 --debug=true
+llmock start --port=3000 --debug=true
 
 # Development mode with hot reload
 npm run dev
@@ -236,22 +237,22 @@ The dashboard updates automatically every 2 seconds to reflect real-time changes
 
 When logging is enabled (`--logRequests=true`), API requests are automatically saved to your system's standard log location:
 
-- **Windows**: `C:\Users\{name}\AppData\Local\llm-mock-nodejs\Log\`
-- **macOS**: `~/Library/Logs/llm-mock-nodejs/`
-- **Linux**: `~/.local/share/llm-mock-nodejs/log/`
+- **Windows**: `C:\Users\{name}\AppData\Local\llmock-nodejs\Log\`
+- **macOS**: `~/Library/Logs/llmock-nodejs/`
+- **Linux**: `~/.local/share/llmock-nodejs/log/`
 
 View logs in real-time at `http://localhost:8001/logs` or find the `api_request_log.json` file in the locations above.
 
 **Quick Commands:**
-- `llm-mock start --logRequests=true` - Start server with logging enabled
-- `llm-mock stop` - Stop the server
-- `llm-mock stop --port=3000` - Stop server on specific port
+- `llmock start --logRequests=true` - Start server with logging enabled
+- `llmock stop` - Stop the server
+- `llmock stop --port=3000` - Stop server on specific port
 
 ## Configuration
 
-### Configuration File (.llm-mock-rc.json)
+### Configuration File (.llmock-rc.json)
 
-The LLM Mock Framework uses a centralized configuration file `.llm-mock-rc.json` to manage all settings and model presets. This approach replaces the previous multiple `.env` files system.
+The LLM Mock Framework uses a centralized configuration file `.llmock-rc.json` to manage all settings and model presets. This approach replaces the previous multiple `.env` files system.
 
 #### Configuration Structure
 
@@ -339,7 +340,7 @@ You can add new model presets by extending the `models` object:
 Then start the server with your custom model:
 
 ```bash
-npm run llm-mock -- --model=my-custom-model
+npm run llmock -- --model=my-custom-model
 ```
 
 #### Embeddings Configuration
@@ -960,7 +961,7 @@ The mock server enables comprehensive testing:
 ## Project Structure
 
 ```
-llm-mock/
+llmock/
 |-- src/
 |   |-- data/
 |   |   |   -- data.json              # Stored responses
@@ -971,8 +972,8 @@ llm-mock/
 |   |   |-- openai_res.json         # Default OpenAI chat completion response
 |   |   |   -- gemini_res.json         # Gemini-specific response example
 |   |   -- ...
-|-- .llm-mock-rc.json               # Main configuration file
-|-- .llm-mock-rc.test.json          # Test configuration
+|-- .llmock-rc.json               # Main configuration file
+|-- .llmock-rc.test.json          # Test configuration
 |-- package.json
 ```
 
@@ -982,13 +983,13 @@ llm-mock/
 
 **Server not responding:**
 
-Check server is up and running on correct port configured in `.llm-mock-rc.json` E.g http://localhost:8001
+Check server is up and running on correct port configured in `.llmock-rc.json` E.g http://localhost:8001
 
 ![LLM Mock Server Page](images/server-page-err.png)
 
 **Port already in use:**
 ```json
-// Change port in .llm-mock-rc.json
+// Change port in .llmock-rc.json
 {
   "server": {
     "port": 8002

@@ -1,0 +1,56 @@
+# Dependencies
+node_modules
+ui/node_modules
+
+# Build artifacts
+*.log
+src/logs/*.json
+src/logs/*.log
+cypress/screenshots
+cypress/videos
+
+# Development files
+.git
+.gitignore
+.husky
+.vscode
+.github
+.nvmrc
+.node_version
+commitlintrc.json
+torchrc.json
+vitest.config.mts
+cypress.config.ts
+validate-branch-name.sh
+
+# Test files
+src/tests/
+scripts/
+cypress/
+**/test*/
+**/*test*
+**/*spec*
+
+# UI source (only include built dist)
+ui/src/
+ui/public/
+ui/package*.json
+ui/vite.config.ts
+ui/index.html
+
+# Config files that shouldn't be published
+.prettierrc.json
+.prettierignore
+tsconfig.json
+
+# Documentation not needed in package
+docs/
+images/
+UI-Dev.md
+
+# Development lock files
+package-lock.json
+
+# Temporary files
+*.tmp
+*.temp
