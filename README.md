@@ -94,7 +94,7 @@ npm install
 
 ### Configuration System
 
-The LLM Mock Framework now uses a centralized configuration file `.llm-mock-rc.json` to manage all model presets and settings. This replaces the previous multiple `.env` files approach.
+The LLM Mock Framework uses a centralized configuration file `.llm-mock-rc.json` to manage all model presets and settings.
 
 #### Available Models
 
@@ -112,17 +112,15 @@ The framework includes several pre-configured model presets:
 Start with default model (chatgpt):
 
 ```bash
-node bin/llm-mock.js
-# or
 npm run llm-mock
 ```
 
 Start with specific model:
 
 ```bash
-node bin/llm-mock.js --model=gemini
-node bin/llm-mock.js --model=streaming
-node bin/llm-mock.js --model=embeddings
+npm run llm-mock -- --model=gemini
+npm run llm-mock -- --model=streaming
+npm run llm-mock -- --model=embeddings
 ```
 
 #### Using NPM Scripts
@@ -298,7 +296,7 @@ You can add new model presets by extending the `models` object:
 Then start the server with your custom model:
 
 ```bash
-node bin/llm-mock.js --model=my-custom-model
+npm run llm-mock -- --model=my-custom-model
 ```
 
 #### Embeddings Configuration
@@ -504,10 +502,12 @@ https://github.com/user-attachments/assets/86115f16-63d7-49de-af32-c6f9c2bec7cf
 Validate incoming requests against templates to ensure API compatibility:
 
 1. Add a request template in `request-templates/` folder
-2. Enable validation in `.env`:
+2. Enable validation in your model configuration:
 
-```bash
-VALIDATE_REQUESTS=true
+```json
+{
+  "validateRequests": true
+}
 ```
 
 Invalid requests return detailed error messages explaining the format mismatch.
@@ -516,11 +516,13 @@ Invalid requests return detailed error messages explaining the format mismatch.
 
 Debug your LLM interactions by logging all requests:
 
-1. Enable logging:
+1. Enable logging in your model configuration:
 
-```bash
-LOG_REQUESTS=true
-VALIDATE_REQUESTS=true
+```json
+{
+  "logRequests": true,
+  "validateRequests": true
+}
 ```
 
 2. View logged requests at:
@@ -535,10 +537,12 @@ Displays detailed information about each request including headers, body, and va
 
 ### Using with LangChain and OpenAI-Style APIs
 
-Configure your endpoint to match the OpenAI chat completion format:
+Configure your endpoint in the model configuration to match the OpenAI chat completion format:
 
-```bash
-LLM_URL_ENDPOINT=chatgpt/chat/completions
+```json
+{
+  "endpoint": "chatgpt/chat/completions"
+}
 ```
 
 This creates the endpoint: `http://localhost:8001/chatgpt/chat/completions`
@@ -564,9 +568,17 @@ Returns a single JSON response:
 }
 ```
 
-#### Streaming Mode (STREAM=true)
+#### Streaming Mode
 
-Set `STREAM=true` in your `.env` file, then use the same endpoint:
+Enable streaming in your model configuration:
+
+```json
+{
+  "stream": true
+}
+```
+
+Then use the same endpoint:
 
 ```bash
 curl -N http://localhost:8001/chatgpt/chat/completions \
@@ -583,7 +595,7 @@ data: {"id":"chatcmpl-124","object":"chat.completion.chunk",...}
 data: [DONE]
 ```
 
-**Note:** The request payload is identical in both modes. The difference is in the server-side response framing, controlled by the `STREAM` environment variable.
+**Note:** The request payload is identical in both modes. The difference is in the server-side response framing, controlled by the `stream` configuration setting.
 
 ### Embeddings API
 
@@ -620,7 +632,7 @@ curl http://localhost:8001/v1/embeddings \
 **Key Features:**
 - **Deterministic**: Same input always produces identical embeddings
 - **Multiple Inputs**: Supports arrays of strings with proper indexing
-- **Configurable Dimensions**: Set via `EMBEDDING_DIMENSION` env var or request parameter
+- **Configurable Dimensions**: Set via `embeddings.dimensions` in model configuration or request parameter
 - **Model-Sensitive**: Different models produce different embeddings for same input
 - **OpenAI Compatible**: Response shape matches OpenAI embeddings API exactly
 
@@ -843,40 +855,49 @@ Debug mode displays:
 ### Recommended Development Flow
 
 1. **Start with lorem responses and no delays** for rapid UI development:
-   ```bash
-   MOCK_LLM_RESPONSE_TYPE=lorem
-   RESPONSE_DELAY_MIN=0
-   RESPONSE_DELAY_MAX=0
+   ```json
+   {
+     "responseType": "lorem",
+     "responseDelay": { "min": 0, "max": 0 }
+   }
    ```
 
 2. **Add response delays** to test loading states and spinners:
-   ```bash
-   RESPONSE_DELAY_MIN=500
-   RESPONSE_DELAY_MAX=1500
+   ```json
+   {
+     "responseDelay": { "min": 500, "max": 1500 }
+   }
    ```
 
 3. **Test with varied latency** to ensure robust error handling:
-   ```bash
-   RESPONSE_DELAY_MIN=100
-   RESPONSE_DELAY_MAX=5000
+   ```json
+   {
+     "responseDelay": { "min": 100, "max": 5000 }
+   }
    ```
 
 4. **Switch to stored responses** for realistic content testing:
-   ```bash
-   MOCK_LLM_RESPONSE_TYPE=stored
-   # Add domain-specific responses to src/data/data.json
+   ```json
+   {
+     "responseType": "stored"
+   }
    ```
+   Add domain-specific responses to `src/data/data.json`
 
 5. **Enable streaming** to test real-time response handling:
-   ```bash
-   STREAM=true
-   # Test your client's streaming response parsing
+   ```json
+   {
+     "stream": true
+   }
    ```
+   Test your client's streaming response parsing
 
 6. **Enable validation** before deploying to production:
-   ```bash
-   VALIDATE_REQUESTS=true
-   LOG_REQUESTS=true
+   ```json
+   {
+     "validateRequests": true,
+     "logRequests": true
+   }
    ```
 
 7. **Test with production LLM** by setting `DEV_MODE=false`
@@ -889,7 +910,7 @@ The mock server enables comprehensive testing:
 - **Timeout handling**: Set high delay values to test timeout logic
 - **Error handling**: Modify response templates to return errors
 - **Variable content**: Use lorem or multiple stored responses
-- **Streaming responses**: Enable `STREAM=true` to test real-time response parsing
+- **Streaming responses**: Enable `"stream": true` to test real-time response parsing
 - **Offline development**: Work without internet connectivity
 - **Cost-free prototyping**: Test UI/UX without API charges
 
@@ -897,22 +918,20 @@ The mock server enables comprehensive testing:
 
 ```
 llm-mock/
-├── src/
-│   ├── data/
-│   │   └── data.json              # Stored responses
-│   ├── request-templates/          # OpenAI-style request format templates
-│   │   ├── openai_req.json         # Default OpenAI chat completion format
-│   │   └── gemini_req.json         # Gemini-specific format example
-│   ├── response-templates/         # OpenAI-style response format templates
-│   │   ├── openai_res.json         # Default OpenAI chat completion response
-│   │   └── gemini_res.json         # Gemini-specific response example
-│   └── ...
-├── .env                            # Configuration
-├── .env.chatgpt                    # ChatGPT/OpenAI preset
-├── .env.gemini                     # Gemini preset
-├── .env.streaming                  # Streaming mode preset
-├── docker-compose.yml
-└── package.json
+|-- src/
+|   |-- data/
+|   |   |   -- data.json              # Stored responses
+|   |-- request-templates/          # OpenAI-style request format templates
+|   |   |-- openai_req.json         # Default OpenAI chat completion format
+|   |   |   -- gemini_req.json         # Gemini-specific format example
+|   |-- response-templates/         # OpenAI-style response format templates
+|   |   |-- openai_res.json         # Default OpenAI chat completion response
+|   |   |   -- gemini_res.json         # Gemini-specific response example
+|   |   -- ...
+|-- .llm-mock-rc.json               # Main configuration file
+|-- .llm-mock-rc.test.json          # Test configuration
+|-- docker-compose.yml
+|   -- package.json
 ```
 
 ## Troubleshooting
@@ -921,14 +940,18 @@ llm-mock/
 
 **Server not responding:**
 
-Check server is up and running on correct port set in `.env` E.g http://localhost:8001
+Check server is up and running on correct port configured in `.llm-mock-rc.json` E.g http://localhost:8001
 
 ![LLM Mock Server Page](images/server-page-err.png)
 
 **Port already in use:**
-```bash
-# Change port in .env
-SERVER_PORT=8002
+```json
+// Change port in .llm-mock-rc.json
+{
+  "server": {
+    "port": 8002
+  }
+}
 ```
 
 **Validation failures:**
@@ -937,9 +960,9 @@ SERVER_PORT=8002
 - Ensure `LLM_NAME` matches template filenames
 
 **Response delays not working:**
-- Verify both `RESPONSE_DELAY_MIN` and `RESPONSE_DELAY_MAX` are set
+- Verify both `responseDelay.min` and `responseDelay.max` are set in your model configuration
 - Check that values are greater than 0
-- Restart the server after changing environment variables
+- Restart the server after changing configuration
 
 **Docker issues:**
 ```bash
