@@ -77,7 +77,6 @@ Adapted from the [mock-api-framework-template](https://github.com/piyook/mock-ap
 ## Prerequisites
 
 - Node.js 20+
-- Docker (for containerized deployment)
 - npm or compatible package manager
 
 ## Installation
@@ -142,32 +141,9 @@ npm run serve:embeddings
 npm run dev
 ```
 
-#### Using Docker (Recommended)
-
-Start the server in Docker containers:
-
-```bash
-npm start
-```
-
-Your LLM API will be available at `http://localhost:8001` by default.
-
-**Managing Docker Containers:**
-
-```bash
-# Stop and remove containers
-npm stop
-
-# Rebuild containers
-npm run rebuild
-
-# Complete cleanup (removes node_modules, caches, and all Docker resources)
-npm run torch
-```
-
 #### Running Locally
 
-Run directly on your machine without Docker:
+Run directly on your machine:
 
 ```bash
 npm run dev
@@ -930,8 +906,7 @@ llm-mock/
 |   |   -- ...
 |-- .llm-mock-rc.json               # Main configuration file
 |-- .llm-mock-rc.test.json          # Test configuration
-|-- docker-compose.yml
-|   -- package.json
+|-- package.json
 ```
 
 ## Troubleshooting
@@ -964,13 +939,6 @@ Check server is up and running on correct port configured in `.llm-mock-rc.json`
 - Check that values are greater than 0
 - Restart the server after changing configuration
 
-**Docker issues:**
-```bash
-# Complete cleanup and rebuild
-npm run torch
-npm install
-npm start
-```
 
 ## Contributing
 
