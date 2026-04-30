@@ -146,7 +146,7 @@ async function stopServer() {
       ? 'tasklist /fi "imagename eq node.exe" /fo csv'
       : 'ps aux | grep node | grep -v grep';
     
-    exec(checkCommand, (error, stdout, stderr) => {
+    exec(checkCommand, (error, stdout, _stderr) => {
       if (error || !stdout.trim()) {
         console.log('No running llm-mock server found.');
         resolve();
@@ -158,7 +158,7 @@ async function stopServer() {
         ? 'taskkill /F /IM node.exe'
         : 'pkill -f node';
       
-      exec(killCommand, (killError, killStdout, killStderr) => {
+      exec(killCommand, (killError, _killStdout, _killStderr) => {
         // Ignore "no process found" errors
         if (killError && !(killError.message.includes('not found') || killError.message.includes('no process'))) {
           console.error('Error stopping server:', killError.message);
