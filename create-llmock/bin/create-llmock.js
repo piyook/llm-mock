@@ -97,7 +97,9 @@ async function copyTemplateFiles(targetDir, projectName) {
   const templateFiles = [
     'package.json',
     '.llmockrc.json',
-    'README.md'
+    'README.md',
+    'Dockerfile',
+    'docker-compose.yml'
   ];
 
   for (const file of templateFiles) {
