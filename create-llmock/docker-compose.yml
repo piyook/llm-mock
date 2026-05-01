@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  llmock-server:
+    build: .
+    ports:
+      - "8001:8001"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    volumes:
+      - ./templates/.llmockrc.json:/app/.llmockrc.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
