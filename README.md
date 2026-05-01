@@ -109,6 +109,16 @@ llmock help
 
 All CLI flags support both `--key=value` and `--key value` formats and override `.llmockrc.json` at runtime.
 
+### Foreground Mode
+
+For Docker containers or when you want the server to stay attached to your terminal:
+
+```bash
+llmock start --foreground
+```
+
+The `--foreground` flag keeps the server process attached and forwards all output to your console. This is essential for Docker containers and useful for debugging. Without this flag, the server runs as a detached background process.
+
 ### Option 3: Docker
 
 ```bash
@@ -572,7 +582,13 @@ vim .llmockrc.json
 npm run docker:restart
 ```
 
-The generated setup includes: a multi-stage Node.js Dockerfile with security best practices, a `docker-compose.yml` with health checks, port 8001 exposed, and the config file mounted.
+### How Docker Works
+
+The Docker container uses the `--foreground` flag to keep the LLMock server process attached. This prevents the container from restarting continuously, which would happen if the server ran as a detached background process. The container includes:
+
+- **Dockerfile**: Multi-stage Node.js build with security best practices
+- **docker-compose.yml**: Port 8001 exposed, config file mounted, health checks
+- **docker-start script**: Runs `llmock start --foreground` to keep the server attached
 
 ### Manual Docker commands
 

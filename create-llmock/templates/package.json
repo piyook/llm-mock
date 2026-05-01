@@ -1,6 +1,6 @@
 {
   "name": "{{PROJECT_NAME}}",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "LLMock project for testing LLM APIs",
   "private": true,
   "type": "module",
@@ -11,6 +11,7 @@
     "llmock:gemini": "llmock --model=gemini",
     "llmock:streaming": "llmock --model=streaming",
     "llmock:embeddings": "llmock --model=embeddings",
+    "docker-start": "llmock start --foreground",
     "docker:start": "docker compose up -d --force-recreate",
     "docker:stop": "docker compose down --volumes",
     "docker:rebuild": "docker compose down --volumes && docker compose up -d --force-recreate --build",

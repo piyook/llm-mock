@@ -15,6 +15,7 @@ let showHelp = false;
 let showConfig = false;
 let customSettings = {};
 let stopPort = 8001; // default port for stop command
+let foregroundMode = false; // run in foreground for Docker
 
 // Parse command (first argument)
 if (args.length > 0) {
@@ -58,6 +59,8 @@ for (let i = 0; i < optionsToParse.length; i++) {
       customSettings.port = portValue;
     }
     i++; // Skip next argument
+  } else if (arg === '--foreground') {
+    foregroundMode = true;
   } else if (arg.startsWith('--')) {
     // Parse --key=value format
     const equalIndex = arg.indexOf('=');
@@ -103,6 +106,7 @@ OPTIONS:
   --delayMax=<ms>          Maximum response delay in milliseconds
   --embeddings=<bool>      Enable embeddings mock (true/false)
   --embeddingDimensions=<num> Embedding vector dimensions
+  --foreground            Run server in foreground (for Docker use)
 
 EXAMPLES:
   llmock start                              # Start with default chatgpt model
@@ -377,44 +381,69 @@ async function main() {
       const isWindows = process.platform === 'win32';
       let serverProcess;
       
-      if (isWindows) {
-        // On Windows, use shell but properly escape the command
-        const escapedPath = serverPath.replace(/"/g, '\\"');
-        const command = `npx tsx "${escapedPath}"`;
-        serverProcess = spawn(command, [], {
-          cwd: packageDir,
-          stdio: 'ignore',
-          shell: true,
-          detached: false
-        });
-      } else {
-        // On Unix systems, use direct spawn without shell
+      if (foregroundMode) {
+        // Run in foreground mode for Docker - keep process attached
         serverProcess = spawn('npx', ['tsx', serverPath], {
           cwd: packageDir,
-          stdio: 'pipe',
-          detached: true
+          stdio: 'inherit',
+          detached: false
         });
+        
+        console.log(`Starting LLM Mock Server in foreground mode...`);
+        console.log(`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
+        
+        serverProcess.on('error', (error) => {
+          console.error('Failed to start server process:', error.message);
+          process.exit(1);
+        });
+        
+        // Keep the CLI alive and forward server output
+        serverProcess.on('close', (code) => {
+          console.log(`Server process exited with code ${code}`);
+          process.exit(code);
+        });
+        
+      } else {
+        // Original detached mode
+        if (isWindows) {
+          // On Windows, use shell but properly escape the command
+          const escapedPath = serverPath.replace(/"/g, '\\"');
+          const command = `npx tsx "${escapedPath}"`;
+          serverProcess = spawn(command, [], {
+            cwd: packageDir,
+            stdio: 'ignore',
+            shell: true,
+            detached: false
+          });
+        } else {
+          // On Unix systems, use direct spawn without shell
+          serverProcess = spawn('npx', ['tsx', serverPath], {
+            cwd: packageDir,
+            stdio: 'pipe',
+            detached: true
+          });
+        }
+        
+        // Detach from the server process (non-Windows)
+        if (!isWindows) {
+          serverProcess.unref();
+        }
+        
+        // Show success message and exit CLI
+        console.log(`Server started successfully!`);
+        console.log(`Server is running at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
+        console.log(`Use 'llmock stop' to stop the server.`);
+        
+        serverProcess.on('error', (error) => {
+          console.error('Failed to start server process:', error.message);
+          process.exit(1);
+        });
+        
+        // Give the server a moment to start, then exit CLI
+        setTimeout(() => {
+          process.exit(0);
+        }, 1000);
       }
-      
-      // Detach from the server process (non-Windows)
-      if (!isWindows) {
-        serverProcess.unref();
-      }
-      
-      // Show success message and exit CLI
-      console.log(`Server started successfully!`);
-      console.log(`Server is running at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
-      console.log(`Use 'llmock stop' to stop the server.`);
-      
-      serverProcess.on('error', (error) => {
-        console.error('Failed to start server process:', error.message);
-        process.exit(1);
-      });
-      
-      // Give the server a moment to start, then exit CLI
-      setTimeout(() => {
-        process.exit(0);
-      }, 1000);
     }
     
   } catch (error) {

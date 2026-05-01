@@ -22,5 +22,5 @@ USER nodejs
 # Expose the port
 EXPOSE 8001
 
-# Command to start the server
-CMD ["npm", "run", "llmock:start"]
+# Command to start the server in foreground mode
+CMD ["npm", "run", "docker-start"]
