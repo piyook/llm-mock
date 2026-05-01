@@ -1,6 +1,6 @@
 {
   "name": "{{PROJECT_NAME}}",
-  "version": "3.0.0",
+  "version": "3.2.0",
   "description": "LLMock project for testing LLM APIs",
   "private": true,
   "type": "module",
