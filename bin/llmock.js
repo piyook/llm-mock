@@ -404,7 +404,9 @@ async function main() {
         });
         
       } else {
-        // Original detached mode
+        // Check if we're in E2E mode
+        const isE2E = process.env.E2E_MODE === 'true';
+        
         if (isWindows) {
           // On Windows, use shell but properly escape the command
           const escapedPath = serverPath.replace(/"/g, '\\"');
@@ -417,19 +419,20 @@ async function main() {
           });
         } else {
           // On Unix systems, use direct spawn without shell
+          // In E2E mode, don't detach to maintain process tree
           serverProcess = spawn('npx', ['tsx', serverPath], {
             cwd: packageDir,
             stdio: 'pipe',
-            detached: true
+            detached: !isE2E  // Only detach if not in E2E mode
           });
         }
         
-        // Detach from the server process (non-Windows)
-        if (!isWindows) {
+        // Detach from the server process (non-Windows) only if not in E2E mode
+        if (!isWindows && !isE2E) {
           serverProcess.unref();
         }
         
-        // Show success message and exit CLI
+        // Show success message
         console.log(`Server started successfully!`);
         console.log(`Server is running at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
         console.log(`Use 'llmock stop' to stop the server.`);
@@ -439,10 +442,20 @@ async function main() {
           process.exit(1);
         });
         
-        // Give the server a moment to start, then exit CLI
-        setTimeout(() => {
-          process.exit(0);
-        }, 1000);
+        if (isE2E) {
+          // In E2E mode, stay alive and forward signals to maintain process tree
+          serverProcess.on('close', (code) => {
+            process.exit(code ?? 0);
+          });
+          
+          process.on('SIGTERM', () => serverProcess.kill('SIGTERM'));
+          process.on('SIGINT', () => serverProcess.kill('SIGINT'));
+        } else {
+          // Normal detached mode - give the server a moment to start, then exit CLI
+          setTimeout(() => {
+            process.exit(0);
+          }, 1000);
+        }
       }
     }
     

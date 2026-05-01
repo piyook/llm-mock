@@ -51,12 +51,12 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 try {
 	const currentModel = getCurrentModel();
 	await app.listen({
-		port: Number(process.env?.SERVER_PORT ?? 8000),
-		host: '0.0.0.0',
+		port: Number(process.env?.SERVER_PORT ?? 8001),
+		host: process.env?.SERVER_HOST || '0.0.0.0',
 	});
 	console.log('\n*****************************************************');
 	console.log(
-		`SERVER UP AND RUNNING ON LOCALHOST:${process.env?.SERVER_PORT ?? 8000}`,
+		`SERVER UP AND RUNNING ON LOCALHOST:${process.env?.SERVER_PORT ?? 8001}`,
 	);
 	console.log(`USING MODEL: ${currentModel?.toUpperCase() || 'CHATGPT'}`);
 	console.log('*****************************************************');

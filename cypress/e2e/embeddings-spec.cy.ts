@@ -75,8 +75,9 @@ describe('Mock LLM Embeddings Spec', () => {
     };
 
     it('should be up and running', () => {
-        cy.visit('/');
-        cy.get('[cy-data="server_status"]').contains('Running');
+        cy.request('/ping').then((response) => {
+            expect(response.status).to.eq(200);
+        });
     });
 
     it('should serve embeddings endpoint', () => {

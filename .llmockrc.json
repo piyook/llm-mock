@@ -69,8 +69,8 @@
       "debug": false,
       "stream": false,
       "responseDelay": {
-        "min": 0,
-        "max": 0
+        "min": 3000,
+        "max": 5000
       },
       "embeddings": {
         "enabled": true,
