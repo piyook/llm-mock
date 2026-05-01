@@ -1,7 +1,7 @@
 # LLMock — Local Mock LLM API
 
-[![GitHub Release](https://img.shields.io/github/v/release/piyook/llmock)](https://github.com/piyook/llmock/releases)
-[![tests workflow](https://github.com/piyook/llmock/actions/workflows/tests.yaml/badge.svg)](https://github.com/piyook/llmock/actions/workflows/tests.yaml)
+[![GitHub Release](https://img.shields.io/github/v/release/piyook/llm-mock)](https://github.com/piyook/llm-mock/releases)
+[![tests workflow](https://github.com/piyook/llm-mock/actions/workflows/tests.yaml/badge.svg)](https://github.com/piyook/llm-mock/actions/workflows/tests.yaml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![npm version](https://img.shields.io/npm/v/llmock)](https://www.npmjs.com/package/llmock)
 
@@ -118,6 +118,8 @@ llmock start --foreground
 ```
 
 The `--foreground` flag keeps the server process attached and forwards all output to your console. This is essential for Docker containers and useful for debugging. Without this flag, the server runs as a detached background process.
+
+**Windows users:** In normal mode, the server may create a minimized terminal window. This is expected behavior for background processes on Windows. Use `llmock start --foreground` if you want to keep the server visible in your terminal.
 
 ### Option 3: Docker
 
