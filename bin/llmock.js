@@ -408,15 +408,20 @@ async function main() {
         const isE2E = process.env.E2E_MODE === 'true';
         
         if (isWindows) {
-          // On Windows, use shell but properly escape the command
+          // On Windows, use start command to minimize window
           const escapedPath = serverPath.replace(/"/g, '\\"');
-          const command = `npx tsx "${escapedPath}"`;
+          const command = `start /MIN npx tsx "${escapedPath}"`;
           serverProcess = spawn(command, [], {
             cwd: packageDir,
             stdio: 'ignore',
             shell: true,
-            detached: false
+            detached: !isE2E  // Only detach if not in E2E mode
           });
+          
+          // Only unref in normal mode, not in E2E mode
+          if (!isE2E) {
+            serverProcess.unref();
+          }
         } else {
           // On Unix systems, use direct spawn without shell
           // In E2E mode, don't detach to maintain process tree
