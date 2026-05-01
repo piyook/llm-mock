@@ -1,0 +1,54 @@
+{
+  "name": "create-llmock",
+  "version": "3.3.0",
+  "description": "Scaffolding tool for creating llmock projects",
+  "main": "index.js",
+  "type": "module",
+  "bin": {
+    "create-llmock": "./bin/create-llmock.js"
+  },
+  "keywords": [
+    "llm",
+    "mock",
+    "api",
+    "server",
+    "testing",
+    "development",
+    "scaffolding",
+    "generator"
+  ],
+  "author": "Piyook <contact@piyook.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/piyook/llm-mock.git"
+  },
+  "bugs": {
+    "url": "https://github.com/piyook/llm-mock/issues"
+  },
+  "homepage": "https://github.com/piyook/llm-mock#readme",
+  "scripts": {
+    "docker:start": "docker compose up -d --force-recreate",
+    "docker:stop": "docker compose down --volumes",
+    "docker:rebuild": "docker compose down --volumes && docker compose up -d --force-recreate --build",
+    "docker:restart": "npm run docker:stop && npm run docker:start"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "bin/**/*",
+    "templates/**/*",
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "prompts": "^2.4.2",
+    "kolorist": "^1.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/prompts": "^2.4.9"
+  }
+}

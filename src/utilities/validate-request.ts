@@ -1,4 +1,11 @@
+import { existsSync } from 'fs';
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import logger from './logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 type LogData = {
 	data: any;
@@ -21,24 +28,53 @@ export const validateRequest = async (request: any) => {
 	}
 
 	let requestTemplate: { default: JSON[] } | undefined;
+	const llmName = process.env.LLM_NAME ?? 'openai';
+	const templateFileName = `${llmName}_req.json`;
 
-	// Load request template if one exists otherwise fail validation
+	// Try to load request template from current working directory first
+	const cwdTemplatePath = resolve(
+		process.cwd(),
+		'request-templates',
+		templateFileName,
+	);
+	const srcTemplatePath = resolve(
+		__dirname,
+		'../request-templates',
+		templateFileName,
+	);
+
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-implied-eval
-		requestTemplate = (await import(
-			/* @vite-ignore */
-			`../request-templates/${process.env.LLM_NAME ?? 'openai'}_req.json`,
-			{
-				assert: { type: 'json' },
-			}
-		)) as { default: JSON[] };
+		console.log(`Looking for template: ${templateFileName}`);
+		console.log(`Checking CWD path: ${cwdTemplatePath}`);
+		console.log(`Checking SRC path: ${srcTemplatePath}`);
+		console.log(`CWD exists: ${existsSync(cwdTemplatePath)}`);
+
+		// First try current working directory
+		if (existsSync(cwdTemplatePath)) {
+			console.log(`Loading template from CWD: ${cwdTemplatePath}`);
+			const fs = await import('fs');
+			const templateData = fs.readFileSync(cwdTemplatePath, 'utf8');
+			requestTemplate = { default: JSON.parse(templateData) };
+		} else {
+			console.log(`Loading template from SRC: ${templateFileName}`);
+			// Fallback to src directory
+			// eslint-disable-next-line @typescript-eslint/no-implied-eval
+			requestTemplate = (await import(
+				/* @vite-ignore */
+				`../request-templates/${templateFileName}`,
+				{
+					assert: { type: 'json' },
+				}
+			)) as { default: JSON[] };
+		}
 	} catch {
 		console.log('INTERNAL ERROR: No request template found');
+		console.log(`Checked: ${cwdTemplatePath} and ${srcTemplatePath}`);
 		logRequestBody({
 			data: request.body,
 			state: 'FAILED',
 			reason: 'MISSING LLM REQUEST TEMPLATE',
-			information: 'Add LLM template in request-templates folder',
+			information: `Add ${templateFileName} in request-templates folder in current directory or src/request-templates`,
 		});
 		return false;
 	}

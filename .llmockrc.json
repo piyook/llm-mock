@@ -1,0 +1,85 @@
+{
+  "defaultModel": "chatgpt",
+  "models": {
+    "chatgpt": {
+      "name": "openai",
+      "model": "gpt-4o",
+      "endpoint": "chatgpt/chat/completions",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": true,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 3000,
+        "max": 5000
+      },
+      "embeddings": {
+        "enabled": true,
+        "dimensions": 128
+      }
+    },
+    "gemini": {
+      "name": "gemini",
+      "model": "gemini-pro",
+      "endpoint": "models/gemini-pro:generateContent",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": true,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 3000,
+        "max": 5000
+      },
+      "embeddings": {
+        "enabled": true,
+        "dimensions": 128
+      }
+    },
+    "streaming": {
+      "name": "openai",
+      "model": "gpt-4o",
+      "endpoint": "chatgpt/chat/completions",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": true,
+      "debug": false,
+      "stream": true,
+      "responseDelay": {
+        "min": 3000,
+        "max": 5000
+      },
+      "embeddings": {
+        "enabled": true,
+        "dimensions": 128
+      }
+    },
+    "embeddings": {
+      "name": "openai",
+      "model": "text-embedding-3-small",
+      "endpoint": "chatgpt/chat/completions",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": true,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 3000,
+        "max": 5000
+      },
+      "embeddings": {
+        "enabled": true,
+        "dimensions": 128
+      }
+    }
+  },
+  "server": {
+    "port": 8001,
+    "host": "0.0.0.0"
+  }
+}
