@@ -12,10 +12,10 @@ jobs:
     lint:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'npm'
             - run: npm ci
             - run: npm run lint -- --deny-warnings
@@ -23,10 +23,10 @@ jobs:
     prettier:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'npm'
             - run: npm ci
             - run: npm run pretty
@@ -34,10 +34,10 @@ jobs:
     audit:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'npm'
             - run: npm ci
             - run: npm audit --omit=dev
@@ -46,10 +46,10 @@ jobs:
         needs: [lint, prettier, audit]
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'npm'
             - run: npm ci
             - run: npm run test:unit
@@ -59,15 +59,15 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'npm'
 
             - name: Cache Cypress binary
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   path: ~/.cache/Cypress
                   key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
