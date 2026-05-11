@@ -1,6 +1,6 @@
 {
 	"name": "llmock",
-	"version": "3.3.1",
+	"version": "3.3.2",
 	"description": "A configurable mock LLM API server for testing and development",
 	"main": "./src/server.ts",
 	"type": "module",
@@ -79,17 +79,17 @@
 		"typescript": "^6.0.3"
 	},
 	"devDependencies": {
-		"@commitlint/cli": "^20.5.3",
-		"@commitlint/config-conventional": "^20.5.3",
+		"@commitlint/cli": "^21.0.0",
+		"@commitlint/config-conventional": "^21.0.0",
 		"@types/chai-json-schema": "^1.4.10",
-		"@types/node": "^25.6.0",
+		"@types/node": "^25.6.2",
 		"chai-json-schema": "^1.5.1",
 		"cypress": "^15.14.2",
 		"husky": "^9.1.7",
-		"lint-staged": "^16.4.0",
-		"oxlint": "^1.62.0",
+		"lint-staged": "^17.0.4",
+		"oxlint": "^1.63.0",
 		"prettier": "3.8.3",
-		"torch-it": "^2.5.4",
+		"torch-it": "^2.6.1",
 		"validate-branch-name": "^1.3.2",
 		"vitest": "^4.1.5"
 	},
