@@ -19,7 +19,7 @@
     "compile-ui": "npm --prefix ../ui run build"
   },
   "dependencies": {
-    "llmock": "^3.3.1"
+    "llmock": "^3.3.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0"
