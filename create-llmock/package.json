@@ -1,6 +1,6 @@
 {
   "name": "create-llmock",
-  "version": "3.3.2",
+  "version": "3.3.3",
   "description": "Scaffolding tool for creating llmock projects",
   "main": "index.js",
   "type": "module",
@@ -48,7 +48,7 @@
     "kolorist": "^1.8.0"
   },
   "devDependencies": {
-    "@types/node": "^25.6.2",
+    "@types/node": "^25.9.1",
     "@types/prompts": "^2.4.9"
   }
 }
