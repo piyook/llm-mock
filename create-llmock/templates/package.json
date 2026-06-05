@@ -1,6 +1,6 @@
 {
   "name": "{{PROJECT_NAME}}",
-  "version": "3.3.2",
+  "version": "3.3.3",
   "description": "LLMock project for testing LLM APIs",
   "private": true,
   "type": "module",
@@ -19,7 +19,7 @@
     "compile-ui": "npm --prefix ../ui run build"
   },
   "dependencies": {
-    "llmock": "^3.3.2"
+    "llmock": "^3.3.3"
   },
   "devDependencies": {
     "@types/node": "^20.0.0"
