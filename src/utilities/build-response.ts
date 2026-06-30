@@ -12,9 +12,7 @@ type ResponseTemplate = {
 };
 
 type DynamicContent =
-	| string
-	| DynamicContent[]
-	| { [key: string]: DynamicContent };
+	string | DynamicContent[] | { [key: string]: DynamicContent };
 
 export const buildResponse = async (content: DynamicContent) => {
 	const llmName = process.env.LLM_NAME ?? 'openai';

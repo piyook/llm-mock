@@ -1,6 +1,6 @@
 {
   "name": "create-llmock",
-  "version": "3.3.3",
+  "version": "3.3.4",
   "description": "Scaffolding tool for creating llmock projects",
   "main": "index.js",
   "type": "module",
