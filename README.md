@@ -27,6 +27,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 ## Why LLMock?
 
 - **Free and fast** — no API costs, instant responses for rapid prototyping
+- **Simple and lightweight** — easier to set up than a local model and uses far fewer system resources
 - **Consistent testing** — predictable, repeatable responses for testing UI logic
 - **Offline capable** — works without internet connectivity
 - **Full visibility** — complete request logging and a live dashboard
