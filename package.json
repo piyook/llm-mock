@@ -68,7 +68,7 @@
     	"llmock:start:gemini": "node scripts/llmock.mjs start --model=gemini",
     	"llmock:start:streaming": "node scripts/llmock.mjs start --model=streaming",
     	"llmock:start:embeddings": "node scripts/llmock.mjs start --model=embeddings",
-    	"llmock:stop": "llmock stop"
+    	"llmock:stop": "node bin/llmock.js stop"
 	},
 	"dependencies": {
 		"@faker-js/faker": "^10.5.0",
