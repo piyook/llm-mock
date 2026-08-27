@@ -1,6 +1,9 @@
 name: standard checks
 
 on:
+    push:
+      branches:
+        - main
     workflow_dispatch:
     pull_request:
         types: [opened, edited, synchronize]
@@ -12,10 +15,10 @@ jobs:
     lint:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'npm'
             - run: npm ci
             - run: npm run lint -- --deny-warnings
@@ -23,10 +26,10 @@ jobs:
     prettier:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'npm'
             - run: npm ci
             - run: npm run pretty
@@ -34,36 +37,49 @@ jobs:
     audit:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'npm'
             - run: npm ci
             - run: npm audit --omit=dev
 
     unit_tests:
         needs: [lint, prettier, audit]
+        if: always()
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'npm'
             - run: npm ci
             - run: npm run test:unit
 
     e2e_tests:
         needs: [unit_tests]
+        if: always()
         runs-on: ubuntu-latest
         steps:
             - name: Checkout
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
 
-            - uses: actions/setup-node@v4
+            - uses: actions/setup-node@v6
               with:
-                  node-version: '20'
+                  node-version: '24'
                   cache: 'npm'
+
+            - name: Cache Cypress binary
+              uses: actions/cache@v5
+              with:
+                  path: ~/.cache/Cypress
+                  key: cypress-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
             - run: npm ci
+
+            - name: Verify Cypress
+              run: npx cypress verify
+
             - run: npm run test:e2e

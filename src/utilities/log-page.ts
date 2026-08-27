@@ -1,15 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import envPaths from 'env-paths';
 import type { FastifyInstance } from 'fastify';
 import { prettyPrintJson } from 'pretty-print-json';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Get OS-appropriate log directory
+const paths = envPaths('llm-mock');
+const logFolder = paths.log;
+
 const createHtml = () => {
 	function readLogs() {
-		const logFolder = `${__dirname}/../logs`;
 		const logPath = path.join(logFolder, 'api_request_log.json');
 		let logs = '';
 		// Append the log entry to the log file

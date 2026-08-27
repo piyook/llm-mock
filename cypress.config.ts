@@ -2,6 +2,6 @@ import { defineConfig } from 'cypress';
 
 export default defineConfig({
 	e2e: {
-		baseUrl: `http://127.0.0.1:${process.env.SERVER_PORT ?? '8001'}`,
+		baseUrl: `http://localhost:${process.env.SERVER_PORT ?? '8001'}`,
 	},
 });

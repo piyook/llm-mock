@@ -1,0 +1,30 @@
+{
+  "name": "{{PROJECT_NAME}}",
+  "version": "3.3.5",
+  "description": "LLMock project for testing LLM APIs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "llmock:start": "llmock start",
+    "llmock:stop": "llmock stop",
+    "llmock:chatgpt": "llmock --model=chatgpt",
+    "llmock:gemini": "llmock --model=gemini",
+    "llmock:streaming": "llmock --model=streaming",
+    "llmock:embeddings": "llmock --model=embeddings",
+    "docker-start": "llmock start --foreground",
+    "docker:start": "docker compose up -d --force-recreate",
+    "docker:stop": "docker compose down --volumes",
+    "docker:rebuild": "docker compose down --volumes && docker compose up -d --force-recreate --build",
+    "docker:restart": "npm run docker:stop && npm run docker:start",
+    "compile-ui": "npm --prefix ../ui run build"
+  },
+  "dependencies": {
+    "llmock": "^3.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

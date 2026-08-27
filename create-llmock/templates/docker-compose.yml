@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  llmock-server:
+    build: .
+    ports:
+      - "8001:8001"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    volumes:
+      - ./.llmockrc.json:/app/.llmockrc.json:ro

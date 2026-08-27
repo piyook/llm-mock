@@ -1,10 +1,21 @@
-import '@dotenvx/dotenvx';
 import fastify from 'fastify';
 import * as seeders from './seeders/index.js';
 import getApiRoutes from './utilities/file-scan.js';
 import serverPage from './utilities/server-page.js';
 import logPage from './utilities/log-page.js';
 import { dbLoadFromDisk } from './models/db.js';
+import {
+	setEnvironmentFromConfig,
+	getCurrentModel,
+	loadConfig,
+} from './config/config-loader.js';
+
+// Initialize configuration from .llmockrc.json
+// Use config path from CLI if available, otherwise look in current working directory
+const configPath = process.env.CONFIG_PATH;
+const config = loadConfig(configPath);
+const modelName = process.env.LLM_MODEL_NAME || config.defaultModel;
+setEnvironmentFromConfig(modelName);
 
 const app = fastify({ logger: false });
 
@@ -38,16 +49,23 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 try {
+	const currentModel = getCurrentModel();
 	await app.listen({
-		port: Number(process.env?.SERVER_PORT ?? 8000),
-		host: '0.0.0.0',
+		port: Number(process.env?.SERVER_PORT ?? 8001),
+		host: process.env?.SERVER_HOST || '0.0.0.0',
 	});
 	console.log('\n*****************************************************');
 	console.log(
-		`SERVER UP AND RUNNING ON LOCALHOST:${process.env?.SERVER_PORT ?? 8000}`,
+		`SERVER UP AND RUNNING ON LOCALHOST:${process.env?.SERVER_PORT ?? 8001}`,
 	);
+	console.log(`USING MODEL: ${currentModel?.toUpperCase() || 'CHATGPT'}`);
 	console.log('*****************************************************');
 } catch (error) {
+	console.error('Server startup error:', error);
+	if (error instanceof Error) {
+		console.error('Error details:', error.message);
+		console.error('Error stack:', error.stack);
+	}
 	app.log.error(error);
 	process.exit(1);
 }

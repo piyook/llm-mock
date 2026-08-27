@@ -1,7 +1,139 @@
-node_modules
+# Dependencies
+node_modules/
+ui/node_modules/
+
+# Build artifacts and outputs
+*.tgz
+*.tar.gz
+dist/
+build/
+ui/dist/
+out/
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
 /src/logs/*.json
-cypress/screenshots
-cypress/videos
-ui/node_modules
-ui/dist
+src/logs/*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+.nyc_output/
+
+# Dependency directories
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Test artifacts
+cypress/screenshots/
+cypress/videos/
+test-results/
+coverage/
+
+# Husky
+.husky/_
+
+# Package manager lock files (keep package-lock.json but ignore others)
+yarn.lock
+pnpm-lock.yaml
+
+# Local configuration files (keep .llmock-rc.json but ignore others)
+.llmock-rc.local.json
+.llmock-rc.development.json
+.llmock-rc.production.json
+
+# Development scripts that shouldn't be committed
+scripts/local-*
+scripts/dev-*
+
+# API keys and secrets
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+
+# local trial folders
+trial/*
