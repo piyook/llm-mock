@@ -9,6 +9,7 @@
     "llmock:stop": "llmock stop",
     "llmock:chatgpt": "llmock --model=chatgpt",
     "llmock:gemini": "llmock --model=gemini",
+    "llmock:claude": "llmock --model=claude",
     "llmock:streaming": "llmock --model=streaming",
     "llmock:embeddings": "llmock --model=embeddings",
     "docker-start": "llmock start --foreground",

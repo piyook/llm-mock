@@ -41,6 +41,7 @@ my-project/
 | `npm run llmock:stop` | Stop the server |
 | `npm run llmock:chatgpt` | Run with ChatGPT model |
 | `npm run llmock:gemini` | Run with Gemini model |
+| `npm run llmock:claude` | Run with Claude (Anthropic Messages API) model |
 | `npm run llmock:streaming` | Run with streaming responses |
 | `npm run llmock:embeddings` | Run with embeddings model |
 

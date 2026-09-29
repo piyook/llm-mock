@@ -25,6 +25,7 @@ This project uses LLMock to provide mock LLM API responses for testing and devel
 - `npm run llmock:stop` - Stop the LLMock server
 - `npm run llmock:chatgpt` - Run with ChatGPT model
 - `npm run llmock:gemini` - Run with Gemini model
+- `npm run llmock:claude` - Run with Claude (Anthropic Messages API) model
 - `npm run llmock:streaming` - Run with streaming responses
 - `npm run llmock:embeddings` - Run with embeddings model
 
