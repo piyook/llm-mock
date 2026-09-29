@@ -1,12 +1,14 @@
 /* eslint-disable  @typescript-eslint/naming-convention */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
-	estimateTokens,
 	generateClaudeStreamingChunks,
 	handleClaudeStreamingResponse,
-	resolveClaudeModel,
 	streamClaudeEvents,
 } from '../../utilities/build-claude-streaming-response.js';
+import {
+	estimateTokens,
+	resolveClaudeModel,
+} from '../../utilities/build-claude-response.js';
 
 type ParsedEvent = { event: string; data: any };
 

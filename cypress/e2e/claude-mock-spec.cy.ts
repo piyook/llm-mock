@@ -48,6 +48,31 @@ describe('Mock LLM Spec for Claude (Anthropic Messages API)', () => {
             );
         });
 
+        it('gives each response a unique id and reports usage', () => {
+            const send = () =>
+                cy.request({ method: 'POST', url, body: baseBody });
+
+            send().then((first) => {
+                send().then((second) => {
+                    expect(first.body.id).to.match(/^msg_[A-Za-z0-9]{24}$/);
+                    expect(second.body.id).to.not.eq(first.body.id);
+                    expect(first.body.usage.input_tokens).to.be.greaterThan(0);
+                    expect(first.body.usage.output_tokens).to.be.greaterThan(0);
+                    expect(first.body).to.not.have.property('created_at');
+                });
+            });
+        });
+
+        it('echoes the requested model', () => {
+            cy.request({
+                method: 'POST',
+                url,
+                body: { ...baseBody, model: 'claude-test-model' },
+            }).then((response) => {
+                expect(response.body.model).to.eq('claude-test-model');
+            });
+        });
+
         it('returns a static message when stream is false', () => {
             cy.request({
                 method: 'POST',

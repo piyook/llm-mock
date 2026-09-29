@@ -1,27 +1,11 @@
-import { faker } from '@faker-js/faker';
 import { delay, getDelayConfig } from './delay.js';
-
-const DEFAULT_MODEL = 'claude-opus-5-5';
-
-/**
- * Model name to echo back: the request's `model`, else the preset's model.
- */
-export const resolveClaudeModel = (body: unknown): string => {
-	const requested =
-		typeof body === 'object' && body !== null
-			? (body as { model?: unknown }).model
-			: undefined;
-
-	return typeof requested === 'string' && requested
-		? requested
-		: (process.env.LLM_MODEL ?? DEFAULT_MODEL);
-};
-
-// Rough estimate (about 4 characters per token) - the mock never tokenizes.
-export const estimateTokens = (value: unknown): number => {
-	const text = typeof value === 'string' ? value : JSON.stringify(value);
-	return Math.max(1, Math.ceil((text?.length ?? 0) / 4));
-};
+import {
+	DEFAULT_CLAUDE_MODEL,
+	estimateInputTokens,
+	estimateTokens,
+	newClaudeMessageId,
+	resolveClaudeModel,
+} from './build-claude-response.js';
 
 // Split after each run of whitespace so the pieces join back to `content`
 // exactly (newlines included, which matters for JSON bodies).
@@ -55,10 +39,10 @@ const toEvent = (type: string, payload: Record<string, unknown>) =>
  */
 export const generateClaudeStreamingChunks = (
 	content: string,
-	model: string = DEFAULT_MODEL,
+	model: string = DEFAULT_CLAUDE_MODEL,
 	inputTokens: number = 1,
 ): string[] => {
-	const id = `msg_${faker.string.alphanumeric(24)}`;
+	const id = newClaudeMessageId();
 	const outputTokens = estimateTokens(content);
 
 	return [
@@ -136,9 +120,7 @@ export const handleClaudeStreamingResponse = async (
 		const events = generateClaudeStreamingChunks(
 			content,
 			resolveClaudeModel(body),
-			estimateTokens(
-				(body as { messages?: unknown } | undefined)?.messages ?? '',
-			),
+			estimateInputTokens(body),
 		);
 
 		reply.hijack();

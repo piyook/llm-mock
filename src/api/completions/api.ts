@@ -7,6 +7,7 @@ import {
 	handleStreamingResponse,
 	applyResponseDelay,
 } from '../../utilities/response-helpers.js';
+import { buildClaudeStaticResponse } from '../../utilities/build-claude-response.js';
 import { handleClaudeStreamingResponse } from '../../utilities/build-claude-streaming-response.js';
 import { shouldStream } from '../../utilities/stream-mode.js';
 
@@ -34,7 +35,11 @@ const handleRequest = async (reply: any, body?: unknown) => {
 		// === STATIC MODE ===
 		// Returns single JSON response matching OpenAI chat.completion format
 		// Uses openai_res.json template with DYNAMIC_CONTENT_HERE replacement
-		const response = await buildStaticResponse(content);
+		// The claude preset adds a unique id, echoed model and token usage
+		const response =
+			process.env?.LLM_NAME === 'claude'
+				? await buildClaudeStaticResponse(content, body)
+				: await buildStaticResponse(content);
 		return reply.send(response);
 	}
 
