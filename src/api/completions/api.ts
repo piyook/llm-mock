@@ -7,6 +7,7 @@ import {
 	handleStreamingResponse,
 	applyResponseDelay,
 } from '../../utilities/response-helpers.js';
+import { handleClaudeStreamingResponse } from '../../utilities/build-claude-streaming-response.js';
 import { shouldStream } from '../../utilities/stream-mode.js';
 
 // Static JSON vs SSE stream is decided per request by shouldStream():
@@ -35,13 +36,19 @@ const handleRequest = async (reply: any, body?: unknown) => {
 		// Uses openai_res.json template with DYNAMIC_CONTENT_HERE replacement
 		const response = await buildStaticResponse(content);
 		return reply.send(response);
-	} else {
-		// === STREAMING MODE ===
-		// Returns OpenAI-style Server-Sent Events stream with chat.completion.chunk events
-		// Streaming format is compatible with OpenAI chat-completions streaming API
-		// Content is split into multiple chunks with proper SSE headers and timing
-		return await handleStreamingResponse(content, reply);
 	}
+
+	if (process.env?.LLM_NAME === 'claude') {
+		// === CLAUDE STREAMING MODE ===
+		// Anthropic Messages SSE events (message_start ... message_stop)
+		return await handleClaudeStreamingResponse(content, reply, body);
+	}
+
+	// === STREAMING MODE ===
+	// Returns OpenAI-style Server-Sent Events stream with chat.completion.chunk events
+	// Streaming format is compatible with OpenAI chat-completions streaming API
+	// Content is split into multiple chunks with proper SSE headers and timing
+	return await handleStreamingResponse(content, reply);
 };
 
 function handler(app: FastifyInstance, pathName: string) {
