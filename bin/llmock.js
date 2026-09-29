@@ -283,10 +283,15 @@ function getDefaultConfig() {
   };
 }
 
+// Config file to use: CONFIG_PATH (e.g. the e2e test config) or ./.llmockrc.json
+function resolveConfigPath() {
+  return resolve(process.cwd(), process.env.CONFIG_PATH || '.llmockrc.json');
+}
+
 // Load configuration
 async function loadConfig() {
   let config;
-  let configPath = resolve(process.cwd(), '.llmockrc.json');
+  let configPath = resolveConfigPath();
   
   // Try to load local config file first
   if (existsSync(configPath)) {
@@ -377,7 +382,7 @@ async function main() {
     // Handle start command (default)
     if (command === 'start') {
       const { config, modelName: selectedModel } = await loadConfig();
-      const configPath = resolve(process.cwd(), '.llmockrc.json');
+      const configPath = resolveConfigPath();
       setEnvironmentVariables(config, selectedModel, configPath);
     
       console.log(`Starting LLM Mock Server with model: ${selectedModel}`);
