@@ -7,29 +7,29 @@ import {
 	handleStreamingResponse,
 	applyResponseDelay,
 } from '../../utilities/response-helpers.js';
+import { shouldStream } from '../../utilities/stream-mode.js';
 
-// Read STREAM env variable at startup
-// Controls whether responses are sent as static JSON or SSE streams
-// STREAM=true: Returns OpenAI-style Server-Sent Events stream
-// STREAM=false: Returns single static JSON response (default behavior)
-const isStreamingMode = process.env?.STREAM?.toLowerCase() === 'true';
+// Static JSON vs SSE stream is decided per request by shouldStream():
+// - claude preset: the request body's `stream` field
+// - other presets: the STREAM env variable (true = OpenAI-style SSE, default false)
 
 /**
  * Handles the common request processing logic for both GET and POST routes
  * Applies delay, generates content, and returns appropriate response format
  *
  * @param reply - Fastify reply object
+ * @param body - Parsed request body (undefined for GET requests)
  * @returns Promise<void>
  */
-const handleRequest = async (reply: any) => {
+const handleRequest = async (reply: any, body?: unknown) => {
 	// Apply configured response delay for realistic API simulation
 	await applyResponseDelay();
 
 	// Generate mock response content (lorem or stored based on configuration)
 	const content = await generateResponseContent();
 
-	// Route to appropriate response handler based on STREAM environment variable
-	if (!isStreamingMode) {
+	// Route to appropriate response handler (see shouldStream for the rules)
+	if (!shouldStream(process.env?.LLM_NAME, body, process.env?.STREAM)) {
 		// === STATIC MODE ===
 		// Returns single JSON response matching OpenAI chat.completion format
 		// Uses openai_res.json template with DYNAMIC_CONTENT_HERE replacement
@@ -60,7 +60,7 @@ function handler(app: FastifyInstance, pathName: string) {
 	app.post(`/${fullPath}`, async (request, reply) => {
 		// Validate incoming request against template to ensure API compatibility
 		if (await validateRequest(request)) {
-			return await handleRequest(reply);
+			return await handleRequest(reply, request.body);
 		}
 
 		// Return detailed error message for invalid requests
