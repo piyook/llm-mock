@@ -33,6 +33,8 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - **Full visibility** — complete request logging and a live dashboard
 - **Realistic simulation** — configurable delays, SSE streaming, and mock embeddings
 - **OpenAI-compatible** — works with ChatGPT, Grok, Llama, DeepSeek, Gemini, and any OpenAI-style API
+- **Anthropic Messages API** — built-in `claude` preset with the SDK's streaming event format
+- **Fixture replies** — return canned text or JSON for requests that contain a chosen string
 
 Built on [Fastify](https://www.fastify.io/) for high performance and reliability.
 
@@ -185,6 +187,7 @@ All settings live in `.llmockrc.json` in your project root. CLI flags always ove
 | `debug` | Enable verbose console logging |
 | `stream` | Return SSE streaming responses |
 | `responseDelay.min/max` | Response delay range in milliseconds |
+| `responseRules` | Optional list of `{ match, file }` fixture replies (see [Response rules](#response-rules-fixture-replies)) |
 | `embeddings.enabled` | Enable the `/v1/embeddings` endpoint |
 | `embeddings.dimensions` | Embedding vector size |
 
@@ -240,6 +243,31 @@ llmock start --model=my-model
 }
 ```
 
+### Response rules (fixture replies)
+
+Lorem text is fine for UI work, but some callers expect a specific shape, such as JSON that gets parsed. Add `responseRules` to a preset to return the contents of a file whenever the request contains a given string:
+
+```json
+{
+  "models": {
+    "chatgpt": {
+      "responseRules": [
+        { "match": "Classify this support ticket", "file": "fixtures/triage.json" },
+        { "match": "Summarise the thread", "file": "fixtures/summary.txt" }
+      ]
+    }
+  }
+}
+```
+
+With a request whose message contains `Classify this support ticket`, the server replies with `fixtures/triage.json` as the message text, so the client can `JSON.parse` it. Anything that matches no rule gets the normal generated response.
+
+- `match` is a case-sensitive substring, tested against every string value in the request body (message text, system prompt, content blocks), not against JSON keys.
+- Rules are checked in order and the first match wins. `match` and `file` must be non-empty strings.
+- `file` is resolved relative to the folder holding the config file, and is read exactly as written (including any trailing newline).
+- A malformed rule stops the server at startup. An unreadable fixture logs a warning at startup, and a request that matches it returns an error rather than falling back to lorem.
+- Works with every preset and with both static and streamed replies.
+
 ### Streaming responses
 
 Enable OpenAI-style Server-Sent Events (SSE) streaming in your config or via CLI:
@@ -251,6 +279,8 @@ Enable OpenAI-style Server-Sent Events (SSE) streaming in your config or via CLI
 ```bash
 llmock start --stream=true
 ```
+
+For the `claude` preset streaming is chosen per request instead: it streams when the request body has `"stream": true`, whatever this setting says (see [Anthropic](#anthropic-claude-messages-api)).
 
 When enabled, the endpoint returns a chunked SSE stream. The first few chunks arrive immediately (mimicking real LLM behaviour), with subsequent chunks following the configured delay.
 
@@ -485,7 +515,55 @@ const embeddings =
 
 ## Supporting Different LLM Providers
 
-LLMock supports any provider that uses the OpenAI chat completion format: ChatGPT, Grok, Llama, DeepSeek, Mistral, Claude, Gemini, and more. For providers with different request/response shapes, create custom templates.
+LLMock supports any provider that uses the OpenAI chat completion format: ChatGPT, Grok, Llama, DeepSeek, Mistral, Gemini, and more. Anthropic's Messages API has its own built-in preset (below). For other providers with different request/response shapes, create custom templates.
+
+### Anthropic (Claude Messages API)
+
+The `claude` preset serves `POST /v1/messages`. Add it to `.llmockrc.json` if your config doesn't already have it:
+
+```json
+{
+  "models": {
+    "claude": {
+      "name": "claude",
+      "model": "claude-opus-5-5",
+      "endpoint": "v1/messages",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "stream": false,
+      "responseDelay": { "min": 200, "max": 800 },
+      "embeddings": { "enabled": false, "dimensions": 128 }
+    }
+  }
+}
+```
+
+```bash
+llmock start --model=claude
+```
+
+Point the official SDK at it with a base URL and a dummy key (the SDK refuses to send without one):
+
+```bash
+ANTHROPIC_BASE_URL=http://localhost:8001 ANTHROPIC_API_KEY=mock-key node app.js
+```
+
+```js
+const client = new Anthropic({ baseURL: 'http://localhost:8001', apiKey: 'mock-key' });
+const message = await client.messages.stream({
+  model: 'claude-opus-5-5',
+  max_tokens: 256,
+  messages: [{ role: 'user', content: 'Hello' }],
+}).finalMessage();
+```
+
+Behaviour:
+
+- **Request validation** requires only `model`, `max_tokens` and `messages`. Extra fields (`system`, `output_config`, `temperature`, ...) are accepted.
+- **Streaming is per request.** `"stream": true` returns Anthropic SSE events in order: `message_start`, `content_block_start`, `content_block_delta` (text deltas that rejoin to the full text), `content_block_stop`, `message_delta` (`stop_reason: "end_turn"`), `message_stop`. Otherwise a single `message` object is returned.
+- **Responses** have a unique `msg_` id, echo the requested `model`, and report estimated `usage` (about 4 characters per token).
+- [Response rules](#response-rules-fixture-replies) work here too, matching against `system` as well as `messages`.
 
 ### Template locations
 
