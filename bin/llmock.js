@@ -3,6 +3,7 @@
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { existsSync } from 'fs';
+import { parseListeningPids, tsxCliPath } from './process-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -164,9 +165,10 @@ async function stopServer(port = 8001) {
   const isWindows = process.platform === 'win32';
 
   return new Promise((resolve) => {
+    // Only the listening process, not clients connected to the port
     const findCommand = isWindows
-      ? `netstat -ano | findstr :${port}`
-      : `lsof -ti tcp:${port}`;
+      ? 'netstat -ano'
+      : `lsof -ti tcp:${port} -sTCP:LISTEN`;
 
     exec(findCommand, (error, stdout) => {
       if (error || !stdout.trim()) {
@@ -178,11 +180,7 @@ async function stopServer(port = 8001) {
       let pids = [];
 
       if (isWindows) {
-        pids = [...new Set(
-          stdout.trim().split('\n')
-            .map(line => line.trim().split(/\s+/).at(-1))
-            .filter(pid => pid && /^\d+$/.test(pid))
-        )];
+        pids = parseListeningPids(stdout, port);
       } else {
         pids = stdout.trim().split('\n').filter(Boolean);
       }
@@ -194,7 +192,7 @@ async function stopServer(port = 8001) {
       }
 
       const killCommand = isWindows
-        ? pids.map(pid => `taskkill /PID ${pid} /F`).join(' && ')
+        ? pids.map(pid => `taskkill /PID ${pid} /T /F`).join(' && ')
         : `kill -9 ${pids.join(' ')}`;
 
       exec(killCommand, () => {
@@ -394,14 +392,16 @@ async function main() {
       const serverPath = resolve(__dirname, '../src/server.ts');
       const packageDir = resolve(__dirname, '..');
       
-      // Use spawn to run TypeScript server with proper detachment
-      // On Windows, we need to handle this differently
-      const isWindows = process.platform === 'win32';
+      // Run tsx's CLI with the current node binary rather than through npx, a
+      // shell or `start`. This behaves the same on every platform, never opens
+      // a console window on Windows, and the spawned pid is the real process.
+      const isE2E = process.env.E2E_MODE === 'true';
+      const serverArgs = [tsxCliPath(), serverPath];
       let serverProcess;
-      
+
       if (foregroundMode) {
         // Run in foreground mode for Docker - keep process attached
-        serverProcess = spawn('npx', ['tsx', serverPath], {
+        serverProcess = spawn(process.execPath, serverArgs, {
           cwd: packageDir,
           stdio: 'inherit',
           detached: false
@@ -422,36 +422,17 @@ async function main() {
         });
         
       } else {
-        // Check if we're in E2E mode
-        const isE2E = process.env.E2E_MODE === 'true';
-        
-        if (isWindows) {
-          // On Windows, use start command to minimize window
-          const escapedPath = serverPath.replace(/"/g, '\\"');
-          const command = `start /MIN npx tsx "${escapedPath}"`;
-          serverProcess = spawn(command, [], {
-            cwd: packageDir,
-            stdio: 'ignore',
-            shell: true,
-            detached: !isE2E  // Only detach if not in E2E mode
-          });
-          
-          // Only unref in normal mode, not in E2E mode
-          if (!isE2E) {
-            serverProcess.unref();
-          }
-        } else {
-          // On Unix systems, use direct spawn without shell
-          // In E2E mode, don't detach to maintain process tree
-          serverProcess = spawn('npx', ['tsx', serverPath], {
-            cwd: packageDir,
-            stdio: 'pipe',
-            detached: !isE2E  // Only detach if not in E2E mode
-          });
-        }
-        
-        // Detach from the server process (non-Windows) only if not in E2E mode
-        if (!isWindows && !isE2E) {
+        // Normal use detaches so the CLI can exit. E2E mode stays attached so
+        // the test runner owns the process tree. windowsHide stops Windows
+        // opening a console window for the detached server.
+        serverProcess = spawn(process.execPath, serverArgs, {
+          cwd: packageDir,
+          stdio: isE2E ? 'inherit' : 'ignore',
+          detached: !isE2E,
+          windowsHide: true
+        });
+
+        if (!isE2E) {
           serverProcess.unref();
         }
         

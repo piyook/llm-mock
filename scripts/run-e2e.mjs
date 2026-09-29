@@ -18,7 +18,10 @@ const startServer = (npmScript) => {
       stdio: 'inherit',
       env: { ...process.env, CONFIG_PATH: '.llmockrc.test.json', E2E_MODE: 'true' },
       shell: true,
-      detached: true, // Create new process group
+      // A new process group lets us kill the tree on Unix. On Windows
+      // `detached` opens a console window, and taskkill /T covers the tree.
+      detached: process.platform !== 'win32',
+      windowsHide: true,
     });
 
     proc.on('error', reject);
