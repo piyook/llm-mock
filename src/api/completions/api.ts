@@ -28,7 +28,7 @@ const handleRequest = async (reply: any, body?: unknown) => {
 	await applyResponseDelay();
 
 	// Generate mock response content (lorem or stored based on configuration)
-	const content = await generateResponseContent();
+	const content = await generateResponseContent(body);
 
 	// Route to appropriate response handler (see shouldStream for the rules)
 	if (!shouldStream(process.env?.LLM_NAME, body, process.env?.STREAM)) {

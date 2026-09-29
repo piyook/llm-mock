@@ -145,6 +145,90 @@ describe('Mock LLM Spec for Claude (Anthropic Messages API)', () => {
         });
     });
 
+    describe('response rules (fixture replies)', () => {
+        const fixturePath = 'cypress/fixtures/mock-rules/plain-reply.txt';
+        const ruleBody = (marker: string, extra = {}) => ({
+            ...baseBody,
+            messages: [{ role: 'user', content: `please answer ${marker}` }],
+            ...extra,
+        });
+
+        it('returns the fixture text exactly on the static path', () => {
+            cy.readFile(fixturePath).then((expected) => {
+                cy.request({
+                    method: 'POST',
+                    url,
+                    body: ruleBody('E2E_FIXTURE_TEXT'),
+                }).then((response) => {
+                    expect(response.body.content[0].text).to.eq(expected);
+                    expect(response.body.type).to.eq('message');
+                });
+            });
+        });
+
+        it('streams the fixture text so the deltas rejoin exactly', () => {
+            cy.readFile(fixturePath).then((expected) => {
+                cy.request({
+                    method: 'POST',
+                    url,
+                    body: ruleBody('E2E_FIXTURE_TEXT', { stream: true }),
+                }).then((response) => {
+                    const text = parseSse(response.body as string)
+                        .filter((e) => e.event === 'content_block_delta')
+                        .map((e) => e.data.delta.text)
+                        .join('');
+                    expect(text).to.eq(expected);
+                });
+            });
+        });
+
+        it('returns a JSON fixture that parses back to the file', () => {
+            cy.readFile('cypress/fixtures/mock-rules/json-reply.json').then(
+                (expected) => {
+                    cy.request({
+                        method: 'POST',
+                        url,
+                        body: ruleBody('E2E_FIXTURE_JSON'),
+                    }).then((response) => {
+                        const parsed = JSON.parse(
+                            response.body.content[0].text,
+                        );
+                        expect(parsed).to.deep.eq(expected);
+                    });
+                },
+            );
+        });
+
+        it('matches a marker in the system prompt', () => {
+            cy.readFile(fixturePath).then((expected) => {
+                cy.request({
+                    method: 'POST',
+                    url,
+                    body: {
+                        ...baseBody,
+                        system: [{ type: 'text', text: 'E2E_FIXTURE_TEXT' }],
+                    },
+                }).then((response) => {
+                    expect(response.body.content[0].text).to.eq(expected);
+                });
+            });
+        });
+
+        it('generates normal text when no rule matches', () => {
+            cy.readFile(fixturePath).then((fixture) => {
+                cy.request({
+                    method: 'POST',
+                    url,
+                    body: ruleBody('nothing special'),
+                }).then((response) => {
+                    const text = response.body.content[0].text;
+                    expect(text).to.not.eq(fixture);
+                    expect(text.length).to.be.greaterThan(0);
+                });
+            });
+        });
+    });
+
     describe('request validation', () => {
         it('accepts a body shaped like the Anthropic SDK sends', () => {
             cy.request({

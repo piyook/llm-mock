@@ -7,8 +7,10 @@ import { dbLoadFromDisk } from './models/db.js';
 import {
 	setEnvironmentFromConfig,
 	getCurrentModel,
+	getResponseRules,
 	loadConfig,
 } from './config/config-loader.js';
+import { loadRuleContent } from './utilities/response-rules.js';
 
 // Initialize configuration from .llmockrc.json
 // Use config path from CLI if available, otherwise look in current working directory
@@ -16,6 +18,16 @@ const configPath = process.env.CONFIG_PATH;
 const config = loadConfig(configPath);
 const modelName = process.env.LLM_MODEL_NAME || config.defaultModel;
 setEnvironmentFromConfig(modelName);
+
+// Fail fast on malformed responseRules and warn about fixture files that can't be read
+const { rules: responseRules, baseDir: rulesDir } = getResponseRules();
+for (const rule of responseRules) {
+	try {
+		loadRuleContent(rule, rulesDir);
+	} catch (error) {
+		console.warn(`WARNING: ${(error as Error).message}`);
+	}
+}
 
 const app = fastify({ logger: false });
 

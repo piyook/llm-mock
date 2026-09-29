@@ -94,7 +94,17 @@
       "embeddings": {
         "enabled": false,
         "dimensions": 128
-      }
+      },
+      "responseRules": [
+        {
+          "match": "E2E_FIXTURE_JSON",
+          "file": "cypress/fixtures/mock-rules/json-reply.json"
+        },
+        {
+          "match": "E2E_FIXTURE_TEXT",
+          "file": "cypress/fixtures/mock-rules/plain-reply.txt"
+        }
+      ]
     }
   },
   "server": {
