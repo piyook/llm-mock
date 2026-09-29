@@ -92,7 +92,7 @@ COMMANDS:
   config                  Show current configuration settings
 
 OPTIONS:
-  --model=<name>          Model preset to use (chatgpt, gemini, streaming, embeddings)
+  --model=<name>          Model preset to use (chatgpt, gemini, streaming, embeddings, claude)
   --port=<number>         Server port (default: 8001)
   --host=<address>        Server host (default: 0.0.0.0)
   --endpoint=<path>       LLM endpoint path
@@ -261,6 +261,19 @@ function getDefaultConfig() {
         stream: false,
         responseDelay: { min: 0, max: 0 },
         embeddings: { enabled: true, dimensions: 128 }
+      },
+      claude: {
+        name: "claude",
+        model: "claude-opus-5-5",
+        endpoint: "v1/messages",
+        responseType: "lorem",
+        maxLoremParas: 8,
+        validateRequests: true,
+        logRequests: true,
+        debug: false,
+        stream: false,
+        responseDelay: { min: 200, max: 800 },
+        embeddings: { enabled: false, dimensions: 128 }
       }
     },
     server: {
