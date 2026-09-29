@@ -264,6 +264,7 @@ With a request whose message contains `Classify this support ticket`, the server
 
 - `match` is a case-sensitive substring, tested against every string value in the request body (message text, system prompt, content blocks), not against JSON keys.
 - Rules are checked in order and the first match wins. `match` and `file` must be non-empty strings.
+- Matching covers the whole request, including earlier turns of a conversation. A rule that matched an early message keeps matching on every later turn, so use distinctive markers and put more specific rules first.
 - `file` is resolved relative to the folder holding the config file, and is read exactly as written (including any trailing newline).
 - A malformed rule stops the server at startup. An unreadable fixture logs a warning at startup, and a request that matches it returns an error rather than falling back to lorem.
 - Works with every preset and with both static and streamed replies.
