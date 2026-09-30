@@ -14,7 +14,7 @@ npx create-llmock my-project
 
 - **llmock** — Core package
 - **`.llmockrc.json`** — Configuration with sensible defaults
-- **Example files** — Sample requests/responses for OpenAI and Gemini APIs
+- **Example files** — Editable request/response templates for OpenAI, Gemini and Claude APIs
 - **npm scripts** — For starting, stopping, and running the server
 - **README** — Setup instructions for the generated project
 
@@ -25,12 +25,16 @@ my-project/
 ├── package.json
 ├── .llmockrc.json
 ├── README.md
-├── requests/
-│   ├── openai-chat.json
-│   └── gemini-chat.json
-└── responses/
-    ├── openai-chat-response.json
-    └── gemini-chat-response.json
+├── Dockerfile
+├── docker-compose.yml
+├── request-templates/
+│   ├── openai_req.json
+│   ├── gemini_req.json
+│   └── claude_req.json
+└── response-templates/
+    ├── openai_res.json
+    ├── gemini_res.json
+    └── claude_res.json
 ```
 
 ## Scripts

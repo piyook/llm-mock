@@ -42,16 +42,17 @@ The server configuration is in `.llmockrc.json`. You can modify:
 ## Customizing Responses
 
 ### Requests
-Place your request templates in the `requests/` directory. The server will match incoming requests to these templates.
+Request templates live in `request-templates/` and are named `<name>_req.json`. When `validateRequests` is on, incoming requests are checked against the template for the active preset.
 
 ### Responses
-Place your response templates in the `responses/` directory. These define the mock responses that will be returned.
+Response templates live in `response-templates/` and are named `<name>_res.json`. The placeholder `DYNAMIC_CONTENT_HERE` is replaced with the generated reply.
 
 ### Example Files
 
-The project includes example files for:
-- OpenAI ChatGPT (`openai-chat.json` / `openai-chat-response.json`)
-- Google Gemini (`gemini-chat.json` / `gemini-chat-response.json`)
+The project includes editable templates for:
+- OpenAI ChatGPT (`openai_req.json` / `openai_res.json`)
+- Google Gemini (`gemini_req.json` / `gemini_res.json`)
+- Anthropic Claude (`claude_req.json` / `claude_res.json`)
 
 ## Server Endpoints
 

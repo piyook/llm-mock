@@ -75,7 +75,7 @@ async function init() {
     console.log(`   cd ${projectName}`);
     console.log('   npm install');
     console.log('   npm run llmock:start');
-    console.log('\n📖 Edit the files in requests/ and responses/ to customize your mock responses.');
+    console.log('\n📖 Edit the files in request-templates/ and response-templates/ to customize request validation and response shapes.');
   } catch (error) {
     console.log(red('❌ Error creating project:'), error.message);
     process.exit(1);
@@ -89,8 +89,8 @@ async function createProject(targetDir, projectName) {
   // Copy template files
   await copyTemplateFiles(targetDir, projectName);
 
-  // Create requests and responses directories with examples
-  await createRequestsAndResponses(targetDir);
+  // Create request/response template folders with editable examples
+  await createTemplates(targetDir);
 }
 
 async function copyTemplateFiles(targetDir, projectName) {
@@ -117,125 +117,22 @@ async function copyTemplateFiles(targetDir, projectName) {
   }
 }
 
-async function createRequestsAndResponses(targetDir) {
-  // Create directories
-  await fs.mkdir(path.join(targetDir, 'requests'), { recursive: true });
-  await fs.mkdir(path.join(targetDir, 'responses'), { recursive: true });
+async function createTemplates(targetDir) {
+  // The server looks for <name>_req.json / <name>_res.json in these folders
+  // before falling back to its built-in copies, so these are editable overrides.
+  await fs.mkdir(path.join(targetDir, 'request-templates'), { recursive: true });
+  await fs.mkdir(path.join(targetDir, 'response-templates'), { recursive: true });
 
-  // Copy example request and response files
-  const examples = [
-    { file: 'openai-chat.json', dir: 'requests' },
-    { file: 'openai-chat-response.json', dir: 'responses' },
-    { file: 'gemini-chat.json', dir: 'requests' },
-    { file: 'gemini-chat-response.json', dir: 'responses' }
-  ];
+  const providers = ['openai', 'gemini', 'claude'];
 
-  for (const example of examples) {
-    const templatePath = path.join(templatesDir, 'examples', example.file);
-    const targetPath = path.join(targetDir, example.dir, example.file);
-    
-    try {
-      const content = await fs.readFile(templatePath, 'utf-8');
-      await fs.writeFile(targetPath, content);
-    } catch {
-      // If template doesn't exist, create a basic example
-      if (example.dir === 'requests') {
-        const basicRequest = createBasicRequest(example.file);
-        await fs.writeFile(targetPath, JSON.stringify(basicRequest, null, 2));
-      } else {
-        const basicResponse = createBasicResponse(example.file);
-        await fs.writeFile(targetPath, JSON.stringify(basicResponse, null, 2));
-      }
+  for (const provider of providers) {
+    for (const [suffix, dir] of [['req', 'request-templates'], ['res', 'response-templates']]) {
+      const file = `${provider}_${suffix}.json`;
+      await fs.copyFile(
+        path.join(templatesDir, 'examples', file),
+        path.join(targetDir, dir, file)
+      );
     }
-  }
-}
-
-function createBasicRequest(filename) {
-  if (filename.includes('openai')) {
-    return [
-      {
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "user",
-            content: "Hello, how are you?"
-          }
-        ],
-        temperature: 1,
-        n: 1,
-        stream: false
-      }
-    ];
-  } else if (filename.includes('gemini')) {
-    return [
-      {
-        contents: [
-          {
-            parts: [
-              {
-                text: "Hello, how are you?"
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 1,
-          maxOutputTokens: 1000
-        }
-      }
-    ];
-  }
-}
-
-function createBasicResponse(filename) {
-  if (filename.includes('openai')) {
-    return [
-      {
-        id: "chatcmpl-example",
-        object: "chat.completion",
-        created: Date.now(),
-        model: "gpt-4o",
-        usage: {
-          prompt_tokens: 10,
-          completion_tokens: 20,
-          total_tokens: 30
-        },
-        choices: [
-          {
-            message: {
-              role: "assistant",
-              content: "Hello! I'm doing well, thank you for asking. How can I help you today?"
-            },
-            finish_reason: "stop",
-            index: 0
-          }
-        ]
-      }
-    ];
-  } else if (filename.includes('gemini')) {
-    return [
-      {
-        candidates: [
-          {
-            content: {
-              parts: [
-                {
-                  text: "Hello! I'm doing well, thank you for asking. How can I help you today?"
-                }
-              ],
-              role: "model"
-            },
-            finishReason: "STOP",
-            index: 0
-          }
-        ],
-        usageMetadata: {
-          promptTokenCount: 10,
-          candidatesTokenCount: 20,
-          totalTokenCount: 30
-        }
-      }
-    ];
   }
 }
 

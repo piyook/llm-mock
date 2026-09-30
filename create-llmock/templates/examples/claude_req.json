@@ -1,0 +1,17 @@
+[
+  {
+    "model": "claude-opus-5-5",
+    "max_tokens": 256,
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Who won the world series in 2020?"
+          }
+        ]
+      }
+    ]
+  }
+]

@@ -74,15 +74,17 @@ my-project/
 ├── README.md
 ├── Dockerfile
 ├── docker-compose.yml
-├── requests/
-│   ├── openai-chat.json
-│   └── gemini-chat.json
-└── responses/
-    ├── openai-chat-response.json
-    └── gemini-chat-response.json
+├── request-templates/
+│   ├── openai_req.json
+│   ├── gemini_req.json
+│   └── claude_req.json
+└── response-templates/
+    ├── openai_res.json
+    ├── gemini_res.json
+    └── claude_res.json
 ```
 
-`requests/` and `responses/` hold example payloads for reference only; the server doesn't read them. OpenAI, Gemini and Claude templates are built in. To add your own provider, see [Template locations](#template-locations).
+The template folders contain editable copies of the built-in OpenAI, Gemini and Claude templates. The server uses them for request validation and response shape. To add your own provider, see [Template locations](#template-locations).
 
 ---
 
@@ -588,7 +590,7 @@ The framework checks two locations, in priority order:
 1. `./request-templates/` and `./response-templates/` in your project root
 2. `src/request-templates/` and `src/response-templates/` in the package source
 
-Templates are named `<name>_req.json` and `<name>_res.json`, where `<name>` is the preset's `name` field. Create the `request-templates/` and `response-templates/` folders yourself; the scaffolder doesn't. Project-level templates take priority, so you can add custom templates without modifying the package.
+Templates are named `<name>_req.json` and `<name>_res.json`, where `<name>` is the preset's `name` field. Scaffolded projects already have these folders; otherwise create them yourself. Project-level templates take priority, so you can add custom templates without modifying the package.
 
 ### Creating a custom provider template
 
