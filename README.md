@@ -60,6 +60,7 @@ That's it. To run against a specific model preset:
 ```bash
 npm run llmock:chatgpt      # OpenAI ChatGPT-style (default)
 npm run llmock:gemini       # Google Gemini format
+npm run llmock:claude       # Anthropic Claude Messages API (/v1/messages)
 npm run llmock:streaming    # OpenAI-style with SSE streaming
 npm run llmock:embeddings   # Optimised for embeddings/RAG testing
 ```
@@ -71,6 +72,8 @@ my-project/
 ├── package.json
 ├── .llmockrc.json
 ├── README.md
+├── Dockerfile
+├── docker-compose.yml
 ├── requests/
 │   ├── openai-chat.json
 │   └── gemini-chat.json
@@ -104,6 +107,7 @@ Then use the CLI directly:
 ```bash
 llmock start                        # default: ChatGPT model, port 8001
 llmock start --model=gemini
+llmock start --model=claude         # Anthropic Messages API
 llmock start --port=3000 --stream=true
 llmock stop
 llmock config                       # show current settings
@@ -122,7 +126,7 @@ llmock start --foreground
 
 The `--foreground` flag keeps the server process attached and forwards all output to your console. This is essential for Docker containers and useful for debugging. Without this flag, the server runs as a detached background process.
 
-**Windows users:** In normal mode, the server may create a minimized terminal window. This is expected behavior for background processes on Windows. Use `llmock start --foreground` if you want to keep the server visible in your terminal.
+On Windows the background server starts without opening a console window. Use `llmock stop` to shut it down, or `llmock start --foreground` to keep it visible in your terminal.
 
 ### Option 3: Docker
 
@@ -360,6 +364,7 @@ The dashboard shows server status, current configuration, available endpoints, a
 | Endpoint | Description |
 |---|---|
 | Configurable (default: `/chatgpt/chat/completions`) | Chat completions |
+| `/v1/messages` (with the `claude` preset) | Anthropic Messages API |
 | `/v1/embeddings` | OpenAI-compatible mock embeddings |
 
 ### Request validation
@@ -520,7 +525,7 @@ LLMock supports any provider that uses the OpenAI chat completion format: ChatGP
 
 ### Anthropic (Claude Messages API)
 
-The `claude` preset serves `POST /v1/messages`. Add it to `.llmockrc.json` if your config doesn't already have it:
+The `claude` preset serves `POST /v1/messages`. It is included in scaffolded projects and in the built-in defaults. If your `.llmockrc.json` predates it, add:
 
 ```json
 {
@@ -551,12 +556,20 @@ ANTHROPIC_BASE_URL=http://localhost:8001 ANTHROPIC_API_KEY=mock-key node app.js
 ```
 
 ```js
+import Anthropic from '@anthropic-ai/sdk';
+
 const client = new Anthropic({ baseURL: 'http://localhost:8001', apiKey: 'mock-key' });
 const message = await client.messages.stream({
   model: 'claude-opus-5-5',
   max_tokens: 256,
   messages: [{ role: 'user', content: 'Hello' }],
 }).finalMessage();
+```
+
+Or with curl:
+
+```bash
+curl http://localhost:8001/v1/messages   -H "Content-Type: application/json"   -H "x-api-key: mock-key"   -H "anthropic-version: 2023-06-01"   -d '{"model": "claude-opus-5-5", "max_tokens": 256, "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 Behaviour:
@@ -703,6 +716,7 @@ llmock start --port=8002
 
 **Request validation failures**
 
+- For the `claude` preset, `model`, `max_tokens` and `messages` are all required
 - Confirm your request template matches the provider's API format
 - Check the request shape at `http://localhost:8001/logs`
 - Verify the `name` field in your model config matches the template filename prefix
