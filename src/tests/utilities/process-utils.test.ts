@@ -1,6 +1,10 @@
 import { existsSync } from 'fs';
 import { describe, expect, test } from 'vitest';
-import { parseListeningPids, tsxCliPath } from '../../../bin/process-utils.js';
+import {
+	parseListeningPids,
+	resolveModelName,
+	tsxCliPath,
+} from '../../../bin/process-utils.js';
 
 describe('tsxCliPath', () => {
 	test('points at an existing tsx cli script', () => {
@@ -8,6 +12,24 @@ describe('tsxCliPath', () => {
 
 		expect(path).toMatch(/tsx[\\/]dist[\\/]cli\.mjs$/);
 		expect(existsSync(path)).toBe(true);
+	});
+});
+
+describe('resolveModelName', () => {
+	test('the --model flag wins over the config default', () => {
+		expect(resolveModelName('gemini', { defaultModel: 'claude' })).toBe(
+			'gemini',
+		);
+	});
+
+	test('uses the config defaultModel when no flag is given', () => {
+		expect(resolveModelName(undefined, { defaultModel: 'claude' })).toBe(
+			'claude',
+		);
+	});
+
+	test('falls back to chatgpt when neither is set', () => {
+		expect(resolveModelName(undefined, {})).toBe('chatgpt');
 	});
 });
 

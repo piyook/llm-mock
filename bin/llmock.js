@@ -3,7 +3,7 @@
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { existsSync } from 'fs';
-import { parseListeningPids, tsxCliPath } from './process-utils.js';
+import { parseListeningPids, resolveModelName, tsxCliPath } from './process-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,7 +11,7 @@ const __dirname = dirname(__filename);
 // Parse command line arguments
 const args = process.argv.slice(2);
 let command = 'start'; // default command
-let modelName = 'chatgpt'; // default model
+let modelName; // from --model; otherwise the config's defaultModel
 let showHelp = false;
 let showConfig = false;
 let customSettings = {};
@@ -306,14 +306,17 @@ async function loadConfig() {
     console.log('Using default configuration (no .llmockrc.json found)');
   }
   
+  // --model wins, then the config's defaultModel, then chatgpt
+  const selectedModel = resolveModelName(modelName, config);
+
   // Validate model exists
-  if (!config.models[modelName]) {
-    console.error(`Error: Model "${modelName}" not found in configuration`);
+  if (!config.models[selectedModel]) {
+    console.error(`Error: Model "${selectedModel}" not found in configuration`);
     console.error(`Available models: ${Object.keys(config.models).join(', ')}`);
     process.exit(1);
   }
 
-  return { config, modelName };
+  return { config, modelName: selectedModel };
 }
 
 // Set environment variables based on configuration

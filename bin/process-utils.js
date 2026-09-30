@@ -11,6 +11,14 @@ export function tsxCliPath() {
 }
 
 /**
+ * Model preset to run: the --model flag if given, else the config's
+ * `defaultModel`, else chatgpt.
+ */
+export function resolveModelName(flagValue, config) {
+  return flagValue || config?.defaultModel || 'chatgpt';
+}
+
+/**
  * Pids LISTENING on `port`, from `netstat -ano` output. Client connections
  * to the port are ignored so stopping the server never kills a browser or
  * test runner that merely has a connection open. Listening rows are found by

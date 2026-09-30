@@ -109,7 +109,7 @@ npm install -g llmock
 Then use the CLI directly:
 
 ```bash
-llmock start                        # default: ChatGPT model, port 8001
+llmock start                        # uses defaultModel from .llmockrc.json (chatgpt if none), port 8001
 llmock start --model=gemini
 llmock start --model=claude         # Anthropic Messages API
 llmock start --port=3000 --stream=true
@@ -148,7 +148,7 @@ See [Docker Support](#docker-support) for full details.
 
 ### Configuration file (`.llmockrc.json`)
 
-All settings live in `.llmockrc.json` in your project root. CLI flags always override these values.
+All settings live in `.llmockrc.json` in your project root. CLI flags always override these values. `defaultModel` names the preset used when you don't pass `--model`.
 
 ```json
 {
