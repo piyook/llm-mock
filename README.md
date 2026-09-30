@@ -140,7 +140,7 @@ cd my-project
 npm run docker:start
 ```
 
-See [Docker Support](#docker-support) for full details.
+See [Docker Support](#docker-support) for full details, including how to run LLMock in Docker from your own project without the scaffolding.
 
 ---
 
@@ -688,6 +688,75 @@ The Docker container uses the `--foreground` flag to keep the LLMock server proc
 - **Dockerfile**: Multi-stage Node.js build with security best practices
 - **docker-compose.yml**: Port 8001 exposed, config file mounted, health checks
 - **docker-start script**: Runs `llmock start --foreground` to keep the server attached
+
+### Standalone Docker setup (no scaffolding)
+
+You don't need `create-llmock` to run LLMock in Docker. The published `llmock` package can run from a small Dockerfile inside your own project, so only your config and fixtures live in your repo.
+
+```
+your-project/
+└── docker/
+    └── llmock/
+        ├── Dockerfile
+        ├── docker-compose.yml
+        ├── .llmockrc.json
+        └── fixtures/
+            └── summary.json
+```
+
+**Dockerfile**
+
+```dockerfile
+FROM node:24-alpine
+WORKDIR /app
+RUN npm install --omit=dev llmock
+EXPOSE 8001
+CMD ["npx", "llmock", "start", "--foreground"]
+```
+
+**docker-compose.yml**
+
+```yaml
+services:
+  llmock:
+    build: .
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+    volumes:
+      - ./.llmockrc.json:/app/.llmockrc.json:ro
+      - ./fixtures:/app/fixtures:ro
+```
+
+**.llmockrc.json**
+
+```json
+{
+  "defaultModel": "claude",
+  "models": {
+    "claude": {
+      "name": "claude",
+      "model": "claude-opus-5-5",
+      "endpoint": "v1/messages",
+      "responseType": "lorem",
+      "stream": true,
+      "responseDelay": { "min": 300, "max": 500 },
+      "responseRules": [
+        { "match": "Summarise this document", "file": "fixtures/summary.json" }
+      ]
+    }
+  },
+  "server": { "port": 8001, "host": "0.0.0.0" }
+}
+```
+
+Start it and point your app at `http://localhost:8001`:
+
+```bash
+docker compose -f docker/llmock/docker-compose.yml up --build
+```
+
+Config and fixtures are mounted read-only, so editing them only needs a restart, not a rebuild. Requests containing a `match` string get the fixture file back (see [Response rules](#response-rules-fixture-replies)); everything else gets generated lorem text. You can wrap the command in an npm script such as `"mock:start"`.
 
 ### Manual Docker commands
 
