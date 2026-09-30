@@ -1,6 +1,6 @@
 {
   "name": "{{PROJECT_NAME}}",
-  "version": "3.3.6",
+  "version": "3.4.0",
   "description": "LLMock project for testing LLM APIs",
   "private": true,
   "type": "module",
@@ -9,6 +9,7 @@
     "llmock:stop": "llmock stop",
     "llmock:chatgpt": "llmock --model=chatgpt",
     "llmock:gemini": "llmock --model=gemini",
+    "llmock:claude": "llmock --model=claude",
     "llmock:streaming": "llmock --model=streaming",
     "llmock:embeddings": "llmock --model=embeddings",
     "docker-start": "llmock start --foreground",
@@ -19,7 +20,7 @@
     "compile-ui": "npm --prefix ../ui run build"
   },
   "dependencies": {
-    "llmock": "^3.3.6"
+    "llmock": "^3.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0"

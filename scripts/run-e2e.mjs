@@ -6,6 +6,7 @@ const suites = [
   { start: "llmock:start:gemini",    spec: "cypress/e2e/gemini-mock-spec.cy.ts" },
   { start: "llmock:start:streaming", spec: "cypress/e2e/streaming-only-spec.cy.ts" },
   { start: "llmock:start:embeddings",spec: "cypress/e2e/embeddings-spec.cy.ts" },
+  { start: "llmock:start:claude",    spec: "cypress/e2e/claude-mock-spec.cy.ts" },
 ];
 
 const cypress = (spec) => execSync(`npx cypress run --spec "${spec}"`, { stdio: "inherit" });
@@ -17,7 +18,10 @@ const startServer = (npmScript) => {
       stdio: 'inherit',
       env: { ...process.env, CONFIG_PATH: '.llmockrc.test.json', E2E_MODE: 'true' },
       shell: true,
-      detached: true, // Create new process group
+      // A new process group lets us kill the tree on Unix. On Windows
+      // `detached` opens a console window, and taskkill /T covers the tree.
+      detached: process.platform !== 'win32',
+      windowsHide: true,
     });
 
     proc.on('error', reject);

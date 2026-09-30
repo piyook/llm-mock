@@ -1,0 +1,3 @@
+First line of a canned reply.
+  Indented second line with "quotes".
+Third line.

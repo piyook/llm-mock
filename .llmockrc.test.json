@@ -76,6 +76,35 @@
         "enabled": true,
         "dimensions": 128
       }
+    },
+    "claude": {
+      "name": "claude",
+      "model": "claude-opus-5-5",
+      "endpoint": "v1/messages",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": false,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 0,
+        "max": 0
+      },
+      "embeddings": {
+        "enabled": false,
+        "dimensions": 128
+      },
+      "responseRules": [
+        {
+          "match": "E2E_FIXTURE_JSON",
+          "file": "cypress/fixtures/mock-rules/json-reply.json"
+        },
+        {
+          "match": "E2E_FIXTURE_TEXT",
+          "file": "cypress/fixtures/mock-rules/plain-reply.txt"
+        }
+      ]
     }
   },
   "server": {

@@ -6,6 +6,8 @@ import {
 	setStreamingHeaders,
 	streamWithDelay,
 } from './build-streaming-response.js';
+import { getResponseRules } from '../config/config-loader.js';
+import { findMatchingRule, loadRuleContent } from './response-rules.js';
 import type { FastifyReply } from 'fastify';
 
 // Default embedding dimension constant
@@ -13,12 +15,30 @@ const DEFAULT_EMBEDDING_DIMENSIONS =
 	Number(process.env?.EMBEDDING_DIMENSION) || 128;
 
 /**
+ * Fixture text for this request if a configured response rule matches it,
+ * otherwise undefined (a normal response is generated instead).
+ */
+const getRuleContent = (requestBody: unknown): string | undefined => {
+	const { rules, baseDir } = getResponseRules();
+	const rule = findMatchingRule(rules, requestBody);
+
+	return rule ? loadRuleContent(rule, baseDir) : undefined;
+};
+
+/**
  * Generates mock LLM response content based on configuration
- * Supports both lorem ipsum and stored response types
+ * Supports response rules (fixture files), lorem ipsum and stored response types
  *
+ * @param requestBody - Parsed request body, used to match response rules
  * @returns Promise<string> Generated content text
  */
-export const generateResponseContent = async (): Promise<string> => {
+export const generateResponseContent = async (
+	requestBody?: unknown,
+): Promise<string> => {
+	// A matching responseRules entry wins over the configured response type
+	const ruleContent = getRuleContent(requestBody);
+	if (ruleContent !== undefined) return ruleContent;
+
 	let content = '';
 
 	switch (process.env?.MOCK_LLM_RESPONSE_TYPE) {

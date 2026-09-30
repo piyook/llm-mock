@@ -1,5 +1,9 @@
 import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
+import { dirname, resolve } from 'path';
+import {
+	validateResponseRules,
+	type ResponseRule,
+} from '../utilities/response-rules.js';
 
 export interface ResponseDelay {
 	min: number;
@@ -23,6 +27,8 @@ export interface ModelConfig {
 	stream: boolean;
 	responseDelay: ResponseDelay;
 	embeddings: EmbeddingsConfig;
+	// Optional: return a fixture file's contents when the request contains `match`
+	responseRules?: ResponseRule[];
 }
 
 export interface ServerConfig {
@@ -37,6 +43,8 @@ export interface LlmMockConfig {
 }
 
 let configCache: LlmMockConfig | null = null;
+// Folder holding the loaded config file; response rule files resolve against it.
+let configDir = process.cwd();
 let currentModelCache: string | null = null;
 
 // Default configuration for global installation
@@ -96,6 +104,19 @@ function getDefaultConfig(): LlmMockConfig {
 				responseDelay: { min: 0, max: 0 },
 				embeddings: { enabled: true, dimensions: 128 },
 			},
+			claude: {
+				name: 'claude',
+				model: 'claude-opus-5-5',
+				endpoint: 'v1/messages',
+				responseType: 'lorem',
+				maxLoremParas: 8,
+				validateRequests: true,
+				logRequests: true,
+				debug: false,
+				stream: false,
+				responseDelay: { min: 200, max: 800 },
+				embeddings: { enabled: false, dimensions: 128 },
+			},
 		},
 		server: {
 			port: 8001,
@@ -110,6 +131,8 @@ export function loadConfig(configPath?: string): LlmMockConfig {
 	}
 
 	const path = configPath || resolve(process.cwd(), '.llmockrc.json');
+
+	configDir = dirname(path);
 
 	if (!existsSync(path)) {
 		// For global usage, provide default configuration when no config file exists
@@ -140,6 +163,25 @@ export function getModelConfig(modelName?: string): ModelConfig {
 
 	currentModelCache = selectedModel;
 	return config.models[selectedModel];
+}
+
+/**
+ * Response rules of the active model preset, plus the folder their files
+ * resolve against. Reads the config directly so it does not change the
+ * current-model cache.
+ */
+export function getResponseRules(): {
+	rules: ResponseRule[];
+	baseDir: string;
+} {
+	const config = loadConfig();
+	const name =
+		process.env.LLM_MODEL_NAME || currentModelCache || config.defaultModel;
+
+	return {
+		rules: validateResponseRules(config.models[name]?.responseRules),
+		baseDir: configDir,
+	};
 }
 
 export function getCurrentModel(): string | null {
