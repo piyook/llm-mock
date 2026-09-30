@@ -82,6 +82,8 @@ my-project/
     └── gemini-chat-response.json
 ```
 
+`requests/` and `responses/` hold example payloads for reference only; the server doesn't read them. OpenAI, Gemini and Claude templates are built in. To add your own provider, see [Template locations](#template-locations).
+
 ---
 
 ## Installation Options
@@ -586,7 +588,7 @@ The framework checks two locations, in priority order:
 1. `./request-templates/` and `./response-templates/` in your project root
 2. `src/request-templates/` and `src/response-templates/` in the package source
 
-Project-level templates take priority, so you can add custom templates without modifying the package.
+Templates are named `<name>_req.json` and `<name>_res.json`, where `<name>` is the preset's `name` field. Create the `request-templates/` and `response-templates/` folders yourself; the scaffolder doesn't. Project-level templates take priority, so you can add custom templates without modifying the package.
 
 ### Creating a custom provider template
 
