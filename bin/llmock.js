@@ -3,80 +3,27 @@
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { existsSync } from 'fs';
-import { parseListeningPids, resolveModelName, tsxCliPath } from './process-utils.js';
+import {
+  applyConfigDefaults,
+  parseCliArgs,
+  parseListeningPids,
+  resolveModelName,
+  tsxCliPath,
+} from './process-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Parse command line arguments
-const args = process.argv.slice(2);
-let command = 'start'; // default command
-let modelName; // from --model; otherwise the config's defaultModel
-let showHelp = false;
-let showConfig = false;
-let customSettings = {};
-let stopPort = 8001; // default port for stop command
-let foregroundMode = false; // run in foreground for Docker
-
-// Parse command (first argument)
-if (args.length > 0) {
-  const firstArg = args[0];
-  if (firstArg === 'help' || firstArg === '--help' || firstArg === '-h') {
-    showHelp = true;
-  } else if (firstArg === 'config' || firstArg === '--config' || firstArg === '-c') {
-    showConfig = true;
-  } else if (firstArg === 'stop') {
-    command = 'stop';
-  } else if (firstArg === 'start') {
-    command = 'start';
-  } else if (firstArg.startsWith('--')) {
-    // If no command specified, default to start and parse options
-    command = 'start';
-  }
-}
-
-// Parse options (remaining arguments)
-const optionsToParse = showHelp || showConfig ? [] : args.slice(1);
-for (let i = 0; i < optionsToParse.length; i++) {
-  const arg = optionsToParse[i];
-  
-  if (arg.startsWith('--model=')) {
-    modelName = arg.split('=')[1];
-  } else if (arg === '--model' && i + 1 < optionsToParse.length) {
-    modelName = optionsToParse[i + 1];
-    i++; // Skip next argument
-  } else if (arg.startsWith('--port=')) {
-    const portValue = arg.split('=')[1];
-    if (command === 'stop') {
-      stopPort = parseInt(portValue, 10);
-    } else {
-      customSettings.port = portValue;
-    }
-  } else if (arg === '--port' && i + 1 < optionsToParse.length) {
-    const portValue = optionsToParse[i + 1];
-    if (command === 'stop') {
-      stopPort = parseInt(portValue, 10);
-    } else {
-      customSettings.port = portValue;
-    }
-    i++; // Skip next argument
-  } else if (arg === '--foreground') {
-    foregroundMode = true;
-  } else if (arg.startsWith('--')) {
-    // Parse --key=value format
-    const equalIndex = arg.indexOf('=');
-    if (equalIndex > 0) {
-      const key = arg.substring(2, equalIndex);
-      const value = arg.substring(equalIndex + 1);
-      customSettings[key] = value;
-    } else if (i + 1 < optionsToParse.length) {
-      // Parse --key value format
-      const key = arg.substring(2);
-      customSettings[key] = optionsToParse[i + 1];
-      i++; // Skip next argument
-    }
-  }
-}
+const {
+  command,
+  showHelp,
+  showConfig,
+  modelName,
+  customSettings,
+  stopPort,
+  foregroundMode,
+} = parseCliArgs(process.argv.slice(2));
 
 // Show help information
 function showHelpInfo() {
@@ -97,8 +44,8 @@ OPTIONS:
   --port=<number>         Server port (default: 8001)
   --host=<address>        Server host (default: 0.0.0.0)
   --endpoint=<path>       LLM endpoint path
-  --responseType=<type>   Response type (lorem, static)
-  --maxLoremParas=<num>    Maximum lorem ipsum paragraphs
+  --responseType=<type>   Response type (lorem, stored)
+  --maxLoremParas=<num>    Maximum lorem ipsum sentences
   --validateRequests=<bool> Validate incoming requests (true/false)
   --logRequests=<bool>    Log incoming requests (true/false)
   --debug=<bool>          Enable debug mode (true/false)
@@ -316,6 +263,14 @@ async function loadConfig() {
     process.exit(1);
   }
 
+  // Fill in optional settings so a short preset works
+  try {
+    config = applyConfigDefaults(config, selectedModel);
+  } catch (error) {
+    console.error(`Error: ${error.message}`);
+    process.exit(1);
+  }
+
   return { config, modelName: selectedModel };
 }
 
@@ -330,6 +285,7 @@ function setEnvironmentVariables(config, modelName, configPath) {
 
   // Server settings (with custom overrides)
   process.env.SERVER_PORT = customSettings.port || serverConfig.port.toString();
+  process.env.SERVER_HOST = customSettings.host || serverConfig.host;
   process.env.LLM_URL_ENDPOINT = customSettings.endpoint || modelConfig.endpoint;
   
   // LLM settings (with custom overrides)
@@ -356,6 +312,31 @@ function setEnvironmentVariables(config, modelName, configPath) {
   process.env.ENABLE_EMBEDDINGS_MOCK = (customSettings.embeddings !== undefined ? 
     customSettings.embeddings === 'true' : modelConfig.embeddings.enabled) ? 'true' : 'false';
   process.env.EMBEDDING_DIMENSION = customSettings.embeddingDimensions || modelConfig.embeddings.dimensions.toString();
+
+  // The embeddings mock owns /v1/embeddings, so the chat endpoint can't use it too
+  const endpoint = process.env.LLM_URL_ENDPOINT.replace(/^\/+/, '');
+  if (endpoint === 'v1/embeddings' && process.env.ENABLE_EMBEDDINGS_MOCK === 'true') {
+    throw new Error(
+      `Model "${modelName}" uses the endpoint "v1/embeddings", which the embeddings mock already serves. Use a different endpoint or set embeddings.enabled to false.`
+    );
+  }
+}
+
+// URL the CLI uses to reach the server it started
+function pingUrl(config) {
+  const host = customSettings.host || config.server.host;
+  const port = customSettings.port || config.server.port;
+  const reachable = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
+  return `http://${reachable.includes(':') ? `[${reachable}]` : reachable}:${port}/ping`;
+}
+
+async function isServerUp(url) {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(1000) });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 // Main execution
@@ -386,6 +367,12 @@ async function main() {
       const configPath = resolveConfigPath();
       setEnvironmentVariables(config, selectedModel, configPath);
     
+      // A detached server that can't bind the port would fail unseen
+      if (!foregroundMode && process.env.E2E_MODE !== 'true' && await isServerUp(pingUrl(config))) {
+        console.error(`A server is already running on port ${process.env.SERVER_PORT}. Run 'llmock stop --port=${process.env.SERVER_PORT}' first, or start on another port with --port.`);
+        process.exit(1);
+      }
+
       console.log(`Starting LLM Mock Server with model: ${selectedModel}`);
       console.log(`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
       
@@ -439,11 +426,6 @@ async function main() {
           serverProcess.unref();
         }
         
-        // Show success message
-        console.log(`Server started successfully!`);
-        console.log(`Server is running at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
-        console.log(`Use 'llmock stop' to stop the server.`);
-        
         serverProcess.on('error', (error) => {
           console.error('Failed to start server process:', error.message);
           process.exit(1);
@@ -458,10 +440,35 @@ async function main() {
           process.on('SIGTERM', () => serverProcess.kill('SIGTERM'));
           process.on('SIGINT', () => serverProcess.kill('SIGINT'));
         } else {
-          // Normal detached mode - give the server a moment to start, then exit CLI
-          setTimeout(() => {
-            process.exit(0);
-          }, 1000);
+          // Normal detached mode - wait until the server answers, then exit CLI.
+          // Its output is not attached, so a failure can only be reported generally.
+          let exitCode = null;
+          serverProcess.on('exit', (code) => {
+            exitCode = code ?? 1;
+          });
+
+          const url = pingUrl(config);
+          const deadline = Date.now() + 20000;
+          let started = false;
+          while (!started && exitCode === null && Date.now() < deadline) {
+            await new Promise((done) => setTimeout(done, 250));
+            started = await isServerUp(url);
+          }
+
+          if (!started) {
+            console.error(
+              exitCode === null
+                ? 'Server did not respond within 20 seconds.'
+                : `Server failed to start (exit code ${exitCode}).`
+            );
+            console.error(`Run 'llmock start --foreground' with the same options to see the error.`);
+            process.exit(1);
+          }
+
+          console.log(`Server started successfully!`);
+          console.log(`Server is running at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
+          console.log(`Use 'llmock stop' to stop the server.`);
+          process.exit(0);
         }
       }
     }

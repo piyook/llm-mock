@@ -1,6 +1,8 @@
 import { existsSync } from 'fs';
 import { describe, expect, test } from 'vitest';
 import {
+	applyConfigDefaults,
+	parseCliArgs,
 	parseListeningPids,
 	resolveModelName,
 	tsxCliPath,
@@ -30,6 +32,126 @@ describe('resolveModelName', () => {
 
 	test('falls back to chatgpt when neither is set', () => {
 		expect(resolveModelName(undefined, {})).toBe('chatgpt');
+	});
+});
+
+describe('parseCliArgs', () => {
+	test('defaults to start with no arguments', () => {
+		expect(parseCliArgs([])).toMatchObject({
+			command: 'start',
+			modelName: undefined,
+			customSettings: {},
+			foregroundMode: false,
+		});
+	});
+
+	test('reads options after the start command', () => {
+		const parsed = parseCliArgs(['start', '--model=claude', '--port', '3000']);
+
+		expect(parsed.command).toBe('start');
+		expect(parsed.modelName).toBe('claude');
+		expect(parsed.customSettings).toEqual({ port: '3000' });
+	});
+
+	test('keeps the first option when the command is omitted', () => {
+		expect(parseCliArgs(['--model=claude']).modelName).toBe('claude');
+		expect(parseCliArgs(['--model', 'gemini']).modelName).toBe('gemini');
+		expect(parseCliArgs(['--foreground', '--stream=true'])).toMatchObject({
+			command: 'start',
+			foregroundMode: true,
+			customSettings: { stream: 'true' },
+		});
+	});
+
+	test('stop takes its port from --port', () => {
+		expect(parseCliArgs(['stop'])).toMatchObject({
+			command: 'stop',
+			stopPort: 8001,
+		});
+		expect(parseCliArgs(['stop', '--port=3000']).stopPort).toBe(3000);
+		expect(parseCliArgs(['stop', '--port', '3000']).stopPort).toBe(3000);
+	});
+
+	test('config accepts --model', () => {
+		expect(parseCliArgs(['config', '--model=claude'])).toMatchObject({
+			showConfig: true,
+			modelName: 'claude',
+		});
+	});
+
+	test('help ignores other arguments', () => {
+		for (const flag of ['help', '--help', '-h']) {
+			expect(parseCliArgs([flag, '--model=claude'])).toMatchObject({
+				showHelp: true,
+				modelName: undefined,
+			});
+		}
+	});
+});
+
+describe('applyConfigDefaults', () => {
+	test('fills in the optional settings of a short preset', () => {
+		const config = applyConfigDefaults(
+			{
+				models: {
+					claude: {
+						name: 'claude',
+						endpoint: 'v1/messages',
+						stream: true,
+						responseDelay: { min: 300 },
+					},
+				},
+			},
+			'claude',
+		);
+
+		expect(config.models.claude).toEqual({
+			name: 'claude',
+			model: 'mock-model',
+			endpoint: 'v1/messages',
+			responseType: 'lorem',
+			maxLoremParas: 8,
+			validateRequests: false,
+			logRequests: false,
+			debug: false,
+			stream: true,
+			responseDelay: { min: 300, max: 0 },
+			embeddings: { enabled: false, dimensions: 128 },
+		});
+		expect(config.server).toEqual({ port: 8001, host: '0.0.0.0' });
+	});
+
+	test('keeps values that are set', () => {
+		const config = applyConfigDefaults(
+			{
+				models: {
+					chatgpt: {
+						name: 'openai',
+						endpoint: 'chat',
+						validateRequests: true,
+						embeddings: { enabled: true, dimensions: 64 },
+					},
+				},
+				server: { port: 3000 },
+			},
+			'chatgpt',
+		);
+
+		expect(config.models.chatgpt.validateRequests).toBe(true);
+		expect(config.models.chatgpt.embeddings).toEqual({
+			enabled: true,
+			dimensions: 64,
+		});
+		expect(config.server).toEqual({ port: 3000, host: '0.0.0.0' });
+	});
+
+	test('rejects a preset without a name or endpoint', () => {
+		expect(() =>
+			applyConfigDefaults({ models: { a: { name: 'openai' } } }, 'a'),
+		).toThrow('"endpoint"');
+		expect(() =>
+			applyConfigDefaults({ models: { a: { endpoint: 'chat' } } }, 'a'),
+		).toThrow('"name"');
 	});
 });
 
