@@ -46,7 +46,12 @@ describe('parseCliArgs', () => {
 	});
 
 	test('reads options after the start command', () => {
-		const parsed = parseCliArgs(['start', '--model=claude', '--port', '3000']);
+		const parsed = parseCliArgs([
+			'start',
+			'--model=claude',
+			'--port',
+			'3000',
+		]);
 
 		expect(parsed.command).toBe('start');
 		expect(parsed.modelName).toBe('claude');

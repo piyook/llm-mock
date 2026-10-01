@@ -22,7 +22,9 @@ describe('project-level templates', () => {
 		);
 		writeFileSync(
 			join(projectDir, 'response-templates', 'custom_res.json'),
-			JSON.stringify([{ output: 'DYNAMIC_CONTENT_HERE', source: 'project' }]),
+			JSON.stringify([
+				{ output: 'DYNAMIC_CONTENT_HERE', source: 'project' },
+			]),
 		);
 
 		process.env.LLM_NAME = 'custom';
