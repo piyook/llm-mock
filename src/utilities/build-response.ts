@@ -2,6 +2,7 @@ import { existsSync } from 'fs';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { getConfigDir } from '../config/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -18,9 +19,9 @@ export const buildResponse = async (content: DynamicContent) => {
 	const llmName = process.env.LLM_NAME ?? 'openai';
 	const templateFileName = `${llmName}_res.json`;
 
-	// Try to load response template from current working directory first
+	// Try the project's templates first (next to the config file)
 	const cwdTemplatePath = resolve(
-		process.cwd(),
+		getConfigDir(),
 		'response-templates',
 		templateFileName,
 	);
@@ -33,7 +34,7 @@ export const buildResponse = async (content: DynamicContent) => {
 	let responseTemplate: ResponseTemplate;
 
 	try {
-		// First try current working directory
+		// First try the project folder
 		if (existsSync(cwdTemplatePath)) {
 			const fs = await import('fs');
 			const templateData = fs.readFileSync(cwdTemplatePath, 'utf8');

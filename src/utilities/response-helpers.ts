@@ -172,10 +172,11 @@ export const generateMockEmbeddings = async (
 	inputArray: string[],
 	dimensions: number = DEFAULT_EMBEDDING_DIMENSIONS,
 ) => {
-	// Import the embeddings response template
+	// Import the embeddings response template. /v1/embeddings is OpenAI-shaped
+	// whichever chat preset is active, so the template doesn't follow LLM_NAME.
 	const responseTemplate = (await import(
 		/* @vite-ignore */
-		`../response-templates/${process.env.LLM_NAME ?? 'openai'}_embeddings_res.json`,
+		'../response-templates/openai_embeddings_res.json',
 		{ assert: { type: 'json' } }
 	)) as any;
 
