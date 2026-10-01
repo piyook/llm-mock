@@ -37,6 +37,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - **OpenAI-compatible** — works with ChatGPT, Grok, Llama, DeepSeek, Gemini, and any OpenAI-style API
 - **Anthropic Messages API** — built-in `claude` preset with the SDK's streaming event format
 - **Fixture replies** — return canned text or JSON for requests that contain a chosen string
+- **Your own reply pools** — pick at random from a set of your own texts, per rule or as the default reply
 
 Built on [Fastify](https://www.fastify.io/) for high performance and reliability.
 
@@ -154,6 +155,8 @@ See [Docker Support](#docker-support) for full details, including how to run LLM
 
 All settings live in `.llmockrc.json` in your project root. CLI flags always override these values. `defaultModel` names the preset used when you don't pass `--model`.
 
+The config file is read once at startup, so restart the server after changing it. Fixture files and the stored responses file are read on every request, so edits to those apply straight away.
+
 ```json
 {
   "defaultModel": "chatgpt",
@@ -193,13 +196,14 @@ All settings live in `.llmockrc.json` in your project root. CLI flags always ove
 | `model` | Model identifier (e.g. `gpt-4o`, `gemini-pro`) |
 | `endpoint` | **Required.** API endpoint path (not `v1/embeddings` while embeddings are enabled) |
 | `responseType` | `"lorem"` (random text) or `"stored"` (predefined responses) |
+| `storedResponsesFile` | Optional JSON file of your own texts for `"stored"` (see [Response types](#response-types)) |
 | `maxLoremParas` | Max sentences in lorem ipsum responses |
 | `validateRequests` | Validate incoming requests against templates |
-| `logRequests` | Save requests to the log file |
+| `logRequests` | Save the most recent request to the log file |
 | `debug` | Enable verbose console logging |
-| `stream` | Return SSE streaming responses |
+| `stream` | Return SSE streaming responses (the `claude` preset decides per request instead) |
 | `responseDelay.min/max` | Response delay range in milliseconds |
-| `responseRules` | Optional list of `{ match, file }` fixture replies (see [Response rules](#response-rules-fixture-replies)) |
+| `responseRules` | Optional list of `{ match, file }` or `{ match, files }` fixture replies (see [Response rules](#response-rules-fixture-replies)) |
 | `embeddings.enabled` | Enable the `/v1/embeddings` endpoint |
 | `embeddings.dimensions` | Embedding vector size |
 | `server.port` / `server.host` | Port and address the server listens on (`8001`, `0.0.0.0`) |
@@ -241,11 +245,30 @@ llmock start --model=my-model
 { "responseType": "lorem", "maxLoremParas": 8 }
 ```
 
-**Stored responses** — returns one of a small set of fixed sentences bundled with the package, picked at random on each request. For replies you choose yourself, use [response rules](#response-rules-fixture-replies) instead:
+**Stored responses** — returns one text from a pool, picked at random on each request. Without further settings the pool is a small set of fixed sentences bundled with the package:
 
 ```json
 { "responseType": "stored" }
 ```
+
+To use your own pool, point `storedResponsesFile` at a JSON file:
+
+```json
+{ "responseType": "stored", "storedResponsesFile": "fixtures/replies.json" }
+```
+
+The file is a JSON array of strings:
+
+```json
+["First canned reply.", "Second canned reply.", "Third canned reply."]
+```
+
+- Entries can also be objects with a string `content`, the shape of the bundled data: `[{ "id": 1, "content": "First canned reply." }]`. Other keys are ignored.
+- The path is resolved relative to the folder holding the config file.
+- A path that is empty or not a string stops the server at startup. When the response type is `stored`, so does a file that is missing, unreadable, not valid JSON, not an array, an empty array, or that has an entry of any other shape.
+- The file is checked at startup and then read again on every request, so you can edit it without restarting. If it becomes invalid while the server is running, requests return an error rather than falling back to the bundled sentences.
+- A matching [response rule](#response-rules-fixture-replies) still wins. Use rules for a specific reply to a specific request, and stored responses for random variety on everything else.
+- Works with every preset and with both static and streamed replies.
 
 ### Response rules (fixture replies)
 
@@ -264,13 +287,15 @@ Lorem text is fine for UI work, but some callers expect a specific shape, such a
 }
 ```
 
-With a request whose message contains `Classify this support ticket`, the server replies with `fixtures/triage.json` as the message text, so the client can `JSON.parse` it. Anything that matches no rule gets the normal generated response.
+With a request whose message contains `Classify this support ticket`, the server replies with `fixtures/triage.json` as the message text, so the client can `JSON.parse` it. Anything that matches no rule gets the normal response for the preset's `responseType`.
 
 - `match` is a case-sensitive substring, tested against every string value in the request body (message text, system prompt, content blocks), not against JSON keys.
 - Rules are checked in order and the first match wins. `match` and `file` must be non-empty strings.
+- GET requests have no body, so rules never apply to them.
 - Matching covers the whole request, including earlier turns of a conversation. A rule that matched an early message keeps matching on every later turn, so use distinctive markers and put more specific rules first.
-- `file` is resolved relative to the folder holding the config file, and is read exactly as written (including any trailing newline).
-- A malformed rule stops the server at startup. An unreadable fixture logs a warning at startup, and a request that matches it returns an error rather than falling back to lorem.
+- `file` is resolved relative to the folder holding the config file, and is read exactly as written (including any trailing newline). It is read on every request, so you can edit it without restarting.
+- For varied replies to the same kind of request, give a rule `files` instead of `file`: `{ "match": "Summarise the thread", "files": ["fixtures/summary-a.txt", "fixtures/summary-b.txt"] }`. One of the files is picked at random on each matching request. A rule has either `file` or `files`, not both, and `files` must be a non-empty list of non-empty strings.
+- A malformed rule stops the server at startup. An unreadable fixture (including any entry of `files`) logs a warning at startup, and a request that needs it returns an error rather than falling back to generated text.
 - Works with every preset and with both static and streamed replies.
 
 ### Streaming responses
@@ -287,7 +312,7 @@ llmock start --stream=true
 
 For the `claude` preset streaming is chosen per request instead: it streams when the request body has `"stream": true`, whatever this setting says (see [Anthropic](#anthropic-claude-messages-api)).
 
-When enabled, the endpoint returns a chunked SSE stream. The first few chunks arrive immediately (mimicking real LLM behaviour), with subsequent chunks following the configured delay.
+When enabled, the endpoint returns a chunked SSE stream. The server waits for the configured response delay, then sends the chunks at least 50 ms apart.
 
 ```
 data: {"id":"chatcmpl-123","object":"chat.completion.chunk","choices":[{"delta":{"role":"assistant"}}]}
@@ -321,17 +346,16 @@ Set both values to `0` for instant responses. The server picks a random value in
 
 Set the endpoint to match any provider's path structure:
 
-```json
-{ "endpoint": "chatgpt/chat/completions" }
-// → http://localhost:8001/chatgpt/chat/completions
+| `endpoint` | URL |
+|---|---|
+| `chatgpt/chat/completions` | `http://localhost:8001/chatgpt/chat/completions` |
+| `models/gemini-pro:generateContent` | `http://localhost:8001/models/gemini-pro:generateContent` |
 
-{ "endpoint": "models/gemini-pro:generateContent" }
-// → http://localhost:8001/models/gemini-pro:generateContent
-```
+Write the path without a leading slash.
 
 ### Environment variables
 
-For CI/CD pipelines, set these to switch between mock and production:
+LLMock does not read any of these itself. They are a suggested convention for your own app, so it can switch between the mock and the real provider (the [LangChain example](#using-with-langchain) uses them):
 
 ```bash
 TEST_MODE=true
@@ -339,7 +363,7 @@ TEST_BASE_URL=http://localhost:8001/chatgpt
 TEST_EMBEDDING_URL=http://localhost:8001/v1/embeddings
 ```
 
-Setting `TEST_MODE=false` switches back to real LLM services.
+With `TEST_MODE=false` your app talks to the real LLM service again.
 
 ---
 
@@ -354,10 +378,10 @@ Once running, open `http://localhost:8001` for the live dashboard:
 | URL | Purpose |
 |---|---|
 | `http://localhost:8001` | Main dashboard |
-| `http://localhost:8001/logs` | Request log history |
+| `http://localhost:8001/logs` | The most recent logged request |
 | `http://localhost:8001/ping` | Health check |
 
-The dashboard shows server status, current configuration, available endpoints, and recent request logs. It refreshes automatically every 2 seconds.
+The dashboard shows server status, current configuration, available endpoints, and the most recent logged request. It refreshes automatically every 2 seconds.
 
 ### Available endpoints
 
@@ -371,8 +395,8 @@ The dashboard shows server status, current configuration, available endpoints, a
 
 Validate incoming requests against templates to confirm API compatibility:
 
-1. Add a template to the `request-templates/` folder
-2. Enable validation: `"validateRequests": true`
+1. Enable validation: `"validateRequests": true`
+2. For a provider that is not built in, add a template to the `request-templates/` folder (see [Template locations](#template-locations))
 
 A request passes when it contains every top-level key of the template. The built-in templates require `model` and `messages` (OpenAI), `contents` (Gemini), and `model`, `max_tokens` and `messages` (Claude). Invalid requests return a `400`; the missing keys are shown at `/logs`.
 
@@ -569,7 +593,15 @@ const message = await client.messages.stream({
 Or with curl:
 
 ```bash
-curl http://localhost:8001/v1/messages   -H "Content-Type: application/json"   -H "x-api-key: mock-key"   -H "anthropic-version: 2023-06-01"   -d '{"model": "claude-opus-5-5", "max_tokens": 256, "messages": [{"role": "user", "content": "Hello"}]}'
+curl http://localhost:8001/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: mock-key" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{
+    "model": "claude-opus-5-5",
+    "max_tokens": 256,
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
 ```
 
 Behaviour:
@@ -577,7 +609,7 @@ Behaviour:
 - **Request validation** requires only `model`, `max_tokens` and `messages`. Extra fields (`system`, `output_config`, `temperature`, ...) are accepted.
 - **Streaming is per request.** `"stream": true` returns Anthropic SSE events in order: `message_start`, `content_block_start`, `content_block_delta` (text deltas that rejoin to the full text), `content_block_stop`, `message_delta` (`stop_reason: "end_turn"`), `message_stop`. Otherwise a single `message` object is returned.
 - **Responses** have a unique `msg_` id, echo the requested `model`, and report estimated `usage` (about 4 characters per token).
-- [Response rules](#response-rules-fixture-replies) work here too, matching against `system` as well as `messages`.
+- [Response rules](#response-rules-fixture-replies) and [stored responses](#response-types) work here too. Rules match against `system` as well as `messages`.
 
 ### Template locations
 
@@ -590,35 +622,41 @@ Templates are named `<name>_req.json` and `<name>_res.json`, where `<name>` is t
 
 ### Creating a custom provider template
 
-**Step 1 — Request template** (`request-templates/<LLM_NAME>_req.json`):
+**Step 1 — Request template** (`request-templates/<name>_req.json`):
+
+The file is a JSON array holding one example request. Its top-level keys are the ones a request must contain when validation is on:
 
 ```json
-{
-  "model": "string",
-  "messages": [
-    { "role": "string", "content": "string" }
-  ]
-}
+[
+  {
+    "model": "string",
+    "messages": [
+      { "role": "string", "content": "string" }
+    ]
+  }
+]
 ```
 
-**Step 2 — Response template** (`response-templates/<LLM_NAME>_res.json`):
+**Step 2 — Response template** (`response-templates/<name>_res.json`):
 
-Use `DYNAMIC_CONTENT_HERE` as the placeholder for generated content:
+Also a JSON array holding one object. Use `DYNAMIC_CONTENT_HERE` as the placeholder for the reply text:
 
 ```json
-{
-  "id": "chatcmpl-123",
-  "object": "chat.completion",
-  "choices": [
-    {
-      "message": {
-        "role": "assistant",
-        "content": "DYNAMIC_CONTENT_HERE"
-      },
-      "finish_reason": "stop"
-    }
-  ]
-}
+[
+  {
+    "id": "chatcmpl-123",
+    "object": "chat.completion",
+    "choices": [
+      {
+        "message": {
+          "role": "assistant",
+          "content": "DYNAMIC_CONTENT_HERE"
+        },
+        "finish_reason": "stop"
+      }
+    ]
+  }
+]
 ```
 
 **Step 3 — Model preset** (`.llmockrc.json`):
@@ -681,8 +719,8 @@ npm run docker:restart
 
 The Docker container uses the `--foreground` flag to keep the LLMock server process attached. This prevents the container from restarting continuously, which would happen if the server ran as a detached background process. The container includes:
 
-- **Dockerfile**: Multi-stage Node.js build with security best practices
-- **docker-compose.yml**: Port 8001 exposed, config file mounted, health checks
+- **Dockerfile**: Node 24 Alpine image that runs the server as a non-root user
+- **docker-compose.yml**: Port 8001 exposed, config file mounted read-only
 - **docker-start script**: Runs `llmock start --foreground` to keep the server attached
 
 ### Standalone Docker setup (no scaffolding)
@@ -752,7 +790,11 @@ Start it and point your app at `http://localhost:8001`:
 docker compose -f docker/llmock/docker-compose.yml up --build
 ```
 
-Config and fixtures are mounted read-only, so editing them only needs a restart, not a rebuild. Requests containing a `match` string get the fixture file back (see [Response rules](#response-rules-fixture-replies)); everything else gets generated lorem text. You can wrap the command in an npm script such as `"mock:start"`.
+Config and fixtures are mounted from your project, so neither needs a rebuild: restart the container after editing the config, while fixture edits apply on the next request. Requests containing a `match` string get the fixture file back (see [Response rules](#response-rules-fixture-replies)); everything else gets generated lorem text.
+
+If you use `storedResponsesFile`, keep that file in the mounted `fixtures` folder (or mount it separately) so it sits at the same path relative to the config inside the container. The same goes for every file a rule names.
+
+You can wrap the command in an npm script such as `"mock:start"`.
 
 ### Manual Docker commands
 
@@ -779,6 +821,8 @@ Confirm the server is running and the port matches `.llmockrc.json`. Open `http:
 
 Run `llmock start --foreground` with the same options to see the server's output. If it reports a server already running on the port, run `llmock stop` (with `--port` if it isn't 8001) first.
 
+The server refuses to start on a malformed `responseRules` entry, or on a `storedResponsesFile` that is missing or not valid; the message names the setting and the file.
+
 **Port already in use**
 
 Change the port in `.llmockrc.json` or pass it as a flag:
@@ -797,6 +841,10 @@ llmock start --port=8002
 **Response delays not applied**
 
 Ensure `responseDelay.min` or `responseDelay.max` is greater than `0`, then restart the server.
+
+**A fixture or stored reply returns an error**
+
+The file could not be read when the request arrived. Check that the path is relative to the folder holding `.llmockrc.json` and, in Docker, that the file is mounted into the container.
 
 ---
 

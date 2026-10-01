@@ -6,6 +6,8 @@ import {
 	collectStrings,
 	findMatchingRule,
 	loadRuleContent,
+	readRuleFile,
+	ruleFiles,
 	validateResponseRules,
 } from '../../utilities/response-rules.js';
 
@@ -109,6 +111,8 @@ describe('loadRuleContent', () => {
 			join(dir, 'nested', 'reply.json'),
 			'{\n  "ok": true\n}\n',
 		);
+		writeFileSync(join(dir, 'a.txt'), 'reply a');
+		writeFileSync(join(dir, 'b.txt'), 'reply b');
 	});
 
 	afterAll(() => {
@@ -129,6 +133,37 @@ describe('loadRuleContent', () => {
 			loadRuleContent({ match: 'MARKER', file: 'nope.txt' }, dir),
 		).toThrow(/fixture file not found.*nope\.txt.*MARKER/);
 	});
+
+	test('picks at random from a rule with several files', () => {
+		const rule = { match: 'x', files: ['a.txt', 'b.txt'] };
+		const seen = new Set<string>();
+		for (let i = 0; i < 60; i++) seen.add(loadRuleContent(rule, dir));
+
+		expect(seen).toEqual(new Set(['reply a', 'reply b']));
+	});
+
+	test('a single entry in files always returns that file', () => {
+		expect(loadRuleContent({ match: 'x', files: ['b.txt'] }, dir)).toBe(
+			'reply b',
+		);
+	});
+});
+
+describe('ruleFiles and readRuleFile', () => {
+	test('lists the single file or every file of a pool', () => {
+		expect(ruleFiles({ match: 'x', file: 'a.txt' })).toEqual(['a.txt']);
+		expect(ruleFiles({ match: 'x', files: ['a.txt', 'b.txt'] })).toEqual([
+			'a.txt',
+			'b.txt',
+		]);
+	});
+
+	test('names the missing file of a pool and the rule', () => {
+		const rule = { match: 'MARKER', files: ['a.txt', 'gone.txt'] };
+		expect(() => readRuleFile(rule, 'gone.txt', tmpdir())).toThrow(
+			/fixture file not found.*gone\.txt.*MARKER/,
+		);
+	});
 });
 
 describe('validateResponseRules', () => {
@@ -141,6 +176,11 @@ describe('validateResponseRules', () => {
 		expect(validateResponseRules(rules)).toEqual(rules);
 	});
 
+	test('accepts a rule with a pool of files', () => {
+		const rules = [{ match: 'a', files: ['b.txt', 'c.txt'] }];
+		expect(validateResponseRules(rules)).toEqual(rules);
+	});
+
 	test.each([
 		['not an array', { match: 'a', file: 'b' }, /must be an array/],
 		['empty match', [{ match: '', file: 'b' }], /\[0\]\.match/],
@@ -148,6 +188,20 @@ describe('validateResponseRules', () => {
 		['empty file', [{ match: 'a', file: '' }], /\[0\]\.file/],
 		['non-string file', [{ match: 'a', file: 3 }], /\[0\]\.file/],
 		['bad second rule', [{ match: 'a', file: 'b' }, null], /\[1\]\.match/],
+		['neither file nor files', [{ match: 'a' }], /\[0\]\.file/],
+		[
+			'both file and files',
+			[{ match: 'a', file: 'b', files: ['c'] }],
+			/\[0\] must have either file or files/,
+		],
+		['files not an array', [{ match: 'a', files: 'b' }], /\[0\]\.files/],
+		['empty files', [{ match: 'a', files: [] }], /\[0\]\.files/],
+		['empty entry in files', [{ match: 'a', files: [''] }], /\[0\]\.files/],
+		[
+			'non-string in files',
+			[{ match: 'a', files: ['b', 3] }],
+			/\[0\]\.files/,
+		],
 	])('rejects %s', (_name, rules, message) => {
 		expect(() => validateResponseRules(rules)).toThrow(message);
 	});

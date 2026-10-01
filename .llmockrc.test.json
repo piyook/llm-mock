@@ -103,6 +103,39 @@
         {
           "match": "E2E_FIXTURE_TEXT",
           "file": "cypress/fixtures/mock-rules/plain-reply.txt"
+        },
+        {
+          "match": "E2E_FIXTURE_POOL",
+          "files": [
+            "cypress/fixtures/mock-rules/pool-a.txt",
+            "cypress/fixtures/mock-rules/pool-b.txt"
+          ]
+        }
+      ]
+    },
+    "stored": {
+      "name": "claude",
+      "model": "claude-opus-5-5",
+      "endpoint": "v1/messages",
+      "responseType": "stored",
+      "storedResponsesFile": "cypress/fixtures/mock-rules/stored-replies.json",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": false,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 0,
+        "max": 0
+      },
+      "embeddings": {
+        "enabled": false,
+        "dimensions": 128
+      },
+      "responseRules": [
+        {
+          "match": "E2E_FIXTURE_TEXT",
+          "file": "cypress/fixtures/mock-rules/plain-reply.txt"
         }
       ]
     }

@@ -16,6 +16,7 @@ npx create-llmock my-project
 - **`.llmockrc.json`** — Configuration with sensible defaults
 - **Example files** — Editable request/response templates for OpenAI, Gemini and Claude APIs
 - **npm scripts** — For starting, stopping, and running the server
+- **Docker files** — `Dockerfile` and `docker-compose.yml` for running the server in a container
 - **README** — Setup instructions for the generated project
 
 ## Project Structure
@@ -60,7 +61,9 @@ npm run docker:rebuild  # Rebuild and restart
 npm run docker:restart  # Stop and start
 ```
 
-The server runs at `http://localhost:8001`. The container mounts `.llmockrc.json`, runs as a non-root user, and includes health checks.
+The server runs at `http://localhost:8001`. The container runs as a non-root user and mounts `.llmockrc.json` read-only, so a config change only needs `npm run docker:restart`.
+
+Everything else in the project (templates, and any fixture or stored response files your config points to) is copied into the image when it is built. After changing those, run `npm run docker:rebuild`, or add a volume for them in `docker-compose.yml`.
 
 ---
 

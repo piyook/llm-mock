@@ -1,0 +1,5 @@
+[
+  "First stored reply for the e2e run.",
+  "Second stored reply for the e2e run.",
+  { "id": 3, "content": "Third stored reply, in the bundled object shape." }
+]

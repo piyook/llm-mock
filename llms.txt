@@ -7,7 +7,7 @@ Describes the llmock version this file ships with (read it from `node_modules/ll
 ## Mental model
 
 - One server process serves **one preset** (a named entry in `.llmockrc.json` → `models`). A preset fixes the chat route, the wire format, and the reply behaviour. To mock two providers at once, run two servers on two ports.
-- Config is read once at startup. Any change to `.llmockrc.json` needs `stop` + `start`. Fixture files are re-read on every request, so editing them needs no restart.
+- Config is read once at startup. Any change to `.llmockrc.json` needs `stop` + `start`. Fixture files and the stored responses file are re-read on every request, so editing them needs no restart.
 - No auth: API keys and headers are ignored (SDKs still need a non-empty dummy key).
 - Replies are text only. There are no tool calls, no error/rate-limit simulation, no token counting endpoint.
 
@@ -25,7 +25,7 @@ npx llmock stop                        # add --port=<n> if not 8001
 - Confirm what is live: `GET /ui-meta` → JSON with `llmName`, `llmUrlEndpoint`, `serverPort`, `streamingStatus`, `validateRequests`, delays.
 - `stop` kills whatever process is listening on the port (default 8001, it does not read the config). Do not point it at a port another service uses.
 - Run the CLI from the folder containing `.llmockrc.json`, or set `CONFIG_PATH=<path>` (relative to the cwd).
-- Scaffold alternative: `npm create llmock@latest <dir>` creates a standalone folder (config, Docker files, npm scripts). It prompts interactively if `<dir>` is omitted or already exists. Its scripts: `npm run llmock:start`, `llmock:stop`, `llmock:<preset>`.
+- Scaffold alternative: `npm create llmock@latest <dir>` creates a standalone folder (config, Docker files, npm scripts). It prompts interactively if `<dir>` is omitted or already exists. Its scripts: `npm run llmock:start`, `llmock:stop`, `llmock:<preset>`. Its Docker setup mounts only `.llmockrc.json`; templates, fixtures and a stored responses file are copied into the image, so changing them needs `npm run docker:rebuild` (or an added volume).
 
 ## Point a client at it (default port 8001)
 
@@ -76,7 +76,7 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `models.<preset>.name` | string | required | Wire format: `"openai"`, `"gemini"`, `"claude"`, or the name of your own templates (see Custom formats). `"claude"` also switches on Anthropic-specific behaviour. |
 | `model` | string | `mock-model` | Informational. Only the claude format uses it (fallback when the request has no `model`). |
 | `endpoint` | string | required | Chat route, no leading slash. Registered for both POST and GET. Must not be `v1/embeddings` while embeddings are enabled (startup error). |
-| `responseType` | `"lorem"` \| `"stored"` | `lorem` | `lorem`: 1..`maxLoremParas` random sentences. `stored`: random pick from 11 fixed strings bundled in the package (not configurable; use `responseRules` for canned text). Any other value: 1–10 lorem paragraphs. |
+| `responseType` | `"lorem"` \| `"stored"` | `lorem` | `lorem`: 1..`maxLoremParas` random sentences. `stored`: random pick from the preset's `storedResponsesFile`, or from 11 fixed strings bundled in the package when that is unset. Any other value: 1–10 lorem paragraphs. |
 | `maxLoremParas` | number | 8 | Max **sentences** for `lorem`. |
 | `validateRequests` | boolean | false | See Validation. |
 | `logRequests` | boolean | false | Record the last validated request (shown at `GET /logs`). |
@@ -85,7 +85,8 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `responseDelay.min/max` | ms | 0 / 0 | Random wait before each reply. `0`/`0` disables. |
 | `embeddings.enabled` | boolean | false | Registers `/v1/embeddings`. When false the route 404s. |
 | `embeddings.dimensions` | number | 128 | Default vector length. |
-| `responseRules` | `{match, file}[]` | none | See Fixture replies. |
+| `responseRules` | `{match, file}[]` or `{match, files}[]` | none | See Fixture replies. |
+| `storedResponsesFile` | string | none | JSON file of texts for `responseType: "stored"`. See Stored replies. |
 | `server.port` | number | 8001 | Listen port. |
 | `server.host` | string | `0.0.0.0` | Bind address. Use `127.0.0.1` to keep the mock off the network; keep `0.0.0.0` in Docker. |
 
@@ -100,9 +101,23 @@ The way to get deterministic output, e.g. JSON your code parses.
 - Because earlier turns are searched, a rule that matched turn 1 keeps matching all later turns of that conversation.
 - The reply text is the file's bytes, verbatim, including a trailing newline. It is inserted as the assistant message text in the preset's normal envelope (and streamed if streaming applies); it is not the raw HTTP body.
 - `file` resolves relative to the folder containing the config file.
+- Random variety for one kind of request: give the rule `files` instead of `file`, e.g. `{ "match": "Summarise", "files": ["fixtures/a.txt", "fixtures/b.txt"] }`. One file is picked at random on each matching request. A rule has `file` or `files`, not both.
 - No rule matched → normal `responseType` reply.
-- `match` or `file` empty/non-string → server refuses to start. File missing → startup warning, and a matching request gets `500` (no fallback to lorem).
+- `match` or `file` empty/non-string, `files` not a non-empty array of non-empty strings, or both `file` and `files` set → server refuses to start. File missing → startup warning (every entry of `files` is checked), and a matching request that picks it gets `500` (no fallback to lorem).
 - GET requests have no body, so rules never apply to them.
+
+## Stored replies (`storedResponsesFile`)
+
+The way to get varied but realistic output: a pool of your own texts, one picked at random per request.
+
+- Only used when `responseType` is `"stored"`. A matching `responseRules` entry still wins; the pool is the reply for everything no rule matches.
+- The file is a JSON array of strings: `["first reply", "second reply"]`. Entries may also be objects with a string `content` (`[{ "id": 1, "content": "..." }]`, the shape of the bundled data; other keys are ignored).
+- The path resolves relative to the folder containing the config file.
+- Empty/non-string path → server refuses to start. With `responseType: "stored"`, a file that is missing, unreadable, not valid JSON, not an array, empty, or has an entry of another shape → server refuses to start.
+- The file is checked at startup and re-read on every request, so editing it needs no restart. If it becomes invalid while the server runs, requests get `500` (no fallback to the bundled strings).
+- Unset → the bundled strings are used.
+- GET requests to the chat route also reply from the pool (only rules need a body).
+- `GET /ui-meta` → `storedResponsesCount` is the size of the pool in use.
 
 ## Validation
 
@@ -176,6 +191,8 @@ export const stopMock = () => execSync('npx llmock stop --port=8001');
 
 Fast deterministic tests: `"responseDelay": {"min": 0, "max": 0}`, one `responseRules` entry per scenario keyed on a unique marker string in the prompt.
 
+Varied replies: `"responseType": "stored"` with `"storedResponsesFile": "fixtures/replies.json"` for every unmatched request, or a rule with `files` for one kind of request. Assert on membership of the pool, not on one exact text.
+
 Docker (config and fixtures mounted, no rebuild on change):
 
 ```dockerfile
@@ -186,4 +203,4 @@ EXPOSE 8001
 CMD ["npx", "llmock", "start", "--foreground"]
 ```
 
-Mount `.llmockrc.json` to `/app/.llmockrc.json`, with the fixtures folder (and any template folders) beside it. `--foreground` is required or the container exits.
+Mount `.llmockrc.json` to `/app/.llmockrc.json`, with the fixtures folder (and any template folders) beside it. A `storedResponsesFile` must be mounted too, at the same path relative to the config (simplest: keep it inside the fixtures folder). `--foreground` is required or the container exits.

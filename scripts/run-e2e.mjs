@@ -7,6 +7,7 @@ const suites = [
   { start: "llmock:start:streaming", spec: "cypress/e2e/streaming-only-spec.cy.ts" },
   { start: "llmock:start:embeddings",spec: "cypress/e2e/embeddings-spec.cy.ts" },
   { start: "llmock:start:claude",    spec: "cypress/e2e/claude-mock-spec.cy.ts" },
+  { start: "llmock:start:stored",    spec: "cypress/e2e/stored-responses-spec.cy.ts" },
 ];
 
 const cypress = (spec) => execSync(`npx cypress run --spec "${spec}"`, { stdio: "inherit" });
