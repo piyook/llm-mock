@@ -41,6 +41,7 @@
 		"src/response-templates/**/*",
 		".llm-mock-rc.json",
 		"README.md",
+		"llms.txt",
 		"LICENSE"
 	],
 	"scripts": {
