@@ -8,9 +8,11 @@ import {
 	setEnvironmentFromConfig,
 	getCurrentModel,
 	getResponseRules,
+	getStoredResponsesFile,
 	loadConfig,
 } from './config/config-loader.js';
-import { loadRuleContent } from './utilities/response-rules.js';
+import { readRuleFile, ruleFiles } from './utilities/response-rules.js';
+import { loadStoredResponses } from './utilities/stored-responses.js';
 
 // Initialize configuration from .llmockrc.json
 // Use config path from CLI if available, otherwise look in current working directory
@@ -22,11 +24,20 @@ setEnvironmentFromConfig(modelName);
 // Fail fast on malformed responseRules and warn about fixture files that can't be read
 const { rules: responseRules, baseDir: rulesDir } = getResponseRules();
 for (const rule of responseRules) {
-	try {
-		loadRuleContent(rule, rulesDir);
-	} catch (error) {
-		console.warn(`WARNING: ${(error as Error).message}`);
+	for (const file of ruleFiles(rule)) {
+		try {
+			readRuleFile(rule, file, rulesDir);
+		} catch (error) {
+			console.warn(`WARNING: ${(error as Error).message}`);
+		}
 	}
+}
+
+// Fail fast on a malformed storedResponsesFile path, and on a file that can't
+// be used when stored responses are what this server will serve
+const { file: storedFile, baseDir: storedDir } = getStoredResponsesFile();
+if (storedFile && process.env.MOCK_LLM_RESPONSE_TYPE === 'stored') {
+	loadStoredResponses(storedFile, storedDir);
 }
 
 const app = fastify({ logger: false });

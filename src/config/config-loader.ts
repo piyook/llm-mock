@@ -4,6 +4,7 @@ import {
 	validateResponseRules,
 	type ResponseRule,
 } from '../utilities/response-rules.js';
+import { validateStoredResponsesFile } from '../utilities/stored-responses.js';
 
 export interface ResponseDelay {
 	min: number;
@@ -29,6 +30,8 @@ export interface ModelConfig {
 	embeddings: EmbeddingsConfig;
 	// Optional: return a fixture file's contents when the request contains `match`
 	responseRules?: ResponseRule[];
+	// Optional: JSON file of texts that `responseType: "stored"` picks from
+	storedResponsesFile?: string;
 }
 
 export interface ServerConfig {
@@ -181,6 +184,26 @@ export function getResponseRules(): {
 
 	return {
 		rules: validateResponseRules(config.models[name]?.responseRules),
+		baseDir: configDir,
+	};
+}
+
+/**
+ * Stored responses file of the active model preset (undefined when the
+ * bundled texts are used), plus the folder it resolves against.
+ */
+export function getStoredResponsesFile(): {
+	file: string | undefined;
+	baseDir: string;
+} {
+	const config = loadConfig();
+	const name =
+		process.env.LLM_MODEL_NAME || currentModelCache || config.defaultModel;
+
+	return {
+		file: validateStoredResponsesFile(
+			config.models[name]?.storedResponsesFile,
+		),
 		baseDir: configDir,
 	};
 }

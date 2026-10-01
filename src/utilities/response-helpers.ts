@@ -6,8 +6,12 @@ import {
 	setStreamingHeaders,
 	streamWithDelay,
 } from './build-streaming-response.js';
-import { getResponseRules } from '../config/config-loader.js';
+import {
+	getResponseRules,
+	getStoredResponsesFile,
+} from '../config/config-loader.js';
 import { findMatchingRule, loadRuleContent } from './response-rules.js';
+import { loadStoredResponses } from './stored-responses.js';
 import type { FastifyReply } from 'fastify';
 
 // Default embedding dimension constant
@@ -51,13 +55,18 @@ export const generateResponseContent = async (
 		}
 
 		case 'stored': {
-			const storedResponses = db.llm.getAll();
+			// The preset's own file if configured (re-read per request, like
+			// rule fixtures), otherwise the texts bundled with the package
+			const { file, baseDir } = getStoredResponsesFile();
+			const storedResponses = file
+				? loadStoredResponses(file, baseDir)
+				: db.llm.getAll().map((item) => item.content);
 
 			const random = faker.number.int({
 				min: 0,
 				max: storedResponses.length - 1,
 			});
-			content = storedResponses[random].content;
+			content = storedResponses[random];
 
 			break;
 		}

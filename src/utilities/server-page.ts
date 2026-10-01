@@ -3,12 +3,27 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../models/db.js';
+import { getStoredResponsesFile } from '../config/config-loader.js';
+import { loadStoredResponses } from './stored-responses.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uiDistDir = path.resolve(__dirname, '../../ui/dist');
+
+// Size of the pool `responseType: "stored"` picks from: the preset's own file
+// if configured, otherwise the bundled texts. 0 if that file can't be used.
+function countStoredResponses(): number {
+	const { file, baseDir } = getStoredResponsesFile();
+	if (!file) return db.llm.getAll().length;
+
+	try {
+		return loadStoredResponses(file, baseDir).length;
+	} catch {
+		return 0;
+	}
+}
 
 function contentTypeForPath(filePath: string): string {
 	const ext = path.extname(filePath).toLowerCase();
@@ -120,9 +135,10 @@ const fallbackHtmlString = `
 function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	// UI meta endpoint for the compiled Svelte dashboard
 	app.get('/ui-meta', async (_request, reply) => {
-		const dbEntries = db.llm.getAll()?.length ?? 0;
 		const storedResponsesCount =
-			process.env.MOCK_LLM_RESPONSE_TYPE === 'stored' ? dbEntries : null;
+			process.env.MOCK_LLM_RESPONSE_TYPE === 'stored'
+				? countStoredResponses()
+				: null;
 
 		const responseDelayMinMs =
 			Number(process.env?.RESPONSE_DELAY_MIN ?? 0) || 0;

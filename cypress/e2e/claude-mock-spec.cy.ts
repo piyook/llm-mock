@@ -214,6 +214,32 @@ describe('Mock LLM Spec for Claude (Anthropic Messages API)', () => {
             });
         });
 
+        it('returns one of the pooled files for a rule with files', () => {
+            const pool = ['Pool reply A.', 'Pool reply B.'];
+
+            Cypress._.times(6, () => {
+                cy.request({
+                    method: 'POST',
+                    url,
+                    body: ruleBody('E2E_FIXTURE_POOL'),
+                }).then((response) => {
+                    expect(pool).to.include(response.body.content[0].text);
+                });
+            });
+
+            cy.request({
+                method: 'POST',
+                url,
+                body: ruleBody('E2E_FIXTURE_POOL', { stream: true }),
+            }).then((response) => {
+                const text = parseSse(response.body as string)
+                    .filter((e) => e.event === 'content_block_delta')
+                    .map((e) => e.data.delta.text)
+                    .join('');
+                expect(pool).to.include(text);
+            });
+        });
+
         it('generates normal text when no rule matches', () => {
             cy.readFile(fixturePath).then((fixture) => {
                 cy.request({
