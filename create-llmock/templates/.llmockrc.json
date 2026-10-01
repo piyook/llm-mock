@@ -80,7 +80,7 @@
     "embeddings": {
       "name": "openai",
       "model": "text-embedding-3-small",
-      "endpoint": "v1/embeddings",
+      "endpoint": "chatgpt/chat/completions",
       "responseType": "lorem",
       "maxLoremParas": 4,
       "validateRequests": true,
