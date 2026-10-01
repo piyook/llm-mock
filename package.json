@@ -1,6 +1,6 @@
 {
 	"name": "llmock",
-	"version": "3.4.1",
+	"version": "3.5.0",
 	"description": "A configurable mock LLM API server for testing and development",
 	"main": "./src/server.ts",
 	"type": "module",
@@ -41,6 +41,7 @@
 		"src/response-templates/**/*",
 		".llm-mock-rc.json",
 		"README.md",
+		"llms.txt",
 		"LICENSE"
 	],
 	"scripts": {

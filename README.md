@@ -7,6 +7,8 @@
 
 A lightweight local server that simulates LLM APIs for development and testing. Build and test AI-powered applications without API costs or an internet connection.
 
+> **Using a coding agent?** Point it at [`llms.txt`](llms.txt) (shipped in the npm package at `node_modules/llmock/llms.txt`) — a compact reference to the CLI, config schema, response shapes and gotchas.
+
 ---
 
 ## Table of Contents
@@ -42,7 +44,7 @@ Built on [Fastify](https://www.fastify.io/) for high performance and reliability
 
 ## Quick Start
 
-**Prerequisites:** Node.js 20+
+**Prerequisites:** Node.js 20 or later (24 LTS recommended; it is the version LLMock is tested on)
 
 The fastest way to get started is with the scaffolding tool, which creates a complete project with configuration files and example templates:
 
@@ -113,12 +115,14 @@ llmock start                        # uses defaultModel from .llmockrc.json (cha
 llmock start --model=gemini
 llmock start --model=claude         # Anthropic Messages API
 llmock start --port=3000 --stream=true
-llmock stop
-llmock config                       # show current settings
+llmock stop                         # add --port=3000 if not on 8001
+llmock config                       # show current settings (accepts --model)
 llmock help
 ```
 
-All CLI flags support both `--key=value` and `--key value` formats and override `.llmockrc.json` at runtime.
+All CLI flags support both `--key=value` and `--key value` formats and override `.llmockrc.json` at runtime. `start` is the default command, so `llmock --model=claude` works too.
+
+`llmock start` returns once the server is answering. If the server cannot start (for example a config error), or one is already running on that port, it exits with an error instead; run with `--foreground` to see the server's own output.
 
 ### Foreground Mode
 
@@ -185,9 +189,9 @@ All settings live in `.llmockrc.json` in your project root. CLI flags always ove
 
 | Option | Description |
 |---|---|
-| `name` | LLM provider name (used for template loading) |
+| `name` | **Required.** LLM provider name (used for template loading) |
 | `model` | Model identifier (e.g. `gpt-4o`, `gemini-pro`) |
-| `endpoint` | API endpoint path |
+| `endpoint` | **Required.** API endpoint path (not `v1/embeddings` while embeddings are enabled) |
 | `responseType` | `"lorem"` (random text) or `"stored"` (predefined responses) |
 | `maxLoremParas` | Max sentences in lorem ipsum responses |
 | `validateRequests` | Validate incoming requests against templates |
@@ -198,6 +202,9 @@ All settings live in `.llmockrc.json` in your project root. CLI flags always ove
 | `responseRules` | Optional list of `{ match, file }` fixture replies (see [Response rules](#response-rules-fixture-replies)) |
 | `embeddings.enabled` | Enable the `/v1/embeddings` endpoint |
 | `embeddings.dimensions` | Embedding vector size |
+| `server.port` / `server.host` | Port and address the server listens on (`8001`, `0.0.0.0`) |
+
+Only `name` and `endpoint` are required in a preset. Anything left out uses: `responseType` `lorem`, `maxLoremParas` 8, no delay, and validation, logging, debug, streaming and embeddings off.
 
 ### Adding custom models
 
@@ -234,21 +241,10 @@ llmock start --model=my-model
 { "responseType": "lorem", "maxLoremParas": 8 }
 ```
 
-**Stored responses** — returns predefined answers from `src/data/data.json`, useful for domain-specific or reproducible testing. The server randomly selects from this list on each request:
+**Stored responses** — returns one of a small set of fixed sentences bundled with the package, picked at random on each request. For replies you choose yourself, use [response rules](#response-rules-fixture-replies) instead:
 
 ```json
-{
-  "responseType": "stored"
-}
-```
-
-```json
-{
-  "responses": [
-    "This is a custom response for testing.",
-    "Another predefined response for consistency."
-  ]
-}
+{ "responseType": "stored" }
 ```
 
 ### Response rules (fixture replies)
@@ -378,17 +374,17 @@ Validate incoming requests against templates to confirm API compatibility:
 1. Add a template to the `request-templates/` folder
 2. Enable validation: `"validateRequests": true`
 
-Invalid requests return a detailed error describing the mismatch.
+A request passes when it contains every top-level key of the template. The built-in templates require `model` and `messages` (OpenAI), `contents` (Gemini), and `model`, `max_tokens` and `messages` (Claude). Invalid requests return a `400`; the missing keys are shown at `/logs`.
 
 ### Request logging
 
-Enable with `"logRequests": true` and view at `http://localhost:8001/logs`, or find the log file at:
+Enable with `"logRequests": true` and view the most recent request at `http://localhost:8001/logs`, or find the log file (it holds the last request only) at:
 
 | Platform | Log location |
 |---|---|
-| Windows | `C:\Users\{name}\AppData\Local\llmock-nodejs\Log\` |
-| macOS | `~/Library/Logs/llmock-nodejs/` |
-| Linux | `~/.local/share/llmock-nodejs/log/` |
+| Windows | `C:\Users\{name}\AppData\Local\llm-mock-nodejs\Log\` |
+| macOS | `~/Library/Logs/llm-mock-nodejs/` |
+| Linux | `~/.local/state/llm-mock-nodejs/` |
 
 ### Debug mode
 
@@ -587,7 +583,7 @@ Behaviour:
 
 The framework checks two locations, in priority order:
 
-1. `./request-templates/` and `./response-templates/` in your project root
+1. `./request-templates/` and `./response-templates/` in the folder that holds your `.llmockrc.json`
 2. `src/request-templates/` and `src/response-templates/` in the package source
 
 Templates are named `<name>_req.json` and `<name>_res.json`, where `<name>` is the preset's `name` field. Scaffolded projects already have these folders; otherwise create them yourself. Project-level templates take priority, so you can add custom templates without modifying the package.
@@ -779,6 +775,10 @@ Confirm the server is running and the port matches `.llmockrc.json`. Open `http:
 
 ![LLM Mock Server error page](images/server-page-err.png)
 
+**`llmock start` exits with an error**
+
+Run `llmock start --foreground` with the same options to see the server's output. If it reports a server already running on the port, run `llmock stop` (with `--port` if it isn't 8001) first.
+
 **Port already in use**
 
 Change the port in `.llmockrc.json` or pass it as a flag:
@@ -796,7 +796,7 @@ llmock start --port=8002
 
 **Response delays not applied**
 
-Ensure both `responseDelay.min` and `responseDelay.max` are set and greater than `0`, then restart the server.
+Ensure `responseDelay.min` or `responseDelay.max` is greater than `0`, then restart the server.
 
 ---
 

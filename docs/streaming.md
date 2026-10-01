@@ -181,7 +181,7 @@ npm run test:streaming
    - Check for console errors
 
 2. **Invalid request errors**
-   - Ensure all required fields are present: `model`, `messages`, `temperature`, `n`, `stream`
+   - Ensure all required fields are present: `model`, `messages`
    - Check request format matches `openai_req.json` template
    - Verify `VALIDATE_REQUESTS=ON` if validation is expected
 

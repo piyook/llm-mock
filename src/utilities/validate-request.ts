@@ -3,6 +3,7 @@ import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import logger from './logger.js';
+import { getConfigDir } from '../config/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -31,9 +32,10 @@ export const validateRequest = async (request: any) => {
 	const llmName = process.env.LLM_NAME ?? 'openai';
 	const templateFileName = `${llmName}_req.json`;
 
-	// Try to load request template from current working directory first
+	// Try the project's templates first (next to the config file). The server
+	// runs from the package folder, so process.cwd() is not the project.
 	const cwdTemplatePath = resolve(
-		process.cwd(),
+		getConfigDir(),
 		'request-templates',
 		templateFileName,
 	);
@@ -45,13 +47,13 @@ export const validateRequest = async (request: any) => {
 
 	try {
 		console.log(`Looking for template: ${templateFileName}`);
-		console.log(`Checking CWD path: ${cwdTemplatePath}`);
+		console.log(`Checking project path: ${cwdTemplatePath}`);
 		console.log(`Checking SRC path: ${srcTemplatePath}`);
-		console.log(`CWD exists: ${existsSync(cwdTemplatePath)}`);
+		console.log(`Project template exists: ${existsSync(cwdTemplatePath)}`);
 
-		// First try current working directory
+		// First try the project folder
 		if (existsSync(cwdTemplatePath)) {
-			console.log(`Loading template from CWD: ${cwdTemplatePath}`);
+			console.log(`Loading template from project: ${cwdTemplatePath}`);
 			const fs = await import('fs');
 			const templateData = fs.readFileSync(cwdTemplatePath, 'utf8');
 			requestTemplate = { default: JSON.parse(templateData) };

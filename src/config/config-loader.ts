@@ -43,7 +43,8 @@ export interface LlmMockConfig {
 }
 
 let configCache: LlmMockConfig | null = null;
-// Folder holding the loaded config file; response rule files resolve against it.
+// Folder holding the loaded config file; response rule files and project-level
+// templates resolve against it.
 let configDir = process.cwd();
 let currentModelCache: string | null = null;
 
@@ -182,6 +183,10 @@ export function getResponseRules(): {
 		rules: validateResponseRules(config.models[name]?.responseRules),
 		baseDir: configDir,
 	};
+}
+
+export function getConfigDir(): string {
+	return configDir;
 }
 
 export function getCurrentModel(): string | null {

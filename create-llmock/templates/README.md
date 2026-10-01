@@ -37,7 +37,6 @@ The server configuration is in `.llmockrc.json`. You can modify:
 - Logging settings
 - Response delays
 - Endpoint paths
-- Request and response directories
 
 ## Customizing Responses
 
@@ -57,9 +56,17 @@ The project includes editable templates for:
 ## Server Endpoints
 
 Once started, the server will be available at:
-- OpenAI compatible: `http://localhost:3000/v1/chat/completions`
-- Gemini compatible: `http://localhost:3000/v1/models/gemini-pro:generateContent`
-- Embeddings: `http://localhost:3000/v1/embeddings`
+- Dashboard: `http://localhost:8001`
+- OpenAI compatible (`chatgpt`, `streaming`): `http://localhost:8001/chatgpt/chat/completions`
+- Gemini compatible (`gemini`): `http://localhost:8001/models/gemini-pro:generateContent`
+- Anthropic Messages (`claude`): `http://localhost:8001/v1/messages`
+- Embeddings: `http://localhost:8001/v1/embeddings`
+
+One preset runs at a time; the chat endpoint is the one for the preset you started.
+
+## Coding agents
+
+`node_modules/llmock/llms.txt` is a compact reference to the CLI, config schema, response shapes and limits, written for coding agents.
 
 ## Development
 
