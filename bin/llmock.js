@@ -48,6 +48,7 @@ OPTIONS:
   --maxLoremParas=<num>    Maximum lorem ipsum sentences
   --validateRequests=<bool> Validate incoming requests (true/false)
   --logRequests=<bool>    Log incoming requests (true/false)
+  --maxLoggedRequests=<num> Requests kept in the log (default: 10, max: 100)
   --debug=<bool>          Enable debug mode (true/false)
   --stream=<bool>          Enable streaming responses (true/false)
   --delayMin=<ms>          Minimum response delay in milliseconds
@@ -90,6 +91,7 @@ MODEL: ${selectedModel}
   Max Lorem Paragraphs: ${modelConfig.maxLoremParas}
   Validate Requests: ${modelConfig.validateRequests}
   Log Requests: ${modelConfig.logRequests}
+  Max Logged Requests: ${modelConfig.maxLoggedRequests}
   Debug: ${modelConfig.debug}
   Stream: ${modelConfig.stream}
   Response Delay: ${modelConfig.responseDelay.min}ms - ${modelConfig.responseDelay.max}ms
@@ -299,6 +301,7 @@ function setEnvironmentVariables(config, modelName, configPath) {
     customSettings.validateRequests === 'true' : modelConfig.validateRequests) ? 'ON' : 'OFF';
   process.env.LOG_REQUESTS = (customSettings.logRequests !== undefined ? 
     customSettings.logRequests === 'true' : modelConfig.logRequests) ? 'ON' : 'OFF';
+  process.env.MAX_LOGGED_REQUESTS = customSettings.maxLoggedRequests || modelConfig.maxLoggedRequests.toString();
   process.env.DEBUG = (customSettings.debug !== undefined ? 
     customSettings.debug === 'true' : modelConfig.debug) ? '*' : 'OFF';
   process.env.STREAM = (customSettings.stream !== undefined ? 

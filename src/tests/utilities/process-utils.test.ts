@@ -118,6 +118,7 @@ describe('applyConfigDefaults', () => {
 			maxLoremParas: 8,
 			validateRequests: false,
 			logRequests: false,
+			maxLoggedRequests: 10,
 			debug: false,
 			stream: true,
 			responseDelay: { min: 300, max: 0 },

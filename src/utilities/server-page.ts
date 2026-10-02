@@ -7,7 +7,7 @@ import {
 	getResponseRules,
 	getStoredResponsesFile,
 } from '../config/config-loader.js';
-import { logPath } from './logger.js';
+import { logPath, maxLogEntries } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { readRuleFile, ruleFiles } from './response-rules.js';
 
@@ -232,6 +232,7 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			responseRules,
 			validateRequests: process.env?.VALIDATE_REQUESTS ?? '',
 			logRequests: process.env?.LOG_REQUESTS ?? '',
+			maxLoggedRequests: maxLogEntries(),
 			debugMode: process.env.DEBUG === '*' ? 'ON' : 'OFF',
 			responseDelayMinMs,
 			responseDelayMaxMs,
@@ -286,6 +287,9 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		let log: unknown = null;
 		try {
 			log = JSON.parse(fs.readFileSync(logPath, 'utf8'));
+			// A log written under a higher limit is only trimmed on the
+			// next request
+			if (Array.isArray(log)) log = log.slice(0, maxLogEntries());
 		} catch {
 			// No log file yet, or one that is mid-write
 		}

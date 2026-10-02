@@ -11,6 +11,7 @@ export type UiMeta = {
 	responseRules: Array<{ match: string; files: string[] }>;
 	validateRequests: string;
 	logRequests: string;
+	maxLoggedRequests: number;
 	debugMode: 'ON' | 'OFF';
 	responseDelayMinMs: number;
 	responseDelayMaxMs: number;

@@ -79,7 +79,8 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `responseType` | `"lorem"` \| `"stored"` | `lorem` | `lorem`: 1..`maxLoremParas` random sentences. `stored`: random pick from the preset's `storedResponsesFile`, or from 11 fixed strings bundled in the package when that is unset. Any other value: 1–10 lorem paragraphs. |
 | `maxLoremParas` | number | 8 | Max **sentences** for `lorem`. |
 | `validateRequests` | boolean | false | See Validation. |
-| `logRequests` | boolean | false | Record the last 10 validated requests (shown at `GET /ui-request-log`). |
+| `logRequests` | boolean | false | Record the most recent validated requests (shown at `GET /ui-request-log`). |
+| `maxLoggedRequests` | number | 10 | How many requests the log keeps. Capped at 100; a value below 1 or not a number falls back to 10. |
 | `debug` | boolean | false | Verbose console output. |
 | `stream` | boolean | false | SSE for `openai`/`gemini` formats. Ignored by `claude`. |
 | `responseDelay.min/max` | ms | 0 / 0 | Random wait before each reply. `0`/`0` disables. |
@@ -90,7 +91,7 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `server.port` | number | 8001 | Listen port. |
 | `server.host` | string | `0.0.0.0` | Bind address. Use `127.0.0.1` to keep the mock off the network; keep `0.0.0.0` in Docker. |
 
-CLI flags override the selected preset for one run: `--model --port --host --endpoint --responseType --maxLoremParas --validateRequests --logRequests --debug --stream --delayMin --delayMax --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. Booleans must be the literal `true`/`false`; every flag except `--foreground` needs a value.
+CLI flags override the selected preset for one run: `--model --port --host --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. Booleans must be the literal `true`/`false`; every flag except `--foreground` needs a value.
 
 ## Fixture replies (`responseRules`)
 
@@ -171,7 +172,7 @@ To change a response envelope or the required request keys, or to mock a provide
 | `GET /ui-meta` | Active settings as JSON |
 | `GET /ui-stored-responses` | The stored responses pool in use, as JSON |
 | `GET /ui-rule-file?rule=<i>&file=<j>` | Contents of one response rule file, as JSON |
-| `GET /ui-request-log` | `{"file", "log"}`: `log` is an array of the **last 10** validated requests, newest first, each with why it passed/failed (older ones are dropped; `log` is `null` if none logged) |
+| `GET /ui-request-log` | `{"file", "log"}`: `log` is an array of the most recent validated requests (the last `maxLoggedRequests`, 10 by default), newest first, each with why it passed/failed (older ones are dropped; `log` is `null` if none logged) |
 | `GET /` | HTML dashboard |
 | `GET /<endpoint>` | A generated reply with no validation and no rules (quick smoke test) |
 

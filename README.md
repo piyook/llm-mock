@@ -199,7 +199,8 @@ The config file is read once at startup, so restart the server after changing it
 | `storedResponsesFile` | Optional JSON file of your own texts for `"stored"` (see [Response types](#response-types)) |
 | `maxLoremParas` | Max sentences in lorem ipsum responses |
 | `validateRequests` | Validate incoming requests against templates |
-| `logRequests` | Save the most recent request to the log file |
+| `logRequests` | Save the most recent requests to the log file |
+| `maxLoggedRequests` | How many requests the log keeps (default `10`, at most `100`) |
 | `debug` | Enable verbose console logging |
 | `stream` | Return SSE streaming responses (the `claude` preset decides per request instead) |
 | `responseDelay.min/max` | Response delay range in milliseconds |
@@ -208,7 +209,7 @@ The config file is read once at startup, so restart the server after changing it
 | `embeddings.dimensions` | Embedding vector size |
 | `server.port` / `server.host` | Port and address the server listens on (`8001`, `0.0.0.0`) |
 
-Only `name` and `endpoint` are required in a preset. Anything left out uses: `responseType` `lorem`, `maxLoremParas` 8, no delay, and validation, logging, debug, streaming and embeddings off.
+Only `name` and `endpoint` are required in a preset. Anything left out uses: `responseType` `lorem`, `maxLoremParas` 8, `maxLoggedRequests` 10, no delay, and validation, logging, debug, streaming and embeddings off.
 
 ### Adding custom models
 
@@ -403,7 +404,7 @@ A request passes when it contains every top-level key of the template. The built
 
 ### Request logging
 
-Enable with `"logRequests": true` and view the last 10 requests, newest first, with **View request log** on the dashboard (as JSON at `http://localhost:8001/ui-request-log`), or find the log file (it holds those 10 requests only) at:
+Enable with `"logRequests": true` and view the most recent requests, newest first, with **View request log** on the dashboard (as JSON at `http://localhost:8001/ui-request-log`). The log keeps the last 10 requests; set `"maxLoggedRequests"` (or `--maxLoggedRequests=<num>`) to keep between 1 and 100. The log file holds those requests only, at:
 
 | Platform | Log location |
 |---|---|

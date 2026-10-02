@@ -24,6 +24,8 @@ export interface ModelConfig {
 	maxLoremParas: number;
 	validateRequests: boolean;
 	logRequests: boolean;
+	// Optional: how many requests the log keeps (default 10, at most 100)
+	maxLoggedRequests?: number;
 	debug: boolean;
 	stream: boolean;
 	responseDelay: ResponseDelay;
@@ -240,6 +242,9 @@ export function setEnvironmentFromConfig(modelName?: string): void {
 		(modelConfig.validateRequests ? 'ON' : 'OFF');
 	process.env.LOG_REQUESTS =
 		process.env.LOG_REQUESTS || (modelConfig.logRequests ? 'ON' : 'OFF');
+	process.env.MAX_LOGGED_REQUESTS =
+		process.env.MAX_LOGGED_REQUESTS ||
+		(modelConfig.maxLoggedRequests ?? 10).toString();
 	process.env.DEBUG = process.env.DEBUG || (modelConfig.debug ? '*' : 'OFF');
 	process.env.STREAM =
 		process.env.STREAM || (modelConfig.stream ? 'true' : 'false');

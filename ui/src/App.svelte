@@ -309,7 +309,7 @@
 				<button
 					class="fileLink"
 					cy-data="request_log_link"
-					title="View the last 10 logged requests"
+					title={`View the last ${meta?.maxLoggedRequests ?? 10} logged requests`}
 					on:click={viewRequestLog}
 				>
 					View request log
