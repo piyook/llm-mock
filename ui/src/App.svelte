@@ -9,11 +9,13 @@
 		type UiMeta,
 	} from './api.js';
 
-	// What the viewer dialog shows: a pool of stored responses (`texts`, one
-	// block each) or a single rule fixture (one block, exactly as written)
+	// What the viewer dialog shows: a pool of stored responses or the logged
+	// requests (`texts`, one block each), or a single rule fixture (one block,
+	// exactly as written). `note` follows the source in the header.
 	type Viewer = {
 		title: string;
 		source: string;
+		note?: string;
 		texts: string[] | null;
 		error: string | null;
 	};
@@ -30,7 +32,7 @@
 	async function openViewer(
 		title: string,
 		source: string,
-		load: () => Promise<{ source?: string; texts: string[] }>,
+		load: () => Promise<{ source?: string; note?: string; texts: string[] }>,
 	) {
 		const opened: Viewer = { title, source, texts: null, error: null };
 		viewer = opened;
@@ -55,7 +57,14 @@
 			meta?.storedResponsesFile ?? 'Bundled responses',
 			async () => {
 				const { file, responses } = await fetchStoredResponses();
-				return { source: file ?? 'Bundled responses', texts: responses };
+				return {
+					source: file ?? 'Bundled responses',
+					note:
+						responses.length > 1
+							? `${responses.length} responses, one picked at random per request`
+							: undefined,
+					texts: responses,
+				};
 			},
 		);
 	}
@@ -68,15 +77,23 @@
 	}
 
 	function viewRequestLog() {
-		void openViewer('Last logged request', 'Request log', async () => {
+		void openViewer('Last logged requests', 'Request log', async () => {
 			const { file, log } = await fetchRequestLog();
+			// A log from an older llmock may not be an array
+			const entries = log === null ? [] : Array.isArray(log) ? log : [log];
+			if (entries.length === 0) {
+				return {
+					source: file,
+					texts: [
+						'No request has been logged yet. Turn on validateRequests and logRequests, restart the server, then send a POST request.',
+					],
+				};
+			}
+
 			return {
 				source: file,
-				texts: [
-					log === null
-						? 'No request has been logged yet. Turn on validateRequests and logRequests, restart the server, then send a POST request.'
-						: JSON.stringify(log, null, 2),
-				],
+				note: `${entries.length} most recent, newest first`,
+				texts: entries.map((entry) => JSON.stringify(entry, null, 2)),
 			};
 		});
 	}
@@ -288,11 +305,11 @@
 				<span class="badge">{meta?.debugMode ?? 'OFF'}</span>
 			</div>
 			<div class="kv">
-				<span class="muted">Last Logged Request</span>
+				<span class="muted">Last Logged Requests</span>
 				<button
 					class="fileLink"
 					cy-data="request_log_link"
-					title="View the last logged request"
+					title="View the last 10 logged requests"
 					on:click={viewRequestLog}
 				>
 					View request log
@@ -324,9 +341,7 @@
 				<div>
 					<h2 style="margin: 0;">{viewer.title}</h2>
 					<div class="muted viewerSource">
-						{viewer.source}{viewer.texts && viewer.texts.length > 1
-							? ` · ${viewer.texts.length} responses, one picked at random per request`
-							: ''}
+						{viewer.source}{viewer.note ? ` · ${viewer.note}` : ''}
 					</div>
 				</div>
 				<button class="fileLink" on:click={() => dialog.close()}>Close</button>

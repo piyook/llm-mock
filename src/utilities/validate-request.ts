@@ -96,14 +96,6 @@ export const validateRequest = async (request: any) => {
 	// For Fastify, the body is already parsed
 	const data = request.body;
 
-	// Log Request if LOG_REQUESTS=ON
-	logRequestBody({
-		data,
-		state: 'PASSED',
-		reason: 'REQUEST STRUCTURE OK',
-		information: 'request structure matches template',
-	});
-
 	const requiredKeys = Object.keys(requestTemplate.default[0]);
 
 	if (typeof data !== 'object' || data === null) {
@@ -137,6 +129,14 @@ export const validateRequest = async (request: any) => {
 		});
 		return false;
 	}
+
+	// Logged once per request, so a failed one isn't also recorded as passed
+	logRequestBody({
+		data,
+		state: 'PASSED',
+		reason: 'REQUEST STRUCTURE OK',
+		information: 'request structure matches template',
+	});
 
 	return true;
 };

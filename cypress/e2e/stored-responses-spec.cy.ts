@@ -42,8 +42,8 @@ describe('Mock LLM Spec for configured stored responses', () => {
     it('opens the request log in the dashboard viewer', () => {
         cy.visit('/');
         cy.get('[cy-data="request_log_link"]').click();
-        cy.get('[cy-data="viewer"]').should('contain', 'Last logged request');
-        cy.get('[cy-data="viewer_text"]').should('have.length', 1);
+        cy.get('[cy-data="viewer"]').should('contain', 'Last logged requests');
+        cy.get('[cy-data="viewer_text"]').should('have.length.within', 1, 10);
     });
 
     it('shows the configured pool in the dashboard viewer', () => {

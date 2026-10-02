@@ -403,7 +403,7 @@ A request passes when it contains every top-level key of the template. The built
 
 ### Request logging
 
-Enable with `"logRequests": true` and view the most recent request with **View request log** on the dashboard (as JSON at `http://localhost:8001/ui-request-log`), or find the log file (it holds the last request only) at:
+Enable with `"logRequests": true` and view the last 10 requests, newest first, with **View request log** on the dashboard (as JSON at `http://localhost:8001/ui-request-log`), or find the log file (it holds those 10 requests only) at:
 
 | Platform | Log location |
 |---|---|

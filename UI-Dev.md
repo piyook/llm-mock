@@ -28,7 +28,7 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
   - `storedResponsesCount` / `storedResponsesFile` (when the response type is `stored`)
   - `responseRules` (each rule's `match` and the `files` it replies with)
 
-- The viewer dialog reads file contents from `/ui-stored-responses` and `/ui-rule-file?rule=<i>&file=<j>`, and the last logged request from `/ui-request-log`.
+- The viewer dialog reads file contents from `/ui-stored-responses` and `/ui-rule-file?rule=<i>&file=<j>`, and the last 10 logged requests from `/ui-request-log`.
 
 ### Running everything locally
 

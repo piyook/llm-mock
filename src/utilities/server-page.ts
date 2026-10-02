@@ -280,8 +280,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		}
 	});
 
-	// The last validated request, for the dashboard viewer. `log` is null
-	// when no request has been logged yet.
+	// The most recent validated requests, newest first, for the dashboard
+	// viewer. `log` is null when no request has been logged yet.
 	app.get('/ui-request-log', async (_request, reply) => {
 		let log: unknown = null;
 		try {
