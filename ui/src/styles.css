@@ -20,9 +20,12 @@ body {
 }
 
 main {
-	padding: 0 3vw 40px 3vw;
-	width: 95vw;
-	max-width: 800px;
+	/* Sized from the page width with the padding included, so it never
+	   overflows sideways on a narrow window */
+	box-sizing: border-box;
+	padding: 0 16px 40px 16px;
+	width: 100%;
+	max-width: 832px;
 	min-width: 320px;
 	margin: 0 auto 32px auto;
 	display: flex;
