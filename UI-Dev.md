@@ -24,6 +24,10 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
   - `mockResponseType`
   - `responseDelayMinMs` / `responseDelayMaxMs`
   - `apiLinks` (resolved API URLs based on `LLM_URL_ENDPOINT`)
+  - `storedResponsesCount` / `storedResponsesFile` (when the response type is `stored`)
+  - `responseRules` (each rule's `match` and the `files` it replies with)
+
+- The viewer dialog reads file contents from `/ui-stored-responses` and `/ui-rule-file?rule=<i>&file=<j>`.
 
 ### Running everything locally
 

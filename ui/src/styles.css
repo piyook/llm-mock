@@ -142,6 +142,130 @@ h1 {
 	outline: none;
 }
 
+/* A row holding a file path needs the full width of the grid */
+.kvWide {
+	grid-column: 1 / -1;
+}
+
+.kvWide .muted {
+	white-space: nowrap;
+}
+
+.fileLink {
+	background: none;
+	border: 1.5px solid var(--accent);
+	border-radius: 8px;
+	padding: 4px 10px;
+	color: var(--text-main);
+	font: inherit;
+	font-weight: 650;
+	cursor: pointer;
+	text-align: left;
+	overflow-wrap: anywhere;
+}
+
+.fileLink:hover,
+.fileLink:focus-visible {
+	background: var(--accent);
+	outline: none;
+}
+
+.rules {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.rule {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+	padding: 10px 12px;
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+.ruleMatch,
+.ruleFiles {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	min-width: 0;
+}
+
+.ruleMatch code {
+	background: var(--accent2);
+	padding: 4px 10px;
+	border-radius: 8px;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+	.rule {
+		grid-template-columns: 1fr;
+	}
+}
+
+.viewer {
+	width: min(800px, 92vw);
+	max-height: 85vh;
+	padding: 0;
+	border: none;
+	outline: none;
+	border-radius: var(--border-radius);
+	box-shadow: var(--shadow);
+	background: var(--bg-card);
+	color: var(--text-main);
+}
+
+.viewer::backdrop {
+	background: rgba(0, 0, 0, 0.6);
+}
+
+.viewerBody {
+	padding: 18px;
+}
+
+.viewerHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 12px;
+	margin-bottom: 14px;
+}
+
+.viewerSource {
+	margin-top: 4px;
+	overflow-wrap: anywhere;
+}
+
+.viewerTexts {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.viewerTexts pre {
+	margin: 0;
+	padding: 10px 12px;
+	border-radius: 12px;
+	background: rgba(0, 0, 0, 0.25);
+	font-family: Consolas, 'Courier New', monospace;
+	font-size: 0.9rem;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.viewerError {
+	margin: 0;
+	padding: 10px 12px;
+	border-radius: 12px;
+	background: rgb(126, 80, 78);
+	overflow-wrap: anywhere;
+}
+
 .footerNote {
 	text-align: center;
 	font-size: 0.95rem;

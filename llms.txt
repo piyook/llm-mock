@@ -105,6 +105,8 @@ The way to get deterministic output, e.g. JSON your code parses.
 - No rule matched → normal `responseType` reply.
 - `match` or `file` empty/non-string, `files` not a non-empty array of non-empty strings, or both `file` and `files` set → server refuses to start. File missing → startup warning (every entry of `files` is checked), and a matching request that picks it gets `500` (no fallback to lorem).
 - GET requests have no body, so rules never apply to them.
+- `GET /ui-meta` → `responseRules` lists the active rules in order as `{"match", "files": [...]}` (a single `file` is reported as a one-entry `files`).
+- `GET /ui-rule-file?rule=<i>&file=<j>` → `{"match", "file", "content"}` for file `j` of rule `i` (both zero-based positions in that list). Unknown position → `404`; unreadable file → `500` with `{"error"}`.
 
 ## Stored replies (`storedResponsesFile`)
 
@@ -117,7 +119,8 @@ The way to get varied but realistic output: a pool of your own texts, one picked
 - The file is checked at startup and re-read on every request, so editing it needs no restart. If it becomes invalid while the server runs, requests get `500` (no fallback to the bundled strings).
 - Unset → the bundled strings are used.
 - GET requests to the chat route also reply from the pool (only rules need a body).
-- `GET /ui-meta` → `storedResponsesCount` is the size of the pool in use.
+- `GET /ui-meta` → `storedResponsesCount` is the size of the pool in use and `storedResponsesFile` its configured path (`null` = bundled strings; both `null` unless `responseType` is `"stored"`).
+- `GET /ui-stored-responses` → `{"file", "responses": [...]}`: every text in the pool in use.
 
 ## Validation
 
@@ -166,6 +169,8 @@ To change a response envelope or the required request keys, or to mock a provide
 |---|---|
 | `GET /ping` | `{"response":"server is running"}` |
 | `GET /ui-meta` | Active settings as JSON |
+| `GET /ui-stored-responses` | The stored responses pool in use, as JSON |
+| `GET /ui-rule-file?rule=<i>&file=<j>` | Contents of one response rule file, as JSON |
 | `GET /logs` | HTML page showing the **last** validated request and why it passed/failed (history is not kept) |
 | `GET /` | HTML dashboard |
 | `GET /<endpoint>` | A generated reply with no validation and no rules (quick smoke test) |

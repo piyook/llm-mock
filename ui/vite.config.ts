@@ -10,6 +10,8 @@ export default defineConfig({
 		proxy: {
 			'/ping': 'http://localhost:8001',
 			'/ui-meta': 'http://localhost:8001',
+			'/ui-stored-responses': 'http://localhost:8001',
+			'/ui-rule-file': 'http://localhost:8001',
 			'/logs': 'http://localhost:8001',
 			'/api': 'http://localhost:8001',
 			'/chatgpt': 'http://localhost:8001',

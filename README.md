@@ -383,6 +383,8 @@ Once running, open `http://localhost:8001` for the live dashboard:
 
 The dashboard shows server status, current configuration, available endpoints, and the most recent logged request. It refreshes automatically every 2 seconds.
 
+With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. When the preset has `responseRules`, a **Response rules** box lists each rule's `match` text beside the file(s) it replies with; click a file to read its contents.
+
 ### Available endpoints
 
 | Endpoint | Description |

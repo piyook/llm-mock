@@ -1,11 +1,70 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
-	import { fetchPing, fetchUiMeta, type UiMeta } from './api.js';
+	import {
+		fetchPing,
+		fetchRuleFile,
+		fetchStoredResponses,
+		fetchUiMeta,
+		type UiMeta,
+	} from './api.js';
+
+	// What the viewer dialog shows: a pool of stored responses (`texts`, one
+	// block each) or a single rule fixture (one block, exactly as written)
+	type Viewer = {
+		title: string;
+		source: string;
+		texts: string[] | null;
+		error: string | null;
+	};
 
 	let meta: UiMeta | null = null;
 	let online: boolean | null = null;
 	let error: string | null = null;
 	let timer: number | null = null;
+	let viewer: Viewer | null = null;
+	let dialog: HTMLDialogElement;
+
+	// Opens the dialog straight away and fills it once `load` settles; a
+	// result for a view that has since been replaced is dropped
+	async function openViewer(
+		title: string,
+		source: string,
+		load: () => Promise<{ source?: string; texts: string[] }>,
+	) {
+		const opened: Viewer = { title, source, texts: null, error: null };
+		viewer = opened;
+		if (!dialog.open) dialog.showModal();
+
+		try {
+			const loaded = await load();
+			if (viewer === opened) viewer = { ...opened, ...loaded };
+		} catch (e) {
+			if (viewer === opened) {
+				viewer = {
+					...opened,
+					error: e instanceof Error ? e.message : String(e),
+				};
+			}
+		}
+	}
+
+	function viewStoredResponses() {
+		void openViewer(
+			'Stored responses',
+			meta?.storedResponsesFile ?? 'Bundled responses',
+			async () => {
+				const { file, responses } = await fetchStoredResponses();
+				return { source: file ?? 'Bundled responses', texts: responses };
+			},
+		);
+	}
+
+	function viewRuleFile(match: string, file: string, rule: number, index: number) {
+		void openViewer(`Reply when request contains "${match}"`, file, async () => {
+			const { content } = await fetchRuleFile(rule, index);
+			return { texts: [content] };
+		});
+	}
 
 	async function refresh() {
 		try {
@@ -117,9 +176,56 @@
 					<span class="muted">Total Stored Responses</span>
 					<span class="badge">{meta?.storedResponsesCount ?? 0}</span>
 				</div>
+				<div class="kv kvWide">
+					<span class="muted">Stored Responses File</span>
+					<button
+						class="fileLink"
+						cy-data="stored_responses_link"
+						title="View the stored responses"
+						on:click={viewStoredResponses}
+					>
+						{meta?.storedResponsesFile ?? 'Bundled'}
+					</button>
+				</div>
 			{/if}
 		</div>
 	</section>
+
+	{#if meta?.responseRules?.length}
+		<section class="card" cy-data="response_rules">
+			<h2 style="margin: 0 0 4px 0;">Response rules</h2>
+			<p class="muted" style="margin: 0 0 12px 0;">
+				A request containing the text on the left gets the file's contents as its
+				reply, instead of a {meta.mockResponseType || 'generated'} response. The first
+				matching rule wins.
+			</p>
+			<div class="rules">
+				{#each meta.responseRules as rule, ruleIndex (ruleIndex)}
+					<div class="rule">
+						<div class="ruleMatch">
+							<span class="muted">Request contains</span>
+							<code>{rule.match}</code>
+						</div>
+						<div class="ruleFiles">
+							<span class="muted">
+								{rule.files.length > 1 ? 'Replies with one of, at random' : 'Replies with'}
+							</span>
+							{#each rule.files as file, fileIndex (fileIndex)}
+								<button
+									class="fileLink"
+									cy-data="rule_file_link"
+									title="View this file"
+									on:click={() => viewRuleFile(rule.match, file, ruleIndex, fileIndex)}
+								>
+									{file}
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+		</section>
+	{/if}
 
 	<section class="card">
 		<h2 style="margin: 0 0 12px 0;">API endpoint (GET &amp; POST)</h2>
@@ -138,4 +244,42 @@
 		LOG_REQUESTS and VALIDATE_REQUESTS must be 'ON' to log POST requests.
 	</div>
 </main>
+
+<dialog
+	class="viewer"
+	cy-data="viewer"
+	bind:this={dialog}
+	on:close={() => (viewer = null)}
+	on:click={(event) => {
+		// A click on the backdrop lands on the dialog element itself
+		if (event.target === dialog) dialog.close();
+	}}
+>
+	{#if viewer}
+		<div class="viewerBody">
+			<div class="viewerHeader">
+				<div>
+					<h2 style="margin: 0;">{viewer.title}</h2>
+					<div class="muted viewerSource">
+						{viewer.source}{viewer.texts && viewer.texts.length > 1
+							? ` · ${viewer.texts.length} responses, one picked at random per request`
+							: ''}
+					</div>
+				</div>
+				<button class="fileLink" on:click={() => dialog.close()}>Close</button>
+			</div>
+			{#if viewer.error}
+				<p class="viewerError">{viewer.error}</p>
+			{:else if viewer.texts === null}
+				<p class="muted">Loading…</p>
+			{:else}
+				<div class="viewerTexts">
+					{#each viewer.texts as text, index (index)}
+						<pre cy-data="viewer_text">{text}</pre>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{/if}
+</dialog>
 
