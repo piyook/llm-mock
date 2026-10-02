@@ -88,6 +88,11 @@
 	}
 
 	function viewRequestLog() {
+		// Requests are only logged with both settings on
+		const loggingOn =
+			meta?.logRequests?.toUpperCase() === 'ON' &&
+			meta?.validateRequests?.toUpperCase() === 'ON';
+
 		void openViewer('Last logged requests', 'Request log', async () => {
 			const { file, log } = await fetchRequestLog();
 			// A log from an older llmock may not be an array
@@ -104,7 +109,11 @@
 
 			return {
 				source: file,
-				note: 'newest first',
+				// The log file outlives a restart, so it can hold requests
+				// from a run that had logging on
+				note: loggingOn
+					? 'newest first'
+					: 'newest first · logging is off, these were logged earlier',
 				paged: true,
 				clearable: true,
 				texts: entries.map((entry) => JSON.stringify(entry, null, 2)),

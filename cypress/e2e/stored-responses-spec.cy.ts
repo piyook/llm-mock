@@ -83,6 +83,11 @@ describe('Mock LLM Spec for configured stored responses', () => {
             .should('have.length', 1)
             .and('contain', 'newest request');
         cy.get('[cy-data="viewer_position"]').should('contain', '1 of 3');
+        // This preset has logRequests off, so the entries are from earlier
+        cy.get('[cy-data="viewer"]').should(
+            'contain',
+            'logging is off, these were logged earlier',
+        );
         cy.get('[cy-data="viewer_back"]').should('be.disabled');
 
         cy.get('[cy-data="viewer_next"]').click().click();
