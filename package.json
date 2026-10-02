@@ -1,6 +1,6 @@
 {
 	"name": "llmock",
-	"version": "3.6.0",
+	"version": "3.7.0",
 	"description": "A configurable mock LLM API server for testing and development",
 	"main": "./src/server.ts",
 	"type": "module",
@@ -78,7 +78,6 @@
 		"@faker-js/faker": "^10.6.0",
 		"env-paths": "^4.0.0",
 		"fastify": "^5.12.5",
-		"pretty-print-json": "^3.0.8",
 		"tsx": "^4.23.15",
 		"typescript": "^7.0.2"
 	},

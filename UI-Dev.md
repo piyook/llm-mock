@@ -18,12 +18,17 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
 
   This JSON endpoint includes:
 
+  - `version` (the running llmock version)
   - `serverPort`
   - `llmUrlEndpoint`
   - `llmName`
   - `mockResponseType`
   - `responseDelayMinMs` / `responseDelayMaxMs`
   - `apiLinks` (resolved API URLs based on `LLM_URL_ENDPOINT`)
+  - `storedResponsesCount` / `storedResponsesFile` (when the response type is `stored`)
+  - `responseRules` (each rule's `match` and the `files` it replies with)
+
+- The viewer dialog reads file contents from `/ui-stored-responses` and `/ui-rule-file?rule=<i>&file=<j>`, and the last logged request from `/ui-request-log`.
 
 ### Running everything locally
 
@@ -48,5 +53,5 @@ npm run ui-dev
 ```
 
 - The UI dev server runs on `http://localhost:5173/`
-- API and meta requests such as `/ping`, `/ui-meta`, `/logs`, and typical LLM endpoints are proxied to `http://localhost:8001` (you’ll still want the main server running via `npm run dev` during UI work).
+- API and meta requests such as `/ping`, `/ui-meta`, `/ui-request-log`, and typical LLM endpoints are proxied to `http://localhost:8001` (you’ll still want the main server running via `npm run dev` during UI work).
 

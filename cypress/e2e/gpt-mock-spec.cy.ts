@@ -106,6 +106,15 @@ describe('Mock LLM Spec for chatGPT', () => {
         });
     });
 
+    it('shows an empty response rules box on the dashboard when no rules are set', () => {
+        cy.visit('/');
+        cy.get('[cy-data="response_rules_empty"]').should(
+            'contain',
+            'No response rules set',
+        );
+        cy.get('[cy-data="rule_file_link"]').should('not.exist');
+    });
+
     it('should validate JSON against schema for a GET Request', () => {
         cy.request('GET', '/chatgpt/chat/completions').then((response) => {
             expect(response.body).to.be.jsonSchema(chatGPTSchema);
@@ -129,7 +138,7 @@ describe('Mock LLM Spec for chatGPT', () => {
         }).then((response) => {
             expect(response.status).to.eq(400);
             expect(response.body).to.contain(
-                'Invalid or Missing Request For This LLM Model Template: OPENAI Model:gpt-4o. Please ensure your request adheres to the expected format - see localhost:8001/logs for details of missing parameters or formatting issues.',
+                'Invalid or Missing Request For This LLM Model Template: OPENAI Model:gpt-4o. Please ensure your request adheres to the expected format - see localhost:8001/ui-request-log for details of missing parameters or formatting issues.',
             );
         });
     });

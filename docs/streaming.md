@@ -210,7 +210,7 @@ LOG_REQUESTS=ON
 VALIDATE_REQUESTS=ON
 ```
 
-Then visit `http://localhost:8001/logs`
+Then open the dashboard at `http://localhost:8001` and click **View request log**
 
 ## Integration Examples
 

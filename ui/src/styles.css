@@ -20,15 +20,29 @@ body {
 }
 
 main {
-	padding: 56px 3vw 40px 3vw;
-	width: 95vw;
-	max-width: 800px;
+	/* Sized from the page width with the padding included, so it never
+	   overflows sideways on a narrow window */
+	box-sizing: border-box;
+	padding: 0 16px 40px 16px;
+	width: 100%;
+	max-width: 832px;
 	min-width: 320px;
-	margin: 48px auto 32px auto;
+	margin: 0 auto 32px auto;
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
 	gap: 24px;
+}
+
+/* Stays at the top while the cards scroll beneath it; the solid background
+   hides them as they pass */
+.pageHeader {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	padding: 16px 0 12px 0;
+	margin-bottom: -12px;
+	background: #20232a;
 }
 
 .card {
@@ -51,19 +65,38 @@ h1 {
 	letter-spacing: 1px;
 }
 
+.card h2 {
+	margin: 0 0 12px 0;
+}
+
+.titleGroup {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+
+.versionPill {
+	border: 1.5px solid var(--accent);
+	border-radius: 8px;
+	padding: 2px 8px;
+	color: var(--text-muted);
+	font-weight: 650;
+	font-size: 0.95rem;
+}
+
+.groupLabel {
+	margin: 14px 0 8px 0;
+}
+
 .muted {
 	color: var(--text-muted);
 }
 
+/* Always takes up its line, so the page doesn't shift when an error shows */
 .errorLine {
-	margin: 10px 0 0 0;
+	margin: 6px 0 0 0;
 	min-height: 1.4em;
-	opacity: 0;
-	transition: opacity 120ms ease-in-out;
-}
-
-.errorVisible {
-	opacity: 1;
 }
 
 .statusPill {
@@ -116,6 +149,7 @@ h1 {
 	border-radius: 8px;
 	color: #fff;
 	font-weight: 800;
+	overflow-wrap: anywhere;
 }
 
 .endpoints {
@@ -140,6 +174,142 @@ h1 {
 .endpointLink:focus {
 	background: #22496a;
 	outline: none;
+}
+
+/* A row holding a file path needs the full width of the grid */
+.kvWide {
+	grid-column: 1 / -1;
+}
+
+.kvWide .muted {
+	white-space: nowrap;
+}
+
+.fileLink {
+	background: none;
+	border: 1.5px solid var(--accent);
+	border-radius: 8px;
+	padding: 4px 10px;
+	color: var(--text-main);
+	font: inherit;
+	font-weight: 650;
+	cursor: pointer;
+	text-align: left;
+	overflow-wrap: anywhere;
+}
+
+.fileLink:hover,
+.fileLink:focus-visible {
+	background: var(--accent);
+	outline: none;
+}
+
+.rules {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.rule {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 12px;
+	padding: 10px 12px;
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.04);
+}
+
+/* With no rules set the row is still drawn, its two values as empty boxes */
+.ruleBlank {
+	align-self: stretch;
+	min-height: 1.5em;
+	cursor: default;
+	pointer-events: none;
+}
+
+.rulesEmpty {
+	margin: 0;
+}
+
+.ruleMatch,
+.ruleFiles {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 6px;
+	min-width: 0;
+}
+
+.ruleMatch code {
+	background: var(--accent2);
+	padding: 4px 10px;
+	border-radius: 8px;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+	.rule {
+		grid-template-columns: 1fr;
+	}
+}
+
+.viewer {
+	width: min(800px, 92vw);
+	max-height: 85vh;
+	padding: 0;
+	border: none;
+	outline: none;
+	border-radius: var(--border-radius);
+	box-shadow: var(--shadow);
+	background: var(--bg-card);
+	color: var(--text-main);
+}
+
+.viewer::backdrop {
+	background: rgba(0, 0, 0, 0.6);
+}
+
+.viewerBody {
+	padding: 18px;
+}
+
+.viewerHeader {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 12px;
+	margin-bottom: 14px;
+}
+
+.viewerSource {
+	margin-top: 4px;
+	overflow-wrap: anywhere;
+}
+
+.viewerTexts {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.viewerTexts pre {
+	margin: 0;
+	padding: 10px 12px;
+	border-radius: 12px;
+	background: rgba(0, 0, 0, 0.25);
+	font-family: Consolas, 'Courier New', monospace;
+	font-size: 0.9rem;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.viewerError {
+	margin: 0;
+	padding: 10px 12px;
+	border-radius: 12px;
+	background: rgb(126, 80, 78);
+	overflow-wrap: anywhere;
 }
 
 .footerNote {

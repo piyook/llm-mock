@@ -3,8 +3,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../models/db.js';
-import { getStoredResponsesFile } from '../config/config-loader.js';
+import {
+	getResponseRules,
+	getStoredResponsesFile,
+} from '../config/config-loader.js';
+import { logPath } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
+import { readRuleFile, ruleFiles } from './response-rules.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 
@@ -12,14 +17,39 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uiDistDir = path.resolve(__dirname, '../../ui/dist');
 
-// Size of the pool `responseType: "stored"` picks from: the preset's own file
-// if configured, otherwise the bundled texts. 0 if that file can't be used.
-function countStoredResponses(): number {
-	const { file, baseDir } = getStoredResponsesFile();
-	if (!file) return db.llm.getAll().length;
-
+// Version of the llmock package this server is running from, null if its
+// package.json can't be read.
+function readPackageVersion(): string | null {
 	try {
-		return loadStoredResponses(file, baseDir).length;
+		const packageJson = JSON.parse(
+			fs.readFileSync(
+				path.resolve(__dirname, '../../package.json'),
+				'utf8',
+			),
+		) as { version?: unknown };
+		return typeof packageJson.version === 'string'
+			? packageJson.version
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+const version = readPackageVersion();
+
+// The pool `responseType: "stored"` picks from: the preset's own file if
+// configured, otherwise the bundled texts. Throws if that file can't be used.
+function readStoredResponses(): string[] {
+	const { file, baseDir } = getStoredResponsesFile();
+	if (!file) return db.llm.getAll().map((item) => item.content);
+
+	return loadStoredResponses(file, baseDir);
+}
+
+// Size of that pool, 0 if the file can't be used.
+function countStoredResponses(): number {
+	try {
+		return readStoredResponses().length;
 	} catch {
 		return 0;
 	}
@@ -135,10 +165,21 @@ const fallbackHtmlString = `
 function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	// UI meta endpoint for the compiled Svelte dashboard
 	app.get('/ui-meta', async (_request, reply) => {
-		const storedResponsesCount =
-			process.env.MOCK_LLM_RESPONSE_TYPE === 'stored'
-				? countStoredResponses()
-				: null;
+		const storedActive = process.env.MOCK_LLM_RESPONSE_TYPE === 'stored';
+		const storedResponsesCount = storedActive
+			? countStoredResponses()
+			: null;
+		// Configured path as written in the config; null means the bundled texts
+		const storedResponsesFile = storedActive
+			? (getStoredResponsesFile().file ?? null)
+			: null;
+
+		// Rules in config order (first match wins), each with every file it
+		// can reply with
+		const responseRules = getResponseRules().rules.map((rule) => ({
+			match: rule.match,
+			files: ruleFiles(rule),
+		}));
 
 		const responseDelayMinMs =
 			Number(process.env?.RESPONSE_DELAY_MIN ?? 0) || 0;
@@ -176,6 +217,7 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		}));
 
 		return reply.send({
+			version,
 			serverPort: Number(process.env?.SERVER_PORT ?? '') || null,
 			llmUrlEndpoint: process.env?.LLM_URL_ENDPOINT ?? '',
 			llmName: process.env?.LLM_NAME ?? '',
@@ -186,6 +228,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 					? Number(process.env?.MAX_LOREM_PARAS ?? '') || null
 					: null,
 			storedResponsesCount,
+			storedResponsesFile,
+			responseRules,
 			validateRequests: process.env?.VALIDATE_REQUESTS ?? '',
 			logRequests: process.env?.LOG_REQUESTS ?? '',
 			debugMode: process.env.DEBUG === '*' ? 'ON' : 'OFF',
@@ -197,6 +241,56 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			embeddingDimension,
 			apiLinks,
 		});
+	});
+
+	// Texts of the stored responses pool, for the dashboard viewer
+	app.get('/ui-stored-responses', async (_request, reply) => {
+		const file = getStoredResponsesFile().file ?? null;
+
+		try {
+			return reply.send({ file, responses: readStoredResponses() });
+		} catch (error) {
+			return reply.code(500).send({ error: (error as Error).message });
+		}
+	});
+
+	// Contents of one response rule fixture, for the dashboard viewer. Files
+	// are addressed by position in the config (?rule=0&file=0), never by path,
+	// so only configured fixtures can be read.
+	app.get('/ui-rule-file', async (request, reply) => {
+		const query = request.query as { rule?: string; file?: string };
+		const { rules, baseDir } = getResponseRules();
+		const rule = rules[Number(query.rule ?? 0)];
+		const file = rule && ruleFiles(rule)[Number(query.file ?? 0)];
+
+		if (!rule || !file) {
+			return reply
+				.code(404)
+				.send({ error: 'No such response rule file' });
+		}
+
+		try {
+			return reply.send({
+				match: rule.match,
+				file,
+				content: readRuleFile(rule, file, baseDir),
+			});
+		} catch (error) {
+			return reply.code(500).send({ error: (error as Error).message });
+		}
+	});
+
+	// The last validated request, for the dashboard viewer. `log` is null
+	// when no request has been logged yet.
+	app.get('/ui-request-log', async (_request, reply) => {
+		let log: unknown = null;
+		try {
+			log = JSON.parse(fs.readFileSync(logPath, 'utf8'));
+		} catch {
+			// No log file yet, or one that is mid-write
+		}
+
+		return reply.send({ file: logPath, log });
 	});
 
 	// Home page route
