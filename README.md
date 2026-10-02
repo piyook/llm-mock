@@ -380,9 +380,9 @@ Once running, open `http://localhost:8001` for the live dashboard:
 | `http://localhost:8001` | Main dashboard |
 | `http://localhost:8001/ping` | Health check |
 
-The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged request. Settings are grouped into **Connect**, **Model**, **Responses**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
+The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged request. Settings are grouped into **Connect**, **Model**, **Responses**, **Response rules**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
 
-With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. When the preset has `responseRules`, a **Response rules** box lists each rule's `match` text beside the file(s) it replies with; click a file to read its contents.
+With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with; click a file to read its contents. With no rules set, the box shows a blank rule with a note pointing to the setting.
 
 ### Available endpoints
 

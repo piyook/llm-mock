@@ -219,6 +219,18 @@ h1 {
 	background: rgba(255, 255, 255, 0.04);
 }
 
+/* With no rules set the row is still drawn, its two values as empty boxes */
+.ruleBlank {
+	align-self: stretch;
+	min-height: 1.5em;
+	cursor: default;
+	pointer-events: none;
+}
+
+.rulesEmpty {
+	margin: 0;
+}
+
 .ruleMatch,
 .ruleFiles {
 	display: flex;

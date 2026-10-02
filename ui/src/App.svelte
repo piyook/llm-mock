@@ -206,41 +206,55 @@
 		</div>
 	</section>
 
-	{#if meta?.responseRules?.length}
-		<section class="card" cy-data="response_rules">
-			<h2 style="margin: 0 0 4px 0;">Response rules</h2>
-			<p class="muted" style="margin: 0 0 12px 0;">
-				A request containing the text on the left gets the file's contents as its
-				reply, instead of a {meta.mockResponseType || 'generated'} response. The first
-				matching rule wins.
-			</p>
-			<div class="rules">
-				{#each meta.responseRules as rule, ruleIndex (ruleIndex)}
-					<div class="rule">
-						<div class="ruleMatch">
-							<span class="muted">Request contains</span>
-							<code>{rule.match}</code>
-						</div>
-						<div class="ruleFiles">
-							<span class="muted">
-								{rule.files.length > 1 ? 'Replies with one of, at random' : 'Replies with'}
-							</span>
-							{#each rule.files as file, fileIndex (fileIndex)}
-								<button
-									class="fileLink"
-									cy-data="rule_file_link"
-									title="View this file"
-									on:click={() => viewRuleFile(rule.match, file, ruleIndex, fileIndex)}
-								>
-									{file}
-								</button>
-							{/each}
-						</div>
+	<section class="card" cy-data="response_rules">
+		<h2 style="margin: 0 0 4px 0;">Response rules</h2>
+		<p class="muted" style="margin: 0 0 12px 0;">
+			A request containing the text on the left gets the file's contents as its
+			reply, instead of a {meta?.mockResponseType || 'generated'} response. The first
+			matching rule wins.
+		</p>
+		<div class="rules">
+			{#each meta?.responseRules ?? [] as rule, ruleIndex (ruleIndex)}
+				<div class="rule">
+					<div class="ruleMatch">
+						<span class="muted">Request contains</span>
+						<code>{rule.match}</code>
 					</div>
-				{/each}
-			</div>
-		</section>
-	{/if}
+					<div class="ruleFiles">
+						<span class="muted">
+							{rule.files.length > 1 ? 'Replies with one of, at random' : 'Replies with'}
+						</span>
+						{#each rule.files as file, fileIndex (fileIndex)}
+							<button
+								class="fileLink"
+								cy-data="rule_file_link"
+								title="View this file"
+								on:click={() => viewRuleFile(rule.match, file, ruleIndex, fileIndex)}
+							>
+								{file}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{:else}
+				<!-- The same row as a rule, with its two values left blank -->
+				<div class="rule">
+					<div class="ruleMatch">
+						<span class="muted">Request contains</span>
+						<code class="ruleBlank"></code>
+					</div>
+					<div class="ruleFiles">
+						<span class="muted">Replies with</span>
+						<span class="fileLink ruleBlank"></span>
+					</div>
+				</div>
+				<p class="muted rulesEmpty" cy-data="response_rules_empty">
+					No response rules set. Add <code>responseRules</code> to the model preset in
+					<code>.llmockrc.json</code> to use them.
+				</p>
+			{/each}
+		</div>
+	</section>
 
 	<section class="card" cy-data="embeddings">
 		<h2>Embeddings</h2>
