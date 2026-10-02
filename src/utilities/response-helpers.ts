@@ -186,7 +186,7 @@ export const generateMockEmbeddings = async (
 	const responseTemplate = (await import(
 		/* @vite-ignore */
 		'../response-templates/openai_embeddings_res.json',
-		{ assert: { type: 'json' } }
+		{ with: { type: 'json' } }
 	)) as any;
 
 	// Use structuredClone to create a deep copy of the template

@@ -65,7 +65,7 @@ export const validateRequest = async (request: any) => {
 				/* @vite-ignore */
 				`../request-templates/${templateFileName}`,
 				{
-					assert: { type: 'json' },
+					with: { type: 'json' },
 				}
 			)) as { default: JSON[] };
 		}
