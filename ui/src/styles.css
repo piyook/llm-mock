@@ -304,6 +304,43 @@ h1 {
 	overflow-wrap: anywhere;
 }
 
+.fileLink:disabled {
+	opacity: 0.4;
+	cursor: default;
+	background: none;
+}
+
+.fileLink.danger {
+	border-color: rgb(190, 90, 86);
+}
+
+.fileLink.danger:hover,
+.fileLink.danger:focus-visible {
+	background: rgb(126, 80, 78);
+}
+
+/* Stays in view while a long request scrolls behind it */
+.viewerFooter {
+	position: sticky;
+	bottom: 0;
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	align-items: center;
+	gap: 10px;
+	margin: 14px -18px -18px;
+	padding: 12px 18px;
+	border-top: 1px solid rgba(255, 255, 255, 0.12);
+	background: var(--bg-card);
+}
+
+.viewerFooterGroup {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px;
+}
+
 .viewerError {
 	margin: 0;
 	padding: 10px 12px;

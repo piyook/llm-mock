@@ -173,6 +173,7 @@ To change a response envelope or the required request keys, or to mock a provide
 | `GET /ui-stored-responses` | The stored responses pool in use, as JSON |
 | `GET /ui-rule-file?rule=<i>&file=<j>` | Contents of one response rule file, as JSON |
 | `GET /ui-request-log` | `{"file", "log"}`: `log` is an array of the most recent validated requests (the last `maxLoggedRequests`, 10 by default), newest first, each with why it passed/failed (older ones are dropped; `log` is `null` if none logged) |
+| `DELETE /ui-request-log` | Empties the request log; returns `{"file", "log": null}` |
 | `GET /` | HTML dashboard |
 | `GET /<endpoint>` | A generated reply with no validation and no rules (quick smoke test) |
 

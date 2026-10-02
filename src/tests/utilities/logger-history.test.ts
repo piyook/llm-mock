@@ -15,6 +15,7 @@ vi.mock('env-paths', () => ({ default: () => ({ log: logDir }) }));
 const {
 	default: logger,
 	logPath,
+	clearLog,
 	maxLogEntries,
 	defaultLogEntries,
 	logEntriesLimit,
@@ -116,6 +117,15 @@ describe('request log history', () => {
 		log(1);
 
 		expect(readLog()).toHaveLength(1);
+	});
+
+	test('clearLog empties the log, and is fine with none to clear', () => {
+		log(1);
+
+		clearLog();
+		clearLog();
+
+		expect(() => readLog()).toThrow();
 	});
 
 	test('writes nothing when logging is off', () => {

@@ -7,7 +7,7 @@ import {
 	getResponseRules,
 	getStoredResponsesFile,
 } from '../config/config-loader.js';
-import { logPath, maxLogEntries } from './logger.js';
+import { clearLog, logPath, maxLogEntries } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { readRuleFile, ruleFiles } from './response-rules.js';
 
@@ -295,6 +295,17 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		}
 
 		return reply.send({ file: logPath, log });
+	});
+
+	// Empties the request log, for the dashboard's "Clear logs" button
+	app.delete('/ui-request-log', async (_request, reply) => {
+		try {
+			clearLog();
+		} catch (error) {
+			return reply.code(500).send({ error: (error as Error).message });
+		}
+
+		return reply.send({ file: logPath, log: null });
 	});
 
 	// Home page route

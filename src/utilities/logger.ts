@@ -37,6 +37,11 @@ function readLogEntries(): unknown[] {
 	}
 }
 
+// Empties the log by removing its file; fine if there is none
+export function clearLog() {
+	fs.rmSync(logPath, { force: true });
+}
+
 export default function logger(
 	logItem: FastifyRequest,
 	state = '',
