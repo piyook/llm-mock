@@ -45,6 +45,9 @@ describe('logging works as expected', async () => {
 			'missing keys: MODEL , MESSAGES',
 		);
 
+		// A failed request is not also logged as passed
+		expect(logger.default).toHaveBeenCalledTimes(1);
+
 		expect(validationResult).toBe(false);
 	});
 });

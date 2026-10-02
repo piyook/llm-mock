@@ -11,6 +11,7 @@ export type UiMeta = {
 	responseRules: Array<{ match: string; files: string[] }>;
 	validateRequests: string;
 	logRequests: string;
+	maxLoggedRequests: number;
 	debugMode: 'ON' | 'OFF';
 	responseDelayMinMs: number;
 	responseDelayMaxMs: number;
@@ -39,8 +40,8 @@ export type RequestLog = {
 
 // The viewer routes answer failures with `{ error }` explaining what is wrong
 // with the file, which is more use to the reader than the status code.
-async function fetchViewerJson<T>(url: string): Promise<T> {
-	const res = await fetch(url);
+async function fetchViewerJson<T>(url: string, method = 'GET'): Promise<T> {
+	const res = await fetch(url, { method });
 	const body = await res.json().catch(() => null);
 	if (!res.ok) {
 		throw new Error(body?.error ?? `${url} failed: ${res.status}`);
@@ -58,6 +59,10 @@ export function fetchRuleFile(rule: number, file: number): Promise<RuleFile> {
 
 export function fetchRequestLog(): Promise<RequestLog> {
 	return fetchViewerJson('/ui-request-log');
+}
+
+export function clearRequestLog(): Promise<RequestLog> {
+	return fetchViewerJson('/ui-request-log', 'DELETE');
 }
 
 export async function fetchPing(): Promise<boolean> {

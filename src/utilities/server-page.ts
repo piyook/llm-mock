@@ -7,7 +7,7 @@ import {
 	getResponseRules,
 	getStoredResponsesFile,
 } from '../config/config-loader.js';
-import { logPath } from './logger.js';
+import { clearLog, logPath, maxLogEntries } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { readRuleFile, ruleFiles } from './response-rules.js';
 
@@ -232,6 +232,7 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			responseRules,
 			validateRequests: process.env?.VALIDATE_REQUESTS ?? '',
 			logRequests: process.env?.LOG_REQUESTS ?? '',
+			maxLoggedRequests: maxLogEntries(),
 			debugMode: process.env.DEBUG === '*' ? 'ON' : 'OFF',
 			responseDelayMinMs,
 			responseDelayMaxMs,
@@ -280,17 +281,31 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		}
 	});
 
-	// The last validated request, for the dashboard viewer. `log` is null
-	// when no request has been logged yet.
+	// The most recent validated requests, newest first, for the dashboard
+	// viewer. `log` is null when no request has been logged yet.
 	app.get('/ui-request-log', async (_request, reply) => {
 		let log: unknown = null;
 		try {
 			log = JSON.parse(fs.readFileSync(logPath, 'utf8'));
+			// A log written under a higher limit is only trimmed on the
+			// next request
+			if (Array.isArray(log)) log = log.slice(0, maxLogEntries());
 		} catch {
 			// No log file yet, or one that is mid-write
 		}
 
 		return reply.send({ file: logPath, log });
+	});
+
+	// Empties the request log, for the dashboard's "Clear logs" button
+	app.delete('/ui-request-log', async (_request, reply) => {
+		try {
+			clearLog();
+		} catch (error) {
+			return reply.code(500).send({ error: (error as Error).message });
+		}
+
+		return reply.send({ file: logPath, log: null });
 	});
 
 	// Home page route

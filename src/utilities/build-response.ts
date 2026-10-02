@@ -45,7 +45,7 @@ export const buildResponse = async (content: DynamicContent) => {
 			responseTemplate = (await import(
 				/* @vite-ignore */
 				`../response-templates/${templateFileName}`,
-				{ assert: { type: 'json' } }
+				{ with: { type: 'json' } }
 			)) as ResponseTemplate;
 		}
 	} catch {

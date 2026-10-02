@@ -235,7 +235,7 @@ describe('generateResponseContent with storedResponsesFile', () => {
 		)) as any;
 		expect(response.content[0].text).toBe(content);
 
-		const streamed = generateClaudeStreamingChunks(content, request)
+		const streamed = generateClaudeStreamingChunks(content, request.model)
 			.map((chunk) => JSON.parse(chunk.split('\n')[1].slice(6)))
 			.filter((data) => data.type === 'content_block_delta')
 			.map((data) => data.delta.text)

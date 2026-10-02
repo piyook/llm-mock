@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import {
+		clearRequestLog,
 		fetchPing,
 		fetchRequestLog,
 		fetchRuleFile,
@@ -9,14 +10,21 @@
 		type UiMeta,
 	} from './api.js';
 
-	// What the viewer dialog shows: a pool of stored responses (`texts`, one
-	// block each) or a single rule fixture (one block, exactly as written)
+	// What the viewer dialog shows: a pool of stored responses or the logged
+	// requests (`texts`, one block each), or a single rule fixture (one block,
+	// exactly as written). `note` follows the source in the header. A `paged`
+	// view shows one block at a time with back/next; `clearable` adds the
+	// button that empties the request log.
 	type Viewer = {
 		title: string;
 		source: string;
+		note?: string;
+		paged?: boolean;
+		clearable?: boolean;
 		texts: string[] | null;
 		error: string | null;
 	};
+	type Loaded = Partial<Omit<Viewer, 'texts' | 'error'>> & { texts: string[] };
 
 	let meta: UiMeta | null = null;
 	let online: boolean | null = null;
@@ -24,16 +32,21 @@
 	let timer: number | null = null;
 	let viewer: Viewer | null = null;
 	let dialog: HTMLDialogElement;
+	// Block shown by a paged view, and whether it is asking to confirm a clear
+	let page = 0;
+	let confirmingClear = false;
 
 	// Opens the dialog straight away and fills it once `load` settles; a
 	// result for a view that has since been replaced is dropped
 	async function openViewer(
 		title: string,
 		source: string,
-		load: () => Promise<{ source?: string; texts: string[] }>,
+		load: () => Promise<Loaded>,
 	) {
 		const opened: Viewer = { title, source, texts: null, error: null };
 		viewer = opened;
+		page = 0;
+		confirmingClear = false;
 		if (!dialog.open) dialog.showModal();
 
 		try {
@@ -55,7 +68,14 @@
 			meta?.storedResponsesFile ?? 'Bundled responses',
 			async () => {
 				const { file, responses } = await fetchStoredResponses();
-				return { source: file ?? 'Bundled responses', texts: responses };
+				return {
+					source: file ?? 'Bundled responses',
+					note:
+						responses.length > 1
+							? `${responses.length} responses, one picked at random per request`
+							: undefined,
+					texts: responses,
+				};
 			},
 		);
 	}
@@ -68,17 +88,61 @@
 	}
 
 	function viewRequestLog() {
-		void openViewer('Last logged request', 'Request log', async () => {
+		// Requests are only logged with both settings on
+		const loggingOn =
+			meta?.logRequests?.toUpperCase() === 'ON' &&
+			meta?.validateRequests?.toUpperCase() === 'ON';
+
+		void openViewer('Last logged requests', 'Request log', async () => {
 			const { file, log } = await fetchRequestLog();
+			// A log from an older llmock may not be an array
+			const entries = log === null ? [] : Array.isArray(log) ? log : [log];
+			if (entries.length === 0) {
+				return {
+					source: file,
+					paged: true,
+					texts: [
+						'No request has been logged yet. Turn on validateRequests and logRequests, restart the server, then send a POST request.',
+					],
+				};
+			}
+
 			return {
 				source: file,
-				texts: [
-					log === null
-						? 'No request has been logged yet. Turn on validateRequests and logRequests, restart the server, then send a POST request.'
-						: JSON.stringify(log, null, 2),
-				],
+				// The log file outlives a restart, so it can hold requests
+				// from a run that had logging on
+				note: loggingOn
+					? 'newest first'
+					: 'newest first · logging is off, these were logged earlier',
+				paged: true,
+				clearable: true,
+				texts: entries.map((entry) => JSON.stringify(entry, null, 2)),
 			};
 		});
+	}
+
+	// Empties the request log, then shows the now empty view. A failure is
+	// shown in place of the log.
+	async function clearLog() {
+		const clearing = viewer;
+		confirmingClear = false;
+		try {
+			await clearRequestLog();
+			if (viewer === clearing) viewRequestLog();
+		} catch (e) {
+			if (viewer === clearing && clearing) {
+				viewer = {
+					...clearing,
+					error: e instanceof Error ? e.message : String(e),
+				};
+			}
+		}
+	}
+
+	// Moves a paged view back or forward, stopping at either end
+	function turnPage(step: number) {
+		const last = (viewer?.texts?.length ?? 1) - 1;
+		page = Math.min(Math.max(page + step, 0), last);
 	}
 
 	// The delay range as one value: "Off", "200ms" or "200–500ms"
@@ -280,25 +344,37 @@
 				<span class="badge">{meta?.validateRequests || 'OFF'}</span>
 			</div>
 			<div class="kv">
-				<span class="muted">Request Log</span>
-				<span class="badge">{meta?.logRequests || 'OFF'}</span>
-			</div>
-			<div class="kv">
 				<span class="muted">Debug Mode</span>
 				<span class="badge">{meta?.debugMode ?? 'OFF'}</span>
 			</div>
 			<div class="kv">
-				<span class="muted">Last Logged Request</span>
+				<span class="muted">Request Log</span>
+				<span class="badge">{meta?.logRequests || 'OFF'}</span>
+			</div>
+			<div class="kv">
+				<span class="muted">Max Logged Requests</span>
+				<span class="badge" cy-data="max_logged_requests">
+					{meta?.maxLoggedRequests ?? 10}
+				</span>
+			</div>
+			<div class="kv kvWide">
+				<span class="muted">Last Logged Requests</span>
 				<button
 					class="fileLink"
 					cy-data="request_log_link"
-					title="View the last logged request"
+					title={`View the last ${meta?.maxLoggedRequests ?? 10} logged requests`}
 					on:click={viewRequestLog}
 				>
 					View request log
 				</button>
 			</div>
 		</div>
+		<p class="muted cardNote" cy-data="max_logged_requests_note">
+			The log keeps the last {meta?.maxLoggedRequests ?? 10} requests. To change this,
+			set <code>maxLoggedRequests</code> (1 to 100) in the model preset in
+			<code>.llmockrc.json</code>, or start with
+			<code>--maxLoggedRequests=&lt;num&gt;</code>.
+		</p>
 	</section>
 
 	<div class="footerNote">
@@ -317,6 +393,11 @@
 		// A click on the backdrop lands on the dialog element itself
 		if (event.target === dialog) dialog.close();
 	}}
+	on:keydown={(event) => {
+		if (!viewer?.paged) return;
+		if (event.key === 'ArrowLeft') turnPage(-1);
+		if (event.key === 'ArrowRight') turnPage(1);
+	}}
 >
 	{#if viewer}
 		<div class="viewerBody">
@@ -324,22 +405,77 @@
 				<div>
 					<h2 style="margin: 0;">{viewer.title}</h2>
 					<div class="muted viewerSource">
-						{viewer.source}{viewer.texts && viewer.texts.length > 1
-							? ` · ${viewer.texts.length} responses, one picked at random per request`
-							: ''}
+						{viewer.source}{viewer.note ? ` · ${viewer.note}` : ''}
 					</div>
 				</div>
-				<button class="fileLink" on:click={() => dialog.close()}>Close</button>
+				{#if !viewer.paged}
+					<button class="fileLink" on:click={() => dialog.close()}>Close</button>
+				{/if}
 			</div>
 			{#if viewer.error}
 				<p class="viewerError">{viewer.error}</p>
 			{:else if viewer.texts === null}
 				<p class="muted">Loading…</p>
+			{:else if viewer.paged}
+				<div class="viewerTexts">
+					<pre cy-data="viewer_text">{viewer.texts[page]}</pre>
+				</div>
 			{:else}
 				<div class="viewerTexts">
 					{#each viewer.texts as text, index (index)}
 						<pre cy-data="viewer_text">{text}</pre>
 					{/each}
+				</div>
+			{/if}
+			{#if viewer.paged}
+				<div class="viewerFooter">
+					<div class="viewerFooterGroup">
+						{#if confirmingClear}
+							<span>Clear all logged requests?</span>
+							<button
+								class="fileLink danger"
+								cy-data="viewer_clear_confirm"
+								on:click={clearLog}
+							>
+								Yes, clear
+							</button>
+							<button class="fileLink" on:click={() => (confirmingClear = false)}>
+								Cancel
+							</button>
+						{:else if viewer.clearable && !viewer.error}
+							<button
+								class="fileLink"
+								cy-data="viewer_clear"
+								on:click={() => (confirmingClear = true)}
+							>
+								Clear logs
+							</button>
+						{/if}
+					</div>
+					<div class="viewerFooterGroup">
+						{#if viewer.clearable && viewer.texts && !viewer.error}
+							<button
+								class="fileLink"
+								cy-data="viewer_back"
+								disabled={page === 0}
+								on:click={() => turnPage(-1)}
+							>
+								Back
+							</button>
+							<span class="muted" cy-data="viewer_position">
+								{page + 1} of {viewer.texts.length}
+							</span>
+							<button
+								class="fileLink"
+								cy-data="viewer_next"
+								disabled={page >= viewer.texts.length - 1}
+								on:click={() => turnPage(1)}
+							>
+								Next
+							</button>
+						{/if}
+						<button class="fileLink" on:click={() => dialog.close()}>Close</button>
+					</div>
 				</div>
 			{/if}
 		</div>

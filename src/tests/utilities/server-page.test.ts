@@ -4,10 +4,22 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import fastify, { type FastifyInstance } from 'fastify';
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { loadConfig } from '../../config/config-loader.js';
 import { gptSeeder } from '../../seeders/gpt-seeder.js';
-import serverPage from '../../utilities/server-page.js';
+
+// Point the log folder at a temp directory so the real log is left alone
+const logDir = await vi.hoisted(async () => {
+	const fs = await import('fs');
+	const os = await import('os');
+	const path = await import('path');
+	return fs.mkdtempSync(path.join(os.tmpdir(), 'llmock-server-page-log-'));
+});
+
+vi.mock('env-paths', () => ({ default: () => ({ log: logDir }) }));
+
+const { default: serverPage } = await import('../../utilities/server-page.js');
+const { logPath } = await import('../../utilities/logger.js');
 
 const require = createRequire(import.meta.url);
 const bundled: string[] = require('../../data/data.json').map(
@@ -96,6 +108,7 @@ describe('dashboard routes for stored responses and response rules', () => {
 	afterAll(async () => {
 		await app.close();
 		rmSync(dir, { recursive: true, force: true });
+		rmSync(logDir, { recursive: true, force: true });
 		for (const [key, value] of [
 			['MOCK_LLM_RESPONSE_TYPE', previous.type],
 			['LLM_MODEL_NAME', previous.model],
@@ -126,12 +139,36 @@ describe('dashboard routes for stored responses and response rules', () => {
 		expect(body.version).toBe(require('../../../package.json').version);
 	});
 
-	test('ui-request-log reports the log file and its contents', async () => {
+	test('ui-request-log reports the log file, and null when nothing is logged', async () => {
+		rmSync(logPath, { force: true });
+
 		const { status, body } = await get('/ui-request-log');
 
 		expect(status).toBe(200);
 		expect(body.file).toMatch(/api_request_log\.json$/);
-		expect(body).toHaveProperty('log');
+		expect(body.log).toBeNull();
+	});
+
+	test('ui-request-log returns no more requests than the limit', async () => {
+		const entries = Array.from({ length: 12 }, (_, id) => ({ id }));
+		writeFileSync(logPath, JSON.stringify(entries));
+
+		const { body } = await get('/ui-request-log');
+
+		expect(body.log).toEqual(entries.slice(0, 10));
+	});
+
+	test('DELETE ui-request-log empties the log', async () => {
+		writeFileSync(logPath, JSON.stringify([{ id: 1 }]));
+
+		const response = await app.inject({
+			method: 'DELETE',
+			url: '/ui-request-log',
+		});
+
+		expect(response.statusCode).toBe(200);
+		expect(response.json().log).toBeNull();
+		expect((await get('/ui-request-log')).body.log).toBeNull();
 	});
 
 	test('ui-meta reports the stored responses file and the rules', async () => {

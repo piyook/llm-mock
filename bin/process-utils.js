@@ -108,6 +108,7 @@ export function applyConfigDefaults(config, modelName) {
     maxLoremParas: 8,
     validateRequests: false,
     logRequests: false,
+    maxLoggedRequests: 10,
     debug: false,
     stream: false,
     ...preset,
