@@ -335,14 +335,20 @@
 				<span class="badge">{meta?.validateRequests || 'OFF'}</span>
 			</div>
 			<div class="kv">
-				<span class="muted">Request Log</span>
-				<span class="badge">{meta?.logRequests || 'OFF'}</span>
-			</div>
-			<div class="kv">
 				<span class="muted">Debug Mode</span>
 				<span class="badge">{meta?.debugMode ?? 'OFF'}</span>
 			</div>
 			<div class="kv">
+				<span class="muted">Request Log</span>
+				<span class="badge">{meta?.logRequests || 'OFF'}</span>
+			</div>
+			<div class="kv">
+				<span class="muted">Max Logged Requests</span>
+				<span class="badge" cy-data="max_logged_requests">
+					{meta?.maxLoggedRequests ?? 10}
+				</span>
+			</div>
+			<div class="kv kvWide">
 				<span class="muted">Last Logged Requests</span>
 				<button
 					class="fileLink"
@@ -354,6 +360,12 @@
 				</button>
 			</div>
 		</div>
+		<p class="muted cardNote" cy-data="max_logged_requests_note">
+			The log keeps the last {meta?.maxLoggedRequests ?? 10} requests. To change this,
+			set <code>maxLoggedRequests</code> (1 to 100) in the model preset in
+			<code>.llmockrc.json</code>, or start with
+			<code>--maxLoggedRequests=&lt;num&gt;</code>.
+		</p>
 	</section>
 
 	<div class="footerNote">

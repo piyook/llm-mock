@@ -39,6 +39,21 @@ describe('Mock LLM Spec for configured stored responses', () => {
         });
     });
 
+    it('shows how many requests the log keeps and how to change it', () => {
+        cy.request('/ui-meta')
+            .its('body.maxLoggedRequests')
+            .then((max) => {
+                cy.visit('/');
+                cy.get('[cy-data="max_logged_requests"]').should(
+                    'contain',
+                    max,
+                );
+                cy.get('[cy-data="max_logged_requests_note"]')
+                    .should('contain', `last ${max} requests`)
+                    .and('contain', 'maxLoggedRequests');
+            });
+    });
+
     it('opens the request log in the dashboard viewer', () => {
         cy.visit('/');
         cy.get('[cy-data="request_log_link"]').click();

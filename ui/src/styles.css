@@ -227,6 +227,10 @@ h1 {
 	pointer-events: none;
 }
 
+.cardNote {
+	margin: 12px 0 0 0;
+}
+
 .rulesEmpty {
 	margin: 0;
 }
