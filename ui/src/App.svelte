@@ -36,6 +36,10 @@
 	let page = 0;
 	let confirmingClear = false;
 
+	// A list longer than this scrolls inside a fixed height window
+	const SCROLL_AFTER = 4;
+	$: ruleCount = meta?.responseRules?.length ?? 0;
+
 	// Opens the dialog straight away and fills it once `load` settles; a
 	// result for a view that has since been replaced is dropped
 	async function openViewer(
@@ -271,13 +275,18 @@
 	</section>
 
 	<section class="card" cy-data="response_rules">
-		<h2 style="margin: 0 0 4px 0;">Response rules</h2>
+		<div class="titleGroup" style="margin: 0 0 4px 0;">
+			<h2 style="margin: 0;">Response rules</h2>
+			<span class="countPill" cy-data="response_rules_count" title="Total response rules">
+				{ruleCount} {ruleCount === 1 ? 'rule' : 'rules'}
+			</span>
+		</div>
 		<p class="muted" style="margin: 0 0 12px 0;">
 			A request containing the text on the left gets the file's contents as its
 			reply, instead of a {meta?.mockResponseType || 'generated'} response. The first
 			matching rule wins.
 		</p>
-		<div class="rules">
+		<div class="rules" class:scrollList={ruleCount > SCROLL_AFTER}>
 			{#each meta?.responseRules ?? [] as rule, ruleIndex (ruleIndex)}
 				<div class="rule">
 					<div class="ruleMatch">
@@ -421,7 +430,7 @@
 					<pre cy-data="viewer_text">{viewer.texts[page]}</pre>
 				</div>
 			{:else}
-				<div class="viewerTexts">
+				<div class="viewerTexts" class:scrollList={viewer.texts.length > SCROLL_AFTER}>
 					{#each viewer.texts as text, index (index)}
 						<pre cy-data="viewer_text">{text}</pre>
 					{/each}

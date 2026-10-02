@@ -113,6 +113,7 @@ describe('Mock LLM Spec for chatGPT', () => {
             'No response rules set',
         );
         cy.get('[cy-data="rule_file_link"]').should('not.exist');
+        cy.get('[cy-data="response_rules_count"]').should('contain', '0 rules');
     });
 
     it('should validate JSON against schema for a GET Request', () => {
