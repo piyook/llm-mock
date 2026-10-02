@@ -76,7 +76,8 @@ h1 {
 	gap: 12px;
 }
 
-.versionPill {
+.versionPill,
+.countPill {
 	border: 1.5px solid var(--accent);
 	border-radius: 8px;
 	padding: 2px 8px;
@@ -210,6 +211,23 @@ h1 {
 	gap: 10px;
 }
 
+/* A long list keeps to a window about four rows high and scrolls inside it,
+   so the sections below stay within reach */
+.scrollList {
+	overflow-y: auto;
+	padding-right: 6px;
+	scrollbar-color: var(--accent) transparent;
+}
+
+.rules.scrollList {
+	max-height: 340px;
+}
+
+/* Rows in a scrolling list keep their height rather than squeeze to fit */
+.scrollList > * {
+	flex-shrink: 0;
+}
+
 .rule {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
@@ -256,6 +274,11 @@ h1 {
 	.rule {
 		grid-template-columns: 1fr;
 	}
+
+	/* Each rule is two lines tall here */
+	.rules.scrollList {
+		max-height: min(600px, 70vh);
+	}
 }
 
 .viewer {
@@ -286,6 +309,17 @@ h1 {
 	margin-bottom: 14px;
 }
 
+/* A long title wraps beside the button instead of squeezing it */
+.viewerHeader > div {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.viewerHeader .fileLink {
+	flex-shrink: 0;
+	white-space: nowrap;
+}
+
 .viewerSource {
 	margin-top: 4px;
 	overflow-wrap: anywhere;
@@ -295,6 +329,10 @@ h1 {
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
+}
+
+.viewerTexts.scrollList {
+	max-height: 60vh;
 }
 
 .viewerTexts pre {

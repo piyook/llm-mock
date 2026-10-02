@@ -139,6 +139,10 @@ describe('Mock LLM Spec for configured stored responses', () => {
                     'contain',
                     'E2E_FIXTURE_TEXT',
                 );
+                cy.get('[cy-data="response_rules_count"]').should(
+                    'contain',
+                    '1 rule',
+                );
                 cy.get('[cy-data="rule_file_link"]').click();
                 cy.get('[cy-data="viewer_text"]').should(
                     'have.text',
@@ -146,6 +150,84 @@ describe('Mock LLM Spec for configured stored responses', () => {
                 );
             },
         );
+    });
+
+    it('leaves a short list of rules and of stored responses unscrolled', () => {
+        cy.visit('/');
+        cy.get('[cy-data="response_rules"] .rules').should(
+            'not.have.class',
+            'scrollList',
+        );
+        cy.get('[cy-data="stored_responses_link"]').click();
+        cy.get('[cy-data="viewer_text"]').should('exist');
+        cy.get('[cy-data="viewer"] .viewerTexts').should(
+            'not.have.class',
+            'scrollList',
+        );
+    });
+
+    // The dashboard routes are stubbed to return more than four of each
+    it('scrolls a long list of rules and of stored responses inside a fixed window', () => {
+        const scrolls = ($list: JQuery<HTMLElement>) => {
+            expect($list).to.have.class('scrollList');
+            expect($list[0].scrollHeight).to.be.greaterThan(
+                $list[0].clientHeight,
+            );
+        };
+        const responseRules = Cypress._.times(6, (i) => ({
+            match: `match ${i + 1}`,
+            files: [`reply-${i + 1}.txt`],
+        }));
+        const responses = Cypress._.times(6, (i) =>
+            `Stored reply ${i + 1}. `.repeat(40),
+        );
+        cy.intercept('GET', '/ui-meta', (req) => {
+            req.continue((res) => {
+                res.body = { ...res.body, responseRules };
+            });
+        });
+        cy.intercept('GET', '/ui-stored-responses', {
+            body: { file: storedPath, responses },
+        });
+
+        cy.visit('/');
+        cy.get('[cy-data="response_rules_count"]').should(
+            'contain',
+            '6 rules',
+        );
+        cy.get('[cy-data="rule_file_link"]').should('have.length', 6);
+        cy.get('[cy-data="response_rules"] .rules').should(scrolls);
+
+        cy.get('[cy-data="stored_responses_link"]').click();
+        cy.get('[cy-data="viewer_text"]').should('have.length', 6);
+        cy.get('[cy-data="viewer"] .viewerTexts').should(scrolls);
+    });
+
+    it('keeps the close button on one line beside a long viewer title', () => {
+        const match = 'a long match phrase that fills the viewer title '.repeat(
+            3,
+        );
+        cy.intercept('GET', '/ui-meta', (req) => {
+            req.continue((res) => {
+                res.body = {
+                    ...res.body,
+                    responseRules: [{ match, files: ['reply.txt'] }],
+                };
+            });
+        });
+        cy.intercept('GET', '/ui-rule-file*', {
+            body: { file: 'reply.txt', content: 'A reply.' },
+        });
+
+        cy.viewport(360, 640);
+        cy.visit('/');
+        cy.get('[cy-data="rule_file_link"]').click();
+        cy.get('[cy-data="viewer_text"]').should('have.text', 'A reply.');
+        cy.get('[cy-data="viewer"] .viewerHeader .fileLink')
+            .should('have.text', 'Close')
+            .and('have.css', 'white-space', 'nowrap')
+            .invoke('outerHeight')
+            .should('be.lessThan', 40);
     });
 
     it('replies with texts from the configured file', () => {
