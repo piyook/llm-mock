@@ -296,7 +296,7 @@ curl http://localhost:8001/ping
 curl http://localhost:8001/ui-meta
 
 # Check logs for detailed request information
-curl http://localhost:8001/logs
+curl http://localhost:8001/ui-request-log
 ```
 
 ## Automated Tests

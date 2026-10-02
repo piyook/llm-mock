@@ -116,7 +116,7 @@ function handler(app: FastifyInstance, _pathName: string) {
 			.status(400)
 			.type('text/plain')
 			.send(
-				`Invalid or Missing Request For Embeddings Template. Please ensure your request adheres to the expected format - see localhost:${process.env?.SERVER_PORT ?? '8001'}/logs for details of missing parameters or formatting issues.`,
+				`Invalid or Missing Request For Embeddings Template. Please ensure your request adheres to the expected format - see localhost:${process.env?.SERVER_PORT ?? '8001'}/ui-request-log for details of missing parameters or formatting issues.`,
 			);
 	});
 }

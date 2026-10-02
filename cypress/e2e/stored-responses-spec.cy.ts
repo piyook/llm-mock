@@ -29,6 +29,23 @@ describe('Mock LLM Spec for configured stored responses', () => {
         });
     });
 
+    it('shows the llmock version on the dashboard', () => {
+        cy.readFile('package.json').then((pkg) => {
+            cy.visit('/');
+            cy.get('[cy-data="llmock_version"]').should(
+                'contain',
+                `v${pkg.version}`,
+            );
+        });
+    });
+
+    it('opens the request log in the dashboard viewer', () => {
+        cy.visit('/');
+        cy.get('[cy-data="request_log_link"]').click();
+        cy.get('[cy-data="viewer"]').should('contain', 'Last logged request');
+        cy.get('[cy-data="viewer_text"]').should('have.length', 1);
+    });
+
     it('shows the configured pool in the dashboard viewer', () => {
         cy.readFile(storedPath).then((entries) => {
             cy.visit('/');

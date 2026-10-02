@@ -1,4 +1,5 @@
 export type UiMeta = {
+	version: string | null;
 	serverPort: number | null;
 	llmUrlEndpoint: string;
 	llmName: string;
@@ -31,6 +32,11 @@ export type RuleFile = {
 	content: string;
 };
 
+export type RequestLog = {
+	file: string;
+	log: unknown;
+};
+
 // The viewer routes answer failures with `{ error }` explaining what is wrong
 // with the file, which is more use to the reader than the status code.
 async function fetchViewerJson<T>(url: string): Promise<T> {
@@ -48,6 +54,10 @@ export function fetchStoredResponses(): Promise<StoredResponses> {
 
 export function fetchRuleFile(rule: number, file: number): Promise<RuleFile> {
 	return fetchViewerJson(`/ui-rule-file?rule=${rule}&file=${file}`);
+}
+
+export function fetchRequestLog(): Promise<RequestLog> {
+	return fetchViewerJson('/ui-request-log');
 }
 
 export async function fetchPing(): Promise<boolean> {

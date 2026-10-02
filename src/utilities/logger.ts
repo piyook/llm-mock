@@ -16,6 +16,9 @@ if (!fs.existsSync(logFolder)) {
 	fs.mkdirSync(logFolder, { recursive: true });
 }
 
+// Holds the last validated request only; each one overwrites it
+export const logPath = path.join(logFolder, 'api_request_log.json');
+
 export default function logger(
 	logItem: FastifyRequest,
 	state = '',
@@ -23,8 +26,6 @@ export default function logger(
 	information = '',
 ) {
 	if (process.env?.LOG_REQUESTS?.toUpperCase() !== 'ON') return;
-
-	const logPath = path.join(logFolder, 'api_request_log.json');
 
 	// Convert the object to a string
 	const logEntry = `[{ "request_validation":{"validation_status":"${state}", "reason": "${reason}", "information": "${information}","request_time":"${new Date().toLocaleString()}"},"sent_POST_request":${JSON.stringify(

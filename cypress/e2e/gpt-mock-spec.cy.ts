@@ -129,7 +129,7 @@ describe('Mock LLM Spec for chatGPT', () => {
         }).then((response) => {
             expect(response.status).to.eq(400);
             expect(response.body).to.contain(
-                'Invalid or Missing Request For This LLM Model Template: OPENAI Model:gpt-4o. Please ensure your request adheres to the expected format - see localhost:8001/logs for details of missing parameters or formatting issues.',
+                'Invalid or Missing Request For This LLM Model Template: OPENAI Model:gpt-4o. Please ensure your request adheres to the expected format - see localhost:8001/ui-request-log for details of missing parameters or formatting issues.',
             );
         });
     });

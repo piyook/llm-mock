@@ -2,7 +2,6 @@ import fastify from 'fastify';
 import * as seeders from './seeders/index.js';
 import getApiRoutes from './utilities/file-scan.js';
 import serverPage from './utilities/server-page.js';
-import logPage from './utilities/log-page.js';
 import { dbLoadFromDisk } from './models/db.js';
 import {
 	setEnvironmentFromConfig,
@@ -45,7 +44,6 @@ const app = fastify({ logger: false });
 const { apiRoutes } = await getApiRoutes(app);
 
 serverPage(app, apiRoutes);
-logPage(app);
 
 // Load database from disk if persistence is enabled
 const loaded = dbLoadFromDisk();

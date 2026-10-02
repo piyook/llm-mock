@@ -20,15 +20,26 @@ body {
 }
 
 main {
-	padding: 56px 3vw 40px 3vw;
+	padding: 0 3vw 40px 3vw;
 	width: 95vw;
 	max-width: 800px;
 	min-width: 320px;
-	margin: 48px auto 32px auto;
+	margin: 0 auto 32px auto;
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
 	gap: 24px;
+}
+
+/* Stays at the top while the cards scroll beneath it; the solid background
+   hides them as they pass */
+.pageHeader {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	padding: 16px 0 12px 0;
+	margin-bottom: -12px;
+	background: #20232a;
 }
 
 .card {
@@ -51,19 +62,38 @@ h1 {
 	letter-spacing: 1px;
 }
 
+.card h2 {
+	margin: 0 0 12px 0;
+}
+
+.titleGroup {
+	display: flex;
+	align-items: baseline;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+
+.versionPill {
+	border: 1.5px solid var(--accent);
+	border-radius: 8px;
+	padding: 2px 8px;
+	color: var(--text-muted);
+	font-weight: 650;
+	font-size: 0.95rem;
+}
+
+.groupLabel {
+	margin: 14px 0 8px 0;
+}
+
 .muted {
 	color: var(--text-muted);
 }
 
+/* Always takes up its line, so the page doesn't shift when an error shows */
 .errorLine {
-	margin: 10px 0 0 0;
+	margin: 6px 0 0 0;
 	min-height: 1.4em;
-	opacity: 0;
-	transition: opacity 120ms ease-in-out;
-}
-
-.errorVisible {
-	opacity: 1;
 }
 
 .statusPill {
@@ -116,6 +146,7 @@ h1 {
 	border-radius: 8px;
 	color: #fff;
 	font-weight: 800;
+	overflow-wrap: anywhere;
 }
 
 .endpoints {

@@ -120,6 +120,20 @@ describe('dashboard routes for stored responses and response rules', () => {
 		return { status: response.statusCode, body: response.json() };
 	};
 
+	test('ui-meta reports the llmock version', async () => {
+		const { body } = await get('/ui-meta');
+
+		expect(body.version).toBe(require('../../../package.json').version);
+	});
+
+	test('ui-request-log reports the log file and its contents', async () => {
+		const { status, body } = await get('/ui-request-log');
+
+		expect(status).toBe(200);
+		expect(body.file).toMatch(/api_request_log\.json$/);
+		expect(body).toHaveProperty('log');
+	});
+
 	test('ui-meta reports the stored responses file and the rules', async () => {
 		const { body } = await get('/ui-meta');
 

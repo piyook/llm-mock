@@ -378,10 +378,9 @@ Once running, open `http://localhost:8001` for the live dashboard:
 | URL | Purpose |
 |---|---|
 | `http://localhost:8001` | Main dashboard |
-| `http://localhost:8001/logs` | The most recent logged request |
 | `http://localhost:8001/ping` | Health check |
 
-The dashboard shows server status, current configuration, available endpoints, and the most recent logged request. It refreshes automatically every 2 seconds.
+The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged request. Settings are grouped into **Connect**, **Model**, **Responses**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
 
 With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. When the preset has `responseRules`, a **Response rules** box lists each rule's `match` text beside the file(s) it replies with; click a file to read its contents.
 
@@ -400,11 +399,11 @@ Validate incoming requests against templates to confirm API compatibility:
 1. Enable validation: `"validateRequests": true`
 2. For a provider that is not built in, add a template to the `request-templates/` folder (see [Template locations](#template-locations))
 
-A request passes when it contains every top-level key of the template. The built-in templates require `model` and `messages` (OpenAI), `contents` (Gemini), and `model`, `max_tokens` and `messages` (Claude). Invalid requests return a `400`; the missing keys are shown at `/logs`.
+A request passes when it contains every top-level key of the template. The built-in templates require `model` and `messages` (OpenAI), `contents` (Gemini), and `model`, `max_tokens` and `messages` (Claude). Invalid requests return a `400`; the missing keys are shown under **View request log** on the dashboard.
 
 ### Request logging
 
-Enable with `"logRequests": true` and view the most recent request at `http://localhost:8001/logs`, or find the log file (it holds the last request only) at:
+Enable with `"logRequests": true` and view the most recent request with **View request log** on the dashboard (as JSON at `http://localhost:8001/ui-request-log`), or find the log file (it holds the last request only) at:
 
 | Platform | Log location |
 |---|---|
@@ -837,7 +836,7 @@ llmock start --port=8002
 
 - For the `claude` preset, `model`, `max_tokens` and `messages` are all required
 - Confirm your request template matches the provider's API format
-- Check the request shape at `http://localhost:8001/logs`
+- Check the request shape with **View request log** on the dashboard
 - Verify the `name` field in your model config matches the template filename prefix
 
 **Response delays not applied**

@@ -17,7 +17,7 @@ type LogData = {
 
 const logRequestBody = ({ data, state, reason, information }: LogData) => {
 	console.log(
-		`New API Request:${new Date().toLocaleString()}. Request data viewable in browser 'localhost:${process.env?.SERVER_PORT ?? '8000'}/logs' or in 'logs/ folder'`,
+		`New API Request:${new Date().toLocaleString()}. View it with 'View request log' on the dashboard at 'localhost:${process.env?.SERVER_PORT ?? '8000'}'`,
 	);
 	logger(data, state, reason, information);
 };

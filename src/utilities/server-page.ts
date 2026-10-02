@@ -7,6 +7,7 @@ import {
 	getResponseRules,
 	getStoredResponsesFile,
 } from '../config/config-loader.js';
+import { logPath } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { readRuleFile, ruleFiles } from './response-rules.js';
 
@@ -15,6 +16,26 @@ const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uiDistDir = path.resolve(__dirname, '../../ui/dist');
+
+// Version of the llmock package this server is running from, null if its
+// package.json can't be read.
+function readPackageVersion(): string | null {
+	try {
+		const packageJson = JSON.parse(
+			fs.readFileSync(
+				path.resolve(__dirname, '../../package.json'),
+				'utf8',
+			),
+		) as { version?: unknown };
+		return typeof packageJson.version === 'string'
+			? packageJson.version
+			: null;
+	} catch {
+		return null;
+	}
+}
+
+const version = readPackageVersion();
 
 // The pool `responseType: "stored"` picks from: the preset's own file if
 // configured, otherwise the bundled texts. Throws if that file can't be used.
@@ -196,6 +217,7 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		}));
 
 		return reply.send({
+			version,
 			serverPort: Number(process.env?.SERVER_PORT ?? '') || null,
 			llmUrlEndpoint: process.env?.LLM_URL_ENDPOINT ?? '',
 			llmName: process.env?.LLM_NAME ?? '',
@@ -256,6 +278,19 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		} catch (error) {
 			return reply.code(500).send({ error: (error as Error).message });
 		}
+	});
+
+	// The last validated request, for the dashboard viewer. `log` is null
+	// when no request has been logged yet.
+	app.get('/ui-request-log', async (_request, reply) => {
+		let log: unknown = null;
+		try {
+			log = JSON.parse(fs.readFileSync(logPath, 'utf8'));
+		} catch {
+			// No log file yet, or one that is mid-write
+		}
+
+		return reply.send({ file: logPath, log });
 	});
 
 	// Home page route

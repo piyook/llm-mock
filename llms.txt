@@ -22,7 +22,7 @@ npx llmock stop                        # add --port=<n> if not 8001
 
 - Detached `start` waits until the server answers, then exits 0. It exits 1 if the server fails to start (the server's output is not attached: rerun with `--foreground` to see the error) or if a server already answers on that port.
 - With `--foreground` the command never returns; poll for readiness yourself: `GET /ping` → `200 {"response":"server is running"}`.
-- Confirm what is live: `GET /ui-meta` → JSON with `llmName`, `llmUrlEndpoint`, `serverPort`, `streamingStatus`, `validateRequests`, delays.
+- Confirm what is live: `GET /ui-meta` → JSON with `version` (llmock version), `llmName`, `llmUrlEndpoint`, `serverPort`, `streamingStatus`, `validateRequests`, delays.
 - `stop` kills whatever process is listening on the port (default 8001, it does not read the config). Do not point it at a port another service uses.
 - Run the CLI from the folder containing `.llmockrc.json`, or set `CONFIG_PATH=<path>` (relative to the cwd).
 - Scaffold alternative: `npm create llmock@latest <dir>` creates a standalone folder (config, Docker files, npm scripts). It prompts interactively if `<dir>` is omitted or already exists. Its scripts: `npm run llmock:start`, `llmock:stop`, `llmock:<preset>`. Its Docker setup mounts only `.llmockrc.json`; templates, fixtures and a stored responses file are copied into the image, so changing them needs `npm run docker:rebuild` (or an added volume).
@@ -79,7 +79,7 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `responseType` | `"lorem"` \| `"stored"` | `lorem` | `lorem`: 1..`maxLoremParas` random sentences. `stored`: random pick from the preset's `storedResponsesFile`, or from 11 fixed strings bundled in the package when that is unset. Any other value: 1–10 lorem paragraphs. |
 | `maxLoremParas` | number | 8 | Max **sentences** for `lorem`. |
 | `validateRequests` | boolean | false | See Validation. |
-| `logRequests` | boolean | false | Record the last validated request (shown at `GET /logs`). |
+| `logRequests` | boolean | false | Record the last validated request (shown at `GET /ui-request-log`). |
 | `debug` | boolean | false | Verbose console output. |
 | `stream` | boolean | false | SSE for `openai`/`gemini` formats. Ignored by `claude`. |
 | `responseDelay.min/max` | ms | 0 / 0 | Random wait before each reply. `0`/`0` disables. |
@@ -133,7 +133,7 @@ With `validateRequests: true`, a POST body must be a JSON object containing thes
 | `gemini` | `contents` |
 | embeddings route (any preset) | `model`, `input` |
 
-Failure → `400 text/plain` (the message names the preset, not the missing key; the detail is at `GET /logs`). The required keys are the top-level keys of the request template, so a project template changes them.
+Failure → `400 text/plain` (the message names the preset, not the missing key; the detail is at `GET /ui-request-log`). The required keys are the top-level keys of the request template, so a project template changes them.
 
 ## Responses
 
@@ -171,7 +171,7 @@ To change a response envelope or the required request keys, or to mock a provide
 | `GET /ui-meta` | Active settings as JSON |
 | `GET /ui-stored-responses` | The stored responses pool in use, as JSON |
 | `GET /ui-rule-file?rule=<i>&file=<j>` | Contents of one response rule file, as JSON |
-| `GET /logs` | HTML page showing the **last** validated request and why it passed/failed (history is not kept) |
+| `GET /ui-request-log` | `{"file", "log"}`: the **last** validated request and why it passed/failed (history is not kept; `log` is `null` if none logged) |
 | `GET /` | HTML dashboard |
 | `GET /<endpoint>` | A generated reply with no validation and no rules (quick smoke test) |
 
