@@ -27,8 +27,8 @@ const handleRequest = async (reply: any, body?: unknown) => {
 	// Apply configured response delay for realistic API simulation
 	await applyResponseDelay();
 
-	// Generate mock response content (lorem or stored based on configuration)
-	const content = await generateResponseContent(body);
+	// Generate the mock reply (rule fixture, lorem or stored based on configuration)
+	const mockReply = await generateResponseContent(body);
 
 	// Route to appropriate response handler (see shouldStream for the rules)
 	if (!shouldStream(process.env?.LLM_NAME, body, process.env?.STREAM)) {
@@ -38,22 +38,22 @@ const handleRequest = async (reply: any, body?: unknown) => {
 		// The claude preset adds a unique id, echoed model and token usage
 		const response =
 			process.env?.LLM_NAME === 'claude'
-				? await buildClaudeStaticResponse(content, body)
-				: await buildStaticResponse(content);
+				? await buildClaudeStaticResponse(mockReply, body)
+				: await buildStaticResponse(mockReply);
 		return reply.send(response);
 	}
 
 	if (process.env?.LLM_NAME === 'claude') {
 		// === CLAUDE STREAMING MODE ===
 		// Anthropic Messages SSE events (message_start ... message_stop)
-		return await handleClaudeStreamingResponse(content, reply, body);
+		return await handleClaudeStreamingResponse(mockReply, reply, body);
 	}
 
 	// === STREAMING MODE ===
 	// Returns OpenAI-style Server-Sent Events stream with chat.completion.chunk events
 	// Streaming format is compatible with OpenAI chat-completions streaming API
 	// Content is split into multiple chunks with proper SSE headers and timing
-	return await handleStreamingResponse(content, reply);
+	return await handleStreamingResponse(mockReply, reply);
 };
 
 function handler(app: FastifyInstance, pathName: string) {

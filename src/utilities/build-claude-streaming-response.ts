@@ -6,6 +6,7 @@ import {
 	newClaudeMessageId,
 	resolveClaudeModel,
 } from './build-claude-response.js';
+import type { MockReply } from '../types.js';
 
 // Split after each run of whitespace so the pieces join back to `content`
 // exactly (newlines included, which matters for JSON bodies).
@@ -108,17 +109,17 @@ export const streamClaudeEvents = async (
 };
 
 /**
- * Sends a Claude-style SSE stream for `content`. Headers are written on the
- * raw response because the events are written to it directly.
+ * Sends a Claude-style SSE stream for the reply's text. Headers are written
+ * on the raw response because the events are written to it directly.
  */
 export const handleClaudeStreamingResponse = async (
-	content: string,
+	mockReply: MockReply,
 	reply: any,
 	body?: unknown,
 ): Promise<void> => {
 	try {
 		const events = generateClaudeStreamingChunks(
-			content,
+			mockReply.text,
 			resolveClaudeModel(body),
 			estimateInputTokens(body),
 		);

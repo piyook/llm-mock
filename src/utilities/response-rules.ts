@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import type { NormalisedRequest } from './normalise-request.js';
 
 /**
  * A response rule returns the contents of `file` instead of generated text
@@ -39,18 +40,14 @@ export const collectStrings = (value: unknown): string[] => {
 };
 
 /**
- * Returns the first rule (in config order) whose `match` appears in the
- * request body, or undefined. Matching is case-sensitive.
+ * Returns the first rule (in config order) whose `match` appears anywhere in
+ * the request's text, or undefined. Matching is case-sensitive.
  */
 export const findMatchingRule = (
 	rules: ResponseRule[],
-	body: unknown,
-): ResponseRule | undefined => {
-	if (rules.length === 0) return undefined;
-
-	const text = collectStrings(body).join('\n');
-	return rules.find((rule) => text.includes(rule.match));
-};
+	request: NormalisedRequest,
+): ResponseRule | undefined =>
+	rules.find((rule) => request.allText.includes(rule.match));
 
 /**
  * Every fixture file a rule can reply with: its `files`, or its single `file`.

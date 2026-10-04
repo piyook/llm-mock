@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { buildResponse } from './build-response.js';
+import type { MockReply } from '../types.js';
 
 export const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5';
 
@@ -48,9 +49,10 @@ export type ClaudeMessage = Record<string, unknown> & {
  * per-request fields: unique id, echoed model and estimated token usage.
  */
 export const buildClaudeStaticResponse = async (
-	content: string,
+	mockReply: MockReply,
 	body?: unknown,
 ): Promise<ClaudeMessage> => {
+	const content = mockReply.text;
 	const template = (await buildResponse(content)) as Record<string, unknown>;
 
 	return {
