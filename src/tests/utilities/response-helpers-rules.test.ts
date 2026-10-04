@@ -77,16 +77,16 @@ describe('generateResponseContent with responseRules', () => {
 	});
 
 	test('returns the fixture file when the request matches a rule', async () => {
-		expect(await generateResponseContent(body('please WANT_JSON'))).toBe(
-			'{\n  "a": 1\n}\n',
-		);
-		expect(await generateResponseContent(body('WANT_TEXT'))).toBe(
+		expect(
+			(await generateResponseContent(body('please WANT_JSON'))).text,
+		).toBe('{\n  "a": 1\n}\n');
+		expect((await generateResponseContent(body('WANT_TEXT'))).text).toBe(
 			'canned text',
 		);
 	});
 
 	test('matches text in the system prompt too', async () => {
-		const content = await generateResponseContent({
+		const { text: content } = await generateResponseContent({
 			system: [{ type: 'text', text: 'WANT_TEXT' }],
 			messages: [{ role: 'user', content: 'hi' }],
 		});
@@ -94,14 +94,16 @@ describe('generateResponseContent with responseRules', () => {
 	});
 
 	test('falls through to generated text when nothing matches', async () => {
-		const content = await generateResponseContent(body('no marker'));
+		const { text: content } = await generateResponseContent(
+			body('no marker'),
+		);
 
 		expect(content).not.toBe('canned text');
 		expect(content.length).toBeGreaterThan(0);
 	});
 
 	test('falls through to generated text with no request body', async () => {
-		const content = await generateResponseContent();
+		const { text: content } = await generateResponseContent();
 
 		expect(content).not.toBe('canned text');
 		expect(content.length).toBeGreaterThan(0);
@@ -116,7 +118,9 @@ describe('generateResponseContent with responseRules', () => {
 	test('a preset without rules always generates text', async () => {
 		process.env.LLM_MODEL_NAME = 'no-rules';
 		try {
-			const content = await generateResponseContent(body('WANT_TEXT'));
+			const { text: content } = await generateResponseContent(
+				body('WANT_TEXT'),
+			);
 			expect(content).not.toBe('canned text');
 		} finally {
 			process.env.LLM_MODEL_NAME = 'with-rules';

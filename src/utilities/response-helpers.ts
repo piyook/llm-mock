@@ -11,8 +11,10 @@ import {
 	getStoredResponsesFile,
 } from '../config/config-loader.js';
 import { findMatchingRule, loadRuleContent } from './response-rules.js';
+import { normaliseRequest } from './normalise-request.js';
 import { loadStoredResponses } from './stored-responses.js';
 import type { FastifyReply } from 'fastify';
+import type { MockReply } from '../types.js';
 
 // Default embedding dimension constant
 const DEFAULT_EMBEDDING_DIMENSIONS =
@@ -24,24 +26,26 @@ const DEFAULT_EMBEDDING_DIMENSIONS =
  */
 const getRuleContent = (requestBody: unknown): string | undefined => {
 	const { rules, baseDir } = getResponseRules();
-	const rule = findMatchingRule(rules, requestBody);
+	if (rules.length === 0) return undefined;
+
+	const rule = findMatchingRule(rules, normaliseRequest(requestBody));
 
 	return rule ? loadRuleContent(rule, baseDir) : undefined;
 };
 
 /**
- * Generates mock LLM response content based on configuration
+ * Generates the mock LLM reply based on configuration
  * Supports response rules (fixture files), lorem ipsum and stored response types
  *
  * @param requestBody - Parsed request body, used to match response rules
- * @returns Promise<string> Generated content text
+ * @returns Promise<MockReply> The reply, with the generated text in `text`
  */
 export const generateResponseContent = async (
 	requestBody?: unknown,
-): Promise<string> => {
+): Promise<MockReply> => {
 	// A matching responseRules entry wins over the configured response type
 	const ruleContent = getRuleContent(requestBody);
-	if (ruleContent !== undefined) return ruleContent;
+	if (ruleContent !== undefined) return { text: ruleContent };
 
 	let content = '';
 
@@ -76,34 +80,34 @@ export const generateResponseContent = async (
 		}
 	}
 
-	return content;
+	return { text: content };
 };
 
 /**
  * Builds a static JSON response using the response template
- * Replaces DYNAMIC_CONTENT_HERE with generated content
+ * Replaces DYNAMIC_CONTENT_HERE with the reply's text
  *
- * @param content - The content to inject into the template
+ * @param mockReply - The reply whose text is injected into the template
  * @returns Promise<object> Complete static response object
  */
-export const buildStaticResponse = async (content: string) => {
-	return await buildResponse(content);
+export const buildStaticResponse = async (mockReply: MockReply) => {
+	return await buildResponse(mockReply.text);
 };
 
 /**
  * Handles streaming response with proper SSE format
- * Converts content to streaming chunks and sends them with appropriate headers
+ * Converts the reply's text to streaming chunks and sends them with appropriate headers
  *
- * @param content - The content to stream
+ * @param mockReply - The reply whose text is streamed
  * @param reply - Fastify reply object
  * @returns Promise<void>
  */
 export const handleStreamingResponse = async (
-	content: string,
+	mockReply: MockReply,
 	reply: FastifyReply,
 ) => {
 	try {
-		const chunks = await generateStreamingChunks(content);
+		const chunks = await generateStreamingChunks(mockReply.text);
 
 		setStreamingHeaders(reply);
 		await streamWithDelay(chunks, reply);
