@@ -9,7 +9,9 @@ import {
 	readRuleFile,
 	ruleFiles,
 	validateResponseRules,
+	type ResponseRule,
 } from '../../utilities/response-rules.js';
+import { normaliseRequest } from '../../utilities/normalise-request.js';
 
 describe('collectStrings', () => {
 	test('collects nested string values and ignores keys and non-strings', () => {
@@ -42,6 +44,9 @@ describe('collectStrings', () => {
 });
 
 describe('findMatchingRule', () => {
+	const find = (list: ResponseRule[], body: unknown) =>
+		findMatchingRule(list, normaliseRequest(body));
+
 	const rules = [
 		{ match: 'ALPHA', file: 'a.txt' },
 		{ match: 'BETA', file: 'b.txt' },
@@ -49,24 +54,24 @@ describe('findMatchingRule', () => {
 
 	test('returns the rule whose text appears in the request', () => {
 		const body = { messages: [{ role: 'user', content: 'say BETA now' }] };
-		expect(findMatchingRule(rules, body)?.file).toBe('b.txt');
+		expect(find(rules, body)?.file).toBe('b.txt');
 	});
 
 	test('first matching rule in config order wins', () => {
 		const body = {
 			messages: [{ role: 'user', content: 'BETA and ALPHA' }],
 		};
-		expect(findMatchingRule(rules, body)?.file).toBe('a.txt');
+		expect(find(rules, body)?.file).toBe('a.txt');
 	});
 
 	test('matches text in system blocks and content blocks', () => {
 		expect(
-			findMatchingRule(rules, {
+			find(rules, {
 				system: [{ type: 'text', text: 'context ALPHA here' }],
 			})?.file,
 		).toBe('a.txt');
 		expect(
-			findMatchingRule(rules, {
+			find(rules, {
 				messages: [
 					{ role: 'user', content: [{ type: 'text', text: 'BETA' }] },
 				],
@@ -79,25 +84,23 @@ describe('findMatchingRule', () => {
 		const body = {
 			messages: [{ role: 'user', content: 'x line one\n"quoted" y' }],
 		};
-		expect(findMatchingRule(multi, body)?.file).toBe('q.txt');
+		expect(find(multi, body)?.file).toBe('q.txt');
 	});
 
 	test('is case sensitive', () => {
 		const body = { messages: [{ role: 'user', content: 'alpha' }] };
-		expect(findMatchingRule(rules, body)).toBeUndefined();
+		expect(find(rules, body)).toBeUndefined();
 	});
 
 	test('does not match on JSON keys', () => {
 		const keyed = [{ match: 'messages', file: 'k.txt' }];
-		expect(
-			findMatchingRule(keyed, { messages: [{ content: 'hi' }] }),
-		).toBeUndefined();
+		expect(find(keyed, { messages: [{ content: 'hi' }] })).toBeUndefined();
 	});
 
 	test('returns undefined for no rules, no match or no body', () => {
-		expect(findMatchingRule([], { a: 'ALPHA' })).toBeUndefined();
-		expect(findMatchingRule(rules, { a: 'nothing' })).toBeUndefined();
-		expect(findMatchingRule(rules, undefined)).toBeUndefined();
+		expect(find([], { a: 'ALPHA' })).toBeUndefined();
+		expect(find(rules, { a: 'nothing' })).toBeUndefined();
+		expect(find(rules, undefined)).toBeUndefined();
 	});
 });
 

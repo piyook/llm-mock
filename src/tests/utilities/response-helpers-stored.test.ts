@@ -130,7 +130,7 @@ describe('generateResponseContent with storedResponsesFile', () => {
 	const sample = async (count = 40) => {
 		const seen = new Set<string>();
 		for (let i = 0; i < count; i++) {
-			seen.add(await generateResponseContent(body('no marker')));
+			seen.add((await generateResponseContent(body('no marker'))).text);
 		}
 		return seen;
 	};
@@ -163,16 +163,16 @@ describe('generateResponseContent with storedResponsesFile', () => {
 		const path = join(dir, 'fixtures', 'strings.json');
 		writeFileSync(path, JSON.stringify(['edited reply']));
 		try {
-			expect(await generateResponseContent(body('no marker'))).toBe(
-				'edited reply',
-			);
+			expect(
+				(await generateResponseContent(body('no marker'))).text,
+			).toBe('edited reply');
 		} finally {
 			writeFileSync(path, JSON.stringify(strings));
 		}
 	});
 
 	test('a matching response rule wins over stored responses', async () => {
-		expect(await generateResponseContent(body('WANT_TEXT'))).toBe(
+		expect((await generateResponseContent(body('WANT_TEXT'))).text).toBe(
 			'canned text',
 		);
 	});
@@ -180,7 +180,9 @@ describe('generateResponseContent with storedResponsesFile', () => {
 	test('is ignored when the response type is not stored', async () => {
 		process.env.MOCK_LLM_RESPONSE_TYPE = 'lorem';
 		try {
-			const content = await generateResponseContent(body('no marker'));
+			const { text: content } = await generateResponseContent(
+				body('no marker'),
+			);
 			expect(strings).not.toContain(content);
 		} finally {
 			process.env.MOCK_LLM_RESPONSE_TYPE = 'stored';
@@ -207,9 +209,11 @@ describe('generateResponseContent with storedResponsesFile', () => {
 
 	test('static and streamed replies carry the stored text (openai)', async () => {
 		process.env.LLM_NAME = 'openai';
-		const content = await generateResponseContent(body('no marker'));
+		const { text: content } = await generateResponseContent(
+			body('no marker'),
+		);
 
-		const response = (await buildStaticResponse(content)) as any;
+		const response = (await buildStaticResponse({ text: content })) as any;
 		expect(response.choices[0].message.content).toBe(content);
 
 		const chunks = await generateStreamingChunks(content);
@@ -227,10 +231,10 @@ describe('generateResponseContent with storedResponsesFile', () => {
 	test('static and streamed replies carry the stored text (claude)', async () => {
 		process.env.LLM_NAME = 'claude';
 		const request = body('no marker');
-		const content = await generateResponseContent(request);
+		const { text: content } = await generateResponseContent(request);
 
 		const response = (await buildClaudeStaticResponse(
-			content,
+			{ text: content },
 			request,
 		)) as any;
 		expect(response.content[0].text).toBe(content);

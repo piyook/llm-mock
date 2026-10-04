@@ -37,7 +37,9 @@ describe('buildClaudeStaticResponse', () => {
 	});
 
 	test('returns an assistant message with the content in one text block', async () => {
-		const response = await buildClaudeStaticResponse('Hello there.');
+		const response = await buildClaudeStaticResponse({
+			text: 'Hello there.',
+		});
 
 		expect(response).toMatchObject({
 			type: 'message',
@@ -49,14 +51,14 @@ describe('buildClaudeStaticResponse', () => {
 	});
 
 	test('does not include non-API fields from the template', async () => {
-		const response = await buildClaudeStaticResponse('x');
+		const response = await buildClaudeStaticResponse({ text: 'x' });
 
 		expect(response).not.toHaveProperty('created_at');
 	});
 
 	test('gives every response a unique msg_ id', async () => {
-		const first = await buildClaudeStaticResponse('x');
-		const second = await buildClaudeStaticResponse('x');
+		const first = await buildClaudeStaticResponse({ text: 'x' });
+		const second = await buildClaudeStaticResponse({ text: 'x' });
 
 		expect(first.id).toMatch(/^msg_[A-Za-z0-9]{24}$/);
 		expect(second.id).toMatch(/^msg_[A-Za-z0-9]{24}$/);
@@ -64,21 +66,24 @@ describe('buildClaudeStaticResponse', () => {
 	});
 
 	test('echoes the requested model', async () => {
-		const response = await buildClaudeStaticResponse('x', {
-			model: 'claude-test-model',
-		});
+		const response = await buildClaudeStaticResponse(
+			{ text: 'x' },
+			{
+				model: 'claude-test-model',
+			},
+		);
 
 		expect(response.model).toBe('claude-test-model');
 	});
 
 	test('falls back to the preset model, then the template default', async () => {
 		process.env.LLM_MODEL = 'claude-preset';
-		expect((await buildClaudeStaticResponse('x', {})).model).toBe(
+		expect((await buildClaudeStaticResponse({ text: 'x' }, {})).model).toBe(
 			'claude-preset',
 		);
 
 		delete process.env.LLM_MODEL;
-		expect((await buildClaudeStaticResponse('x')).model).toBe(
+		expect((await buildClaudeStaticResponse({ text: 'x' })).model).toBe(
 			'claude-opus-5-5',
 		);
 	});
@@ -87,7 +92,10 @@ describe('buildClaudeStaticResponse', () => {
 		const body = { messages: [{ role: 'user', content: 'How are you?' }] };
 		const content = 'Fine thanks, and you?';
 
-		const { usage } = await buildClaudeStaticResponse(content, body);
+		const { usage } = await buildClaudeStaticResponse(
+			{ text: content },
+			body,
+		);
 
 		expect(usage).toEqual({
 			input_tokens: estimateInputTokens(body),
@@ -99,7 +107,7 @@ describe('buildClaudeStaticResponse', () => {
 
 	test('keeps content exactly as generated, including newlines', async () => {
 		const content = '{\n  "a": 1\n}\n';
-		const response = await buildClaudeStaticResponse(content);
+		const response = await buildClaudeStaticResponse({ text: content });
 
 		expect((response.content as { text: string }[])[0].text).toBe(content);
 	});
