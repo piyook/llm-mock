@@ -1,18 +1,17 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadConfig } from '../../config/config-loader.js';
 import { gptSeeder } from '../../seeders/gpt-seeder.js';
+import { buildClaudeStaticResponse } from '../../utilities/build-claude-response.js';
+import { generateClaudeStreamingChunks } from '../../utilities/build-claude-streaming-response.js';
+import { generateStreamingChunks } from '../../utilities/build-streaming-response.js';
 import {
 	buildStaticResponse,
 	generateResponseContent,
 } from '../../utilities/response-helpers.js';
-import { generateStreamingChunks } from '../../utilities/build-streaming-response.js';
-import { buildClaudeStaticResponse } from '../../utilities/build-claude-response.js';
-import { generateClaudeStreamingChunks } from '../../utilities/build-claude-streaming-response.js';
 
 const require = createRequire(import.meta.url);
 const bundled: string[] = require('../../data/data.json').map(

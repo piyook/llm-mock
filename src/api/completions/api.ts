@@ -1,16 +1,15 @@
-/* eslint-disable @typescript-eslint/naming-convention */
 import type { FastifyInstance } from 'fastify';
-import { validateRequest } from '../../utilities/validate-request.js';
-import {
-	generateResponseContent,
-	buildStaticResponse,
-	handleStreamingResponse,
-	applyResponseDelay,
-} from '../../utilities/response-helpers.js';
 import { buildClaudeStaticResponse } from '../../utilities/build-claude-response.js';
 import { handleClaudeStreamingResponse } from '../../utilities/build-claude-streaming-response.js';
-import { shouldStream } from '../../utilities/stream-mode.js';
 import { applyChaos } from '../../utilities/chaos.js';
+import {
+	applyResponseDelay,
+	buildStaticResponse,
+	generateResponseContent,
+	handleStreamingResponse,
+} from '../../utilities/response-helpers.js';
+import { shouldStream } from '../../utilities/stream-mode.js';
+import { validateRequest } from '../../utilities/validate-request.js';
 
 // Static JSON vs SSE stream is decided per request by shouldStream():
 // - claude preset: the request body's `stream` field
@@ -66,7 +65,7 @@ function handler(app: FastifyInstance, pathName: string) {
 
 	// GET route - handles chat completion requests via HTTP GET
 	// Supports both static and streaming modes based on STREAM env variable
-	app.get(`/${fullPath}`, async (request, reply) => {
+	app.get(`/${fullPath}`, async (_request, reply) => {
 		return await handleRequest(reply);
 	});
 

@@ -39,8 +39,8 @@ ui/vite.config.ts
 ui/index.html
 
 # Config files that shouldn't be published
-.prettierrc.json
-.prettierignore
+biome.json
+.fallowrc.json
 tsconfig.json
 
 # Documentation not needed in package

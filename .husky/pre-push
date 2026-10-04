@@ -18,8 +18,7 @@ else
     git fetch --quiet origin main
     base=origin/main
 fi
-npm run pretty
-npm run lint
+npx biome ci --error-on-warnings
 npx fallow audit --base "$base"
 npm run typecheck
 npm audit --omit=dev

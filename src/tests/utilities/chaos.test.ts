@@ -1,4 +1,3 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
 import fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {

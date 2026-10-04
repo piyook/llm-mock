@@ -21,18 +21,7 @@ jobs:
                   node-version: '24'
                   cache: 'npm'
             - run: npm ci
-            - run: npm run lint -- --deny-warnings
-
-    prettier:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v6
-            - uses: actions/setup-node@v6
-              with:
-                  node-version: '24'
-                  cache: 'npm'
-            - run: npm ci
-            - run: npm run pretty
+            - run: npx biome ci --error-on-warnings
 
     audit:
         runs-on: ubuntu-latest
@@ -71,7 +60,7 @@ jobs:
             - run: npx fallow audit --base origin/${{ github.base_ref }}
 
     unit_tests:
-        needs: [lint, prettier, audit, typecheck, fallow]
+        needs: [lint, audit, typecheck, fallow]
         if: always()
         runs-on: ubuntu-latest
         steps:

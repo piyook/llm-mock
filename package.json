@@ -50,10 +50,8 @@
 		"compile-ui": "npm --prefix ui run build",
 		"prep": "npm run compile-ui && npm pack",
 		"prepare": "husky || true",
-		"lint": "oxlint",
-		"lint-fix": "oxlint --fix",
-		"pretty": "prettier 'src/**/*.{js,jsx,ts,tsx,css,scss,md}' --check",
-		"pretty-fix": "prettier 'src/**/*.{js,jsx,ts,tsx,css,scss,md}' --write",
+		"lint": "biome check --error-on-warnings",
+		"lint-fix": "biome check --write",
 		"typecheck": "tsc --noEmit",
 		"test:unit": "vitest run",
 		"torch": "torch-it",
@@ -84,6 +82,7 @@
 		"typescript": "^7.0.2"
 	},
 	"devDependencies": {
+		"@biomejs/biome": "2.5.15",
 		"@commitlint/cli": "^21.2.3",
 		"@commitlint/config-conventional": "^21.2.3",
 		"@types/chai-json-schema": "^1.4.10",
@@ -93,14 +92,11 @@
 		"fallow": "^3.31.0",
 		"husky": "^9.1.7",
 		"lint-staged": "^17.6.0",
-		"oxlint": "^1.85.0",
-		"prettier": "3.9.9",
 		"torch-it": "^2.6.2",
 		"vitest": "^5.0.2"
 	},
 	"lint-staged": {
-		"src/**/*.{js,jsx,ts,tsx}": "oxlint",
-		"src/**/*.{js,jsx,ts,tsx,css,scss,md}": "oxlint"
+		"*": "biome check --write --error-on-warnings --no-errors-on-unmatched --files-ignore-unknown=true"
 	},
 	"commitlint": {
 		"extends": [

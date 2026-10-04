@@ -1,14 +1,13 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
+import {
+	estimateTokens,
+	resolveClaudeModel,
+} from '../../utilities/build-claude-response.js';
 import {
 	generateClaudeStreamingChunks,
 	handleClaudeStreamingResponse,
 	streamClaudeEvents,
 } from '../../utilities/build-claude-streaming-response.js';
-import {
-	estimateTokens,
-	resolveClaudeModel,
-} from '../../utilities/build-claude-response.js';
 
 type ParsedEvent = { event: string; data: any };
 
@@ -109,7 +108,7 @@ describe('generateClaudeStreamingChunks', () => {
 
 	test('message_delta ends the turn and reports output tokens', () => {
 		const content = 'some generated words here';
-		const delta = parse(generateClaudeStreamingChunks(content)).at(-2)!;
+		const [delta] = parse(generateClaudeStreamingChunks(content)).slice(-2);
 
 		expect(delta.data.delta).toEqual({
 			stop_reason: 'end_turn',

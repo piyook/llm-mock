@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention */
 import type { FastifyReply } from 'fastify';
 
 export type ChaosMode = 'every' | 'random';

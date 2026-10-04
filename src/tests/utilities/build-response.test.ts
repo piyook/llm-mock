@@ -1,6 +1,5 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
-import { expect, test, describe, beforeEach } from 'vitest';
 import type { FastifyRequest } from 'fastify';
+import { beforeEach, describe, expect, test } from 'vitest';
 import { buildResponse } from '../../utilities/build-response.js';
 import { setTestEnvironmentVariables } from '../test-config-helper.js';
 

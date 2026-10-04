@@ -1,9 +1,6 @@
-/* eslint-disable import/order  */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-
 import { createRequire } from 'node:module';
 import { db } from '../models/db.js';
-import { type Llm } from '../types.js';
+import type { Llm } from '../types.js';
 
 const require = createRequire(import.meta.url);
 const llmData: Llm[] = require('../data/data.json');

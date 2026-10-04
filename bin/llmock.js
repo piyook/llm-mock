@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
-import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
-import { existsSync } from 'fs';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
-  applyConfigDefaults,
-  parseCliArgs,
-  parseListeningPids,
-  resolveModelName,
-  tsxCliPath,
+	applyConfigDefaults,
+	parseCliArgs,
+	parseListeningPids,
+	resolveModelName,
+	tsxCliPath,
 } from './process-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -16,18 +16,18 @@ const __dirname = dirname(__filename);
 
 // Parse command line arguments
 const {
-  command,
-  showHelp,
-  showConfig,
-  modelName,
-  customSettings,
-  stopPort,
-  foregroundMode,
+	command,
+	showHelp,
+	showConfig,
+	modelName,
+	customSettings,
+	stopPort,
+	foregroundMode,
 } = parseCliArgs(process.argv.slice(2));
 
 // Show help information
 function showHelpInfo() {
-  console.log(`
+	console.log(`
 LLM Mock Server - A configurable mock LLM API server
 
 USAGE:
@@ -78,10 +78,10 @@ For more information, visit: https://github.com/piyook/llmock
 
 // Show current configuration
 function showCurrentConfig(config, selectedModel) {
-  const modelConfig = config.models[selectedModel];
-  const serverConfig = config.server;
-  
-  console.log(`
+	const modelConfig = config.models[selectedModel];
+	const serverConfig = config.server;
+
+	console.log(`
 Current LLM Mock Server Configuration:
 
 SERVER:
@@ -107,9 +107,13 @@ MODEL: ${selectedModel}
   Embedding Dimensions: ${modelConfig.embeddings.dimensions}
 
 CUSTOM SETTINGS:
-${Object.keys(customSettings).length > 0 ? 
-  Object.entries(customSettings).map(([key, value]) => `  ${key}: ${value}`).join('\n') : 
-  '  None (using defaults)'}
+${
+	Object.keys(customSettings).length > 0
+		? Object.entries(customSettings)
+				.map(([key, value]) => `  ${key}: ${value}`)
+				.join('\n')
+		: '  None (using defaults)'
+}
 
 Available models: ${Object.keys(config.models).join(', ')}
 `);
@@ -117,384 +121,461 @@ Available models: ${Object.keys(config.models).join(', ')}
 
 // Stop running llm-mock server
 async function stopServer(port = 8001) {
-  const { exec } = await import('child_process');
-  
-  const isWindows = process.platform === 'win32';
+	const { exec } = await import('node:child_process');
 
-  return new Promise((resolve) => {
-    // Only the listening process, not clients connected to the port
-    const findCommand = isWindows
-      ? 'netstat -ano'
-      : `lsof -ti tcp:${port} -sTCP:LISTEN`;
+	const isWindows = process.platform === 'win32';
 
-    exec(findCommand, (error, stdout) => {
-      if (error || !stdout.trim()) {
-        console.log(`No running llmock server found on port ${port}.`);
-        resolve();
-        return;
-      }
+	return new Promise((resolve) => {
+		// Only the listening process, not clients connected to the port
+		const findCommand = isWindows
+			? 'netstat -ano'
+			: `lsof -ti tcp:${port} -sTCP:LISTEN`;
 
-      let pids = [];
+		exec(findCommand, (error, stdout) => {
+			if (error || !stdout.trim()) {
+				console.log(`No running llmock server found on port ${port}.`);
+				resolve();
+				return;
+			}
 
-      if (isWindows) {
-        pids = parseListeningPids(stdout, port);
-      } else {
-        pids = stdout.trim().split('\n').filter(Boolean);
-      }
+			let pids = [];
 
-      if (pids.length === 0) {
-        console.log(`No process found on port ${port}.`);
-        resolve();
-        return;
-      }
+			if (isWindows) {
+				pids = parseListeningPids(stdout, port);
+			} else {
+				pids = stdout.trim().split('\n').filter(Boolean);
+			}
 
-      const killCommand = isWindows
-        ? pids.map(pid => `taskkill /PID ${pid} /T /F`).join(' && ')
-        : `kill -9 ${pids.join(' ')}`;
+			if (pids.length === 0) {
+				console.log(`No process found on port ${port}.`);
+				resolve();
+				return;
+			}
 
-      exec(killCommand, () => {
-        console.log(`llmock server stopped successfully on port ${port}.`);
-        resolve();
-      });
-    });
-  });
+			const killCommand = isWindows
+				? pids.map((pid) => `taskkill /PID ${pid} /T /F`).join(' && ')
+				: `kill -9 ${pids.join(' ')}`;
+
+			exec(killCommand, () => {
+				console.log(
+					`llmock server stopped successfully on port ${port}.`,
+				);
+				resolve();
+			});
+		});
+	});
 }
 
 // Default configuration for global installation
 function getDefaultConfig() {
-  return {
-    defaultModel: "chatgpt",
-    models: {
-      chatgpt: {
-        name: "openai",
-        model: "gpt-4o",
-        endpoint: "chatgpt/chat/completions",
-        responseType: "lorem",
-        maxLoremParas: 8,
-        validateRequests: true,
-        logRequests: true,
-        debug: false,
-        stream: false,
-        responseDelay: { min: 3000, max: 5000 },
-        embeddings: { enabled: true, dimensions: 128 }
-      },
-      gemini: {
-        name: "gemini",
-        model: "gemini-pro",
-        endpoint: "models/gemini-pro:generateContent",
-        responseType: "lorem",
-        maxLoremParas: 8,
-        validateRequests: true,
-        logRequests: true,
-        debug: false,
-        stream: false,
-        responseDelay: { min: 3000, max: 5000 },
-        embeddings: { enabled: true, dimensions: 128 }
-      },
-      streaming: {
-        name: "openai",
-        model: "gpt-4o",
-        endpoint: "chatgpt/chat/completions",
-        responseType: "lorem",
-        maxLoremParas: 8,
-        validateRequests: true,
-        logRequests: true,
-        debug: false,
-        stream: true,
-        responseDelay: { min: 3000, max: 5000 },
-        embeddings: { enabled: true, dimensions: 128 }
-      },
-      embeddings: {
-        name: "openai",
-        model: "text-embedding-3-small",
-        endpoint: "chatgpt/chat/completions",
-        responseType: "lorem",
-        maxLoremParas: 8,
-        validateRequests: true,
-        logRequests: true,
-        debug: false,
-        stream: false,
-        responseDelay: { min: 0, max: 0 },
-        embeddings: { enabled: true, dimensions: 128 }
-      },
-      claude: {
-        name: "claude",
-        model: "claude-opus-5-5",
-        endpoint: "v1/messages",
-        responseType: "lorem",
-        maxLoremParas: 8,
-        validateRequests: true,
-        logRequests: true,
-        debug: false,
-        stream: false,
-        responseDelay: { min: 200, max: 800 },
-        embeddings: { enabled: false, dimensions: 128 }
-      }
-    },
-    server: {
-      port: 8001,
-      host: "0.0.0.0"
-    }
-  };
+	return {
+		defaultModel: 'chatgpt',
+		models: {
+			chatgpt: {
+				name: 'openai',
+				model: 'gpt-4o',
+				endpoint: 'chatgpt/chat/completions',
+				responseType: 'lorem',
+				maxLoremParas: 8,
+				validateRequests: true,
+				logRequests: true,
+				debug: false,
+				stream: false,
+				responseDelay: { min: 3000, max: 5000 },
+				embeddings: { enabled: true, dimensions: 128 },
+			},
+			gemini: {
+				name: 'gemini',
+				model: 'gemini-pro',
+				endpoint: 'models/gemini-pro:generateContent',
+				responseType: 'lorem',
+				maxLoremParas: 8,
+				validateRequests: true,
+				logRequests: true,
+				debug: false,
+				stream: false,
+				responseDelay: { min: 3000, max: 5000 },
+				embeddings: { enabled: true, dimensions: 128 },
+			},
+			streaming: {
+				name: 'openai',
+				model: 'gpt-4o',
+				endpoint: 'chatgpt/chat/completions',
+				responseType: 'lorem',
+				maxLoremParas: 8,
+				validateRequests: true,
+				logRequests: true,
+				debug: false,
+				stream: true,
+				responseDelay: { min: 3000, max: 5000 },
+				embeddings: { enabled: true, dimensions: 128 },
+			},
+			embeddings: {
+				name: 'openai',
+				model: 'text-embedding-3-small',
+				endpoint: 'chatgpt/chat/completions',
+				responseType: 'lorem',
+				maxLoremParas: 8,
+				validateRequests: true,
+				logRequests: true,
+				debug: false,
+				stream: false,
+				responseDelay: { min: 0, max: 0 },
+				embeddings: { enabled: true, dimensions: 128 },
+			},
+			claude: {
+				name: 'claude',
+				model: 'claude-opus-5-5',
+				endpoint: 'v1/messages',
+				responseType: 'lorem',
+				maxLoremParas: 8,
+				validateRequests: true,
+				logRequests: true,
+				debug: false,
+				stream: false,
+				responseDelay: { min: 200, max: 800 },
+				embeddings: { enabled: false, dimensions: 128 },
+			},
+		},
+		server: {
+			port: 8001,
+			host: '0.0.0.0',
+		},
+	};
 }
 
 // Config file to use: CONFIG_PATH (e.g. the e2e test config) or ./.llmockrc.json
 function resolveConfigPath() {
-  return resolve(process.cwd(), process.env.CONFIG_PATH || '.llmockrc.json');
+	return resolve(process.cwd(), process.env.CONFIG_PATH || '.llmockrc.json');
 }
 
 // Load configuration
 async function loadConfig() {
-  let config;
-  let configPath = resolveConfigPath();
-  
-  // Try to load local config file first
-  if (existsSync(configPath)) {
-    try {
-      const fs = await import('fs');
-      config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    } catch (error) {
-      console.error('Error parsing .llmockrc.json:', error.message);
-      process.exit(1);
-    }
-  } else {
-    // Use default configuration for global installation
-    config = getDefaultConfig();
-    console.log('Using default configuration (no .llmockrc.json found)');
-  }
-  
-  // --model wins, then the config's defaultModel, then chatgpt
-  const selectedModel = resolveModelName(modelName, config);
+	let config;
+	const configPath = resolveConfigPath();
 
-  // Validate model exists
-  if (!config.models[selectedModel]) {
-    console.error(`Error: Model "${selectedModel}" not found in configuration`);
-    console.error(`Available models: ${Object.keys(config.models).join(', ')}`);
-    process.exit(1);
-  }
+	// Try to load local config file first
+	if (existsSync(configPath)) {
+		try {
+			const fs = await import('node:fs');
+			config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+		} catch (error) {
+			console.error('Error parsing .llmockrc.json:', error.message);
+			process.exit(1);
+		}
+	} else {
+		// Use default configuration for global installation
+		config = getDefaultConfig();
+		console.log('Using default configuration (no .llmockrc.json found)');
+	}
 
-  // Fill in optional settings so a short preset works
-  try {
-    config = applyConfigDefaults(config, selectedModel);
-  } catch (error) {
-    console.error(`Error: ${error.message}`);
-    process.exit(1);
-  }
+	// --model wins, then the config's defaultModel, then chatgpt
+	const selectedModel = resolveModelName(modelName, config);
 
-  return { config, modelName: selectedModel };
+	// Validate model exists
+	if (!config.models[selectedModel]) {
+		console.error(
+			`Error: Model "${selectedModel}" not found in configuration`,
+		);
+		console.error(
+			`Available models: ${Object.keys(config.models).join(', ')}`,
+		);
+		process.exit(1);
+	}
+
+	// Fill in optional settings so a short preset works
+	try {
+		config = applyConfigDefaults(config, selectedModel);
+	} catch (error) {
+		console.error(`Error: ${error.message}`);
+		process.exit(1);
+	}
+
+	return { config, modelName: selectedModel };
 }
 
 // Set environment variables based on configuration
 function setEnvironmentVariables(config, modelName, configPath) {
-  const modelConfig = config.models[modelName];
-  const serverConfig = config.server;
+	const modelConfig = config.models[modelName];
+	const serverConfig = config.server;
 
-  // Pass the selected model name and config path to the server
-  process.env.LLM_MODEL_NAME = modelName;
-  process.env.CONFIG_PATH = configPath;
+	// Pass the selected model name and config path to the server
+	process.env.LLM_MODEL_NAME = modelName;
+	process.env.CONFIG_PATH = configPath;
 
-  // Server settings (with custom overrides)
-  process.env.SERVER_PORT = customSettings.port || serverConfig.port.toString();
-  process.env.SERVER_HOST = customSettings.host || serverConfig.host;
-  process.env.LLM_URL_ENDPOINT = customSettings.endpoint || modelConfig.endpoint;
-  
-  // LLM settings (with custom overrides)
-  process.env.LLM_NAME = modelConfig.name;
-  process.env.LLM_MODEL = modelConfig.model;
-  process.env.MOCK_LLM_RESPONSE_TYPE = customSettings.responseType || modelConfig.responseType;
-  process.env.MAX_LOREM_PARAS = customSettings.maxLoremParas || modelConfig.maxLoremParas.toString();
-  
-  // Feature flags (with custom overrides)
-  process.env.VALIDATE_REQUESTS = (customSettings.validateRequests !== undefined ? 
-    customSettings.validateRequests === 'true' : modelConfig.validateRequests) ? 'ON' : 'OFF';
-  process.env.LOG_REQUESTS = (customSettings.logRequests !== undefined ? 
-    customSettings.logRequests === 'true' : modelConfig.logRequests) ? 'ON' : 'OFF';
-  process.env.MAX_LOGGED_REQUESTS = customSettings.maxLoggedRequests || modelConfig.maxLoggedRequests.toString();
-  process.env.DEBUG = (customSettings.debug !== undefined ? 
-    customSettings.debug === 'true' : modelConfig.debug) ? '*' : 'OFF';
-  process.env.STREAM = (customSettings.stream !== undefined ? 
-    customSettings.stream === 'true' : modelConfig.stream) ? 'true' : 'false';
-  
-  // Response delays (with custom overrides)
-  process.env.RESPONSE_DELAY_MIN = customSettings.delayMin || modelConfig.responseDelay.min.toString();
-  process.env.RESPONSE_DELAY_MAX = customSettings.delayMax || modelConfig.responseDelay.max.toString();
+	// Server settings (with custom overrides)
+	process.env.SERVER_PORT =
+		customSettings.port || serverConfig.port.toString();
+	process.env.SERVER_HOST = customSettings.host || serverConfig.host;
+	process.env.LLM_URL_ENDPOINT =
+		customSettings.endpoint || modelConfig.endpoint;
 
-  // Chaos (with custom overrides)
-  process.env.CHAOS_ENABLED = (customSettings.chaos !== undefined ?
-    customSettings.chaos === 'true' : modelConfig.chaos.enabled) ? 'true' : 'false';
-  process.env.CHAOS_FREQUENCY = customSettings.chaosFrequency || modelConfig.chaos.frequency.toString();
-  process.env.CHAOS_MODE = customSettings.chaosMode || modelConfig.chaos.mode;
-  process.env.CHAOS_STATUS = customSettings.chaosStatus || modelConfig.chaos.status.toString();
-  
-  // Embeddings (with custom overrides)
-  process.env.ENABLE_EMBEDDINGS_MOCK = (customSettings.embeddings !== undefined ? 
-    customSettings.embeddings === 'true' : modelConfig.embeddings.enabled) ? 'true' : 'false';
-  process.env.EMBEDDING_DIMENSION = customSettings.embeddingDimensions || modelConfig.embeddings.dimensions.toString();
+	// LLM settings (with custom overrides)
+	process.env.LLM_NAME = modelConfig.name;
+	process.env.LLM_MODEL = modelConfig.model;
+	process.env.MOCK_LLM_RESPONSE_TYPE =
+		customSettings.responseType || modelConfig.responseType;
+	process.env.MAX_LOREM_PARAS =
+		customSettings.maxLoremParas || modelConfig.maxLoremParas.toString();
 
-  // The embeddings mock owns /v1/embeddings, so the chat endpoint can't use it too
-  const endpoint = process.env.LLM_URL_ENDPOINT.replace(/^\/+/, '');
-  if (endpoint === 'v1/embeddings' && process.env.ENABLE_EMBEDDINGS_MOCK === 'true') {
-    throw new Error(
-      `Model "${modelName}" uses the endpoint "v1/embeddings", which the embeddings mock already serves. Use a different endpoint or set embeddings.enabled to false.`
-    );
-  }
+	// Feature flags (with custom overrides)
+	process.env.VALIDATE_REQUESTS = (
+		customSettings.validateRequests !== undefined
+			? customSettings.validateRequests === 'true'
+			: modelConfig.validateRequests
+	)
+		? 'ON'
+		: 'OFF';
+	process.env.LOG_REQUESTS = (
+		customSettings.logRequests !== undefined
+			? customSettings.logRequests === 'true'
+			: modelConfig.logRequests
+	)
+		? 'ON'
+		: 'OFF';
+	process.env.MAX_LOGGED_REQUESTS =
+		customSettings.maxLoggedRequests ||
+		modelConfig.maxLoggedRequests.toString();
+	process.env.DEBUG = (
+		customSettings.debug !== undefined
+			? customSettings.debug === 'true'
+			: modelConfig.debug
+	)
+		? '*'
+		: 'OFF';
+	process.env.STREAM = (
+		customSettings.stream !== undefined
+			? customSettings.stream === 'true'
+			: modelConfig.stream
+	)
+		? 'true'
+		: 'false';
+
+	// Response delays (with custom overrides)
+	process.env.RESPONSE_DELAY_MIN =
+		customSettings.delayMin || modelConfig.responseDelay.min.toString();
+	process.env.RESPONSE_DELAY_MAX =
+		customSettings.delayMax || modelConfig.responseDelay.max.toString();
+
+	// Chaos (with custom overrides)
+	process.env.CHAOS_ENABLED = (
+		customSettings.chaos !== undefined
+			? customSettings.chaos === 'true'
+			: modelConfig.chaos.enabled
+	)
+		? 'true'
+		: 'false';
+	process.env.CHAOS_FREQUENCY =
+		customSettings.chaosFrequency || modelConfig.chaos.frequency.toString();
+	process.env.CHAOS_MODE = customSettings.chaosMode || modelConfig.chaos.mode;
+	process.env.CHAOS_STATUS =
+		customSettings.chaosStatus || modelConfig.chaos.status.toString();
+
+	// Embeddings (with custom overrides)
+	process.env.ENABLE_EMBEDDINGS_MOCK = (
+		customSettings.embeddings !== undefined
+			? customSettings.embeddings === 'true'
+			: modelConfig.embeddings.enabled
+	)
+		? 'true'
+		: 'false';
+	process.env.EMBEDDING_DIMENSION =
+		customSettings.embeddingDimensions ||
+		modelConfig.embeddings.dimensions.toString();
+
+	// The embeddings mock owns /v1/embeddings, so the chat endpoint can't use it too
+	const endpoint = process.env.LLM_URL_ENDPOINT.replace(/^\/+/, '');
+	if (
+		endpoint === 'v1/embeddings' &&
+		process.env.ENABLE_EMBEDDINGS_MOCK === 'true'
+	) {
+		throw new Error(
+			`Model "${modelName}" uses the endpoint "v1/embeddings", which the embeddings mock already serves. Use a different endpoint or set embeddings.enabled to false.`,
+		);
+	}
 }
 
 // URL the CLI uses to reach the server it started
 function pingUrl(config) {
-  const host = customSettings.host || config.server.host;
-  const port = customSettings.port || config.server.port;
-  const reachable = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
-  return `http://${reachable.includes(':') ? `[${reachable}]` : reachable}:${port}/ping`;
+	const host = customSettings.host || config.server.host;
+	const port = customSettings.port || config.server.port;
+	const reachable = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
+	return `http://${reachable.includes(':') ? `[${reachable}]` : reachable}:${port}/ping`;
 }
 
 async function isServerUp(url) {
-  try {
-    const response = await fetch(url, { signal: AbortSignal.timeout(1000) });
-    return response.ok;
-  } catch {
-    return false;
-  }
+	try {
+		const response = await fetch(url, {
+			signal: AbortSignal.timeout(1000),
+		});
+		return response.ok;
+	} catch {
+		return false;
+	}
 }
 
 // Main execution
 async function main() {
-  try {
-    // Handle help command
-    if (showHelp) {
-      showHelpInfo();
-      return;
-    }
-    
-    // Handle stop command
-    if (command === 'stop') {
-      await stopServer(stopPort);
-      return;
-    }
-    
-    // Handle config command
-    if (showConfig) {
-      const { config, modelName: selectedModel } = await loadConfig();
-      showCurrentConfig(config, selectedModel);
-      return;
-    }
-    
-    // Handle start command (default)
-    if (command === 'start') {
-      const { config, modelName: selectedModel } = await loadConfig();
-      const configPath = resolveConfigPath();
-      setEnvironmentVariables(config, selectedModel, configPath);
-    
-      // A detached server that can't bind the port would fail unseen
-      if (!foregroundMode && process.env.E2E_MODE !== 'true' && await isServerUp(pingUrl(config))) {
-        console.error(`A server is already running on port ${process.env.SERVER_PORT}. Run 'llmock stop --port=${process.env.SERVER_PORT}' first, or start on another port with --port.`);
-        process.exit(1);
-      }
+	try {
+		// Handle help command
+		if (showHelp) {
+			showHelpInfo();
+			return;
+		}
 
-      console.log(`Starting LLM Mock Server with model: ${selectedModel}`);
-      console.log(`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
-      
-      // Import and start the server using spawn for better process control
-      const { spawn } = await import('child_process');
-      
-      const serverPath = resolve(__dirname, '../src/server.ts');
-      const packageDir = resolve(__dirname, '..');
-      
-      // Run tsx's CLI with the current node binary rather than through npx, a
-      // shell or `start`. This behaves the same on every platform, never opens
-      // a console window on Windows, and the spawned pid is the real process.
-      const isE2E = process.env.E2E_MODE === 'true';
-      const serverArgs = [tsxCliPath(), serverPath];
-      let serverProcess;
+		// Handle stop command
+		if (command === 'stop') {
+			await stopServer(stopPort);
+			return;
+		}
 
-      if (foregroundMode) {
-        // Run in foreground mode for Docker - keep process attached
-        serverProcess = spawn(process.execPath, serverArgs, {
-          cwd: packageDir,
-          stdio: 'inherit',
-          detached: false
-        });
-        
-        console.log(`Starting LLM Mock Server in foreground mode...`);
-        console.log(`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
-        
-        serverProcess.on('error', (error) => {
-          console.error('Failed to start server process:', error.message);
-          process.exit(1);
-        });
-        
-        // Keep the CLI alive and forward server output
-        serverProcess.on('close', (code) => {
-          console.log(`Server process exited with code ${code}`);
-          process.exit(code);
-        });
-        
-      } else {
-        // Normal use detaches so the CLI can exit. E2E mode stays attached so
-        // the test runner owns the process tree. windowsHide stops Windows
-        // opening a console window for the detached server.
-        serverProcess = spawn(process.execPath, serverArgs, {
-          cwd: packageDir,
-          stdio: isE2E ? 'inherit' : 'ignore',
-          detached: !isE2E,
-          windowsHide: true
-        });
+		// Handle config command
+		if (showConfig) {
+			const { config, modelName: selectedModel } = await loadConfig();
+			showCurrentConfig(config, selectedModel);
+			return;
+		}
 
-        if (!isE2E) {
-          serverProcess.unref();
-        }
-        
-        serverProcess.on('error', (error) => {
-          console.error('Failed to start server process:', error.message);
-          process.exit(1);
-        });
-        
-        if (isE2E) {
-          // In E2E mode, stay alive and forward signals to maintain process tree
-          serverProcess.on('close', (code) => {
-            process.exit(code ?? 0);
-          });
-          
-          process.on('SIGTERM', () => serverProcess.kill('SIGTERM'));
-          process.on('SIGINT', () => serverProcess.kill('SIGINT'));
-        } else {
-          // Normal detached mode - wait until the server answers, then exit CLI.
-          // Its output is not attached, so a failure can only be reported generally.
-          let exitCode = null;
-          serverProcess.on('exit', (code) => {
-            exitCode = code ?? 1;
-          });
+		// Handle start command (default)
+		if (command === 'start') {
+			const { config, modelName: selectedModel } = await loadConfig();
+			const configPath = resolveConfigPath();
+			setEnvironmentVariables(config, selectedModel, configPath);
 
-          const url = pingUrl(config);
-          const deadline = Date.now() + 20000;
-          let started = false;
-          while (!started && exitCode === null && Date.now() < deadline) {
-            await new Promise((done) => setTimeout(done, 250));
-            started = await isServerUp(url);
-          }
+			// A detached server that can't bind the port would fail unseen
+			if (
+				!foregroundMode &&
+				process.env.E2E_MODE !== 'true' &&
+				(await isServerUp(pingUrl(config)))
+			) {
+				console.error(
+					`A server is already running on port ${process.env.SERVER_PORT}. Run 'llmock stop --port=${process.env.SERVER_PORT}' first, or start on another port with --port.`,
+				);
+				process.exit(1);
+			}
 
-          if (!started) {
-            console.error(
-              exitCode === null
-                ? 'Server did not respond within 20 seconds.'
-                : `Server failed to start (exit code ${exitCode}).`
-            );
-            console.error(`Run 'llmock start --foreground' with the same options to see the error.`);
-            process.exit(1);
-          }
+			console.log(
+				`Starting LLM Mock Server with model: ${selectedModel}`,
+			);
+			console.log(
+				`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`,
+			);
 
-          console.log(`Server started successfully!`);
-          console.log(`Server is running at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
-          console.log(`Use 'llmock stop' to stop the server.`);
-          process.exit(0);
-        }
-      }
-    }
-    
-  } catch (error) {
-    console.error('Failed to start server:', error.message);
-    process.exit(1);
-  }
+			// Import and start the server using spawn for better process control
+			const { spawn } = await import('node:child_process');
+
+			const serverPath = resolve(__dirname, '../src/server.ts');
+			const packageDir = resolve(__dirname, '..');
+
+			// Run tsx's CLI with the current node binary rather than through npx, a
+			// shell or `start`. This behaves the same on every platform, never opens
+			// a console window on Windows, and the spawned pid is the real process.
+			const isE2E = process.env.E2E_MODE === 'true';
+			const serverArgs = [tsxCliPath(), serverPath];
+			let serverProcess;
+
+			if (foregroundMode) {
+				// Run in foreground mode for Docker - keep process attached
+				serverProcess = spawn(process.execPath, serverArgs, {
+					cwd: packageDir,
+					stdio: 'inherit',
+					detached: false,
+				});
+
+				console.log(`Starting LLM Mock Server in foreground mode...`);
+				console.log(
+					`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`,
+				);
+
+				serverProcess.on('error', (error) => {
+					console.error(
+						'Failed to start server process:',
+						error.message,
+					);
+					process.exit(1);
+				});
+
+				// Keep the CLI alive and forward server output
+				serverProcess.on('close', (code) => {
+					console.log(`Server process exited with code ${code}`);
+					process.exit(code);
+				});
+			} else {
+				// Normal use detaches so the CLI can exit. E2E mode stays attached so
+				// the test runner owns the process tree. windowsHide stops Windows
+				// opening a console window for the detached server.
+				serverProcess = spawn(process.execPath, serverArgs, {
+					cwd: packageDir,
+					stdio: isE2E ? 'inherit' : 'ignore',
+					detached: !isE2E,
+					windowsHide: true,
+				});
+
+				if (!isE2E) {
+					serverProcess.unref();
+				}
+
+				serverProcess.on('error', (error) => {
+					console.error(
+						'Failed to start server process:',
+						error.message,
+					);
+					process.exit(1);
+				});
+
+				if (isE2E) {
+					// In E2E mode, stay alive and forward signals to maintain process tree
+					serverProcess.on('close', (code) => {
+						process.exit(code ?? 0);
+					});
+
+					process.on('SIGTERM', () => serverProcess.kill('SIGTERM'));
+					process.on('SIGINT', () => serverProcess.kill('SIGINT'));
+				} else {
+					// Normal detached mode - wait until the server answers, then exit CLI.
+					// Its output is not attached, so a failure can only be reported generally.
+					let exitCode = null;
+					serverProcess.on('exit', (code) => {
+						exitCode = code ?? 1;
+					});
+
+					const url = pingUrl(config);
+					const deadline = Date.now() + 20000;
+					let started = false;
+					while (
+						!started &&
+						exitCode === null &&
+						Date.now() < deadline
+					) {
+						await new Promise((done) => setTimeout(done, 250));
+						started = await isServerUp(url);
+					}
+
+					if (!started) {
+						console.error(
+							exitCode === null
+								? 'Server did not respond within 20 seconds.'
+								: `Server failed to start (exit code ${exitCode}).`,
+						);
+						console.error(
+							`Run 'llmock start --foreground' with the same options to see the error.`,
+						);
+						process.exit(1);
+					}
+
+					console.log(`Server started successfully!`);
+					console.log(
+						`Server is running at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`,
+					);
+					console.log(`Use 'llmock stop' to stop the server.`);
+					process.exit(0);
+				}
+			}
+		}
+	} catch (error) {
+		console.error('Failed to start server:', error.message);
+		process.exit(1);
+	}
 }
 
 main();

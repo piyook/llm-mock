@@ -2,15 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
-import { db } from '../models/db.js';
 import {
 	getResponseRules,
 	getStoredResponsesFile,
 } from '../config/config-loader.js';
-import { clearLog, logPath, maxLogEntries } from './logger.js';
-import { loadStoredResponses } from './stored-responses.js';
-import { readRuleFile, ruleFiles } from './response-rules.js';
+import { db } from '../models/db.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
+import { clearLog, logPath, maxLogEntries } from './logger.js';
+import { readRuleFile, ruleFiles } from './response-rules.js';
+import { loadStoredResponses } from './stored-responses.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 

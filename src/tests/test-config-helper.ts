@@ -1,8 +1,8 @@
-import { existsSync, copyFileSync, unlinkSync } from 'fs';
-import { resolve } from 'path';
+import { copyFileSync, existsSync, unlinkSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
-	setEnvironmentFromConfig,
 	loadConfig,
+	setEnvironmentFromConfig,
 } from '../config/config-loader.js';
 
 const TEST_CONFIG_PATH = resolve(process.cwd(), '.llm-mock-rc.test.json');

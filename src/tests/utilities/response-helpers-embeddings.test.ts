@@ -1,5 +1,4 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
-import { expect, test, describe, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import {
 	generateMockEmbedding,
 	generateMockEmbeddings,

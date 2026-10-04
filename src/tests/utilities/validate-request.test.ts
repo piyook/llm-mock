@@ -1,5 +1,4 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
-import { expect, test, describe } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { validateRequest } from '../../utilities/validate-request.js';
 
 describe('validation function works as expected', async () => {

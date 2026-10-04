@@ -1,20 +1,20 @@
 import { faker } from '@faker-js/faker';
+import type { FastifyReply } from 'fastify';
+import {
+	getResponseRules,
+	getStoredResponsesFile,
+} from '../config/config-loader.js';
 import { db } from '../models/db.js';
+import type { MockReply } from '../types.js';
 import { buildResponse } from './build-response.js';
 import {
 	generateStreamingChunks,
 	setStreamingHeaders,
 	streamWithDelay,
 } from './build-streaming-response.js';
-import {
-	getResponseRules,
-	getStoredResponsesFile,
-} from '../config/config-loader.js';
-import { findMatchingRule, loadRuleContent } from './response-rules.js';
 import { normaliseRequest } from './normalise-request.js';
+import { findMatchingRule, loadRuleContent } from './response-rules.js';
 import { loadStoredResponses } from './stored-responses.js';
-import type { FastifyReply } from 'fastify';
-import type { MockReply } from '../types.js';
 
 // Default embedding dimension constant
 const DEFAULT_EMBEDDING_DIMENSIONS =

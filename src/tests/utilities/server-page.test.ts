@@ -1,8 +1,7 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { loadConfig } from '../../config/config-loader.js';
@@ -10,9 +9,9 @@ import { gptSeeder } from '../../seeders/gpt-seeder.js';
 
 // Point the log folder at a temp directory so the real log is left alone
 const logDir = await vi.hoisted(async () => {
-	const fs = await import('fs');
-	const os = await import('os');
-	const path = await import('path');
+	const fs = await import('node:fs');
+	const os = await import('node:os');
+	const path = await import('node:path');
 	return fs.mkdtempSync(path.join(os.tmpdir(), 'llmock-server-page-log-'));
 });
 
@@ -20,8 +19,9 @@ vi.mock('env-paths', () => ({ default: () => ({ log: logDir }) }));
 
 const { default: serverPage } = await import('../../utilities/server-page.js');
 const { logPath } = await import('../../utilities/logger.js');
-const { resetChaos, shouldInjectError } =
-	await import('../../utilities/chaos.js');
+const { resetChaos, shouldInjectError } = await import(
+	'../../utilities/chaos.js'
+);
 
 const require = createRequire(import.meta.url);
 const bundled: string[] = require('../../data/data.json').map(

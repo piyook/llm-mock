@@ -1,5 +1,4 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
-import { expect, test, describe, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
 	generateStreamingChunks,
 	setStreamingHeaders,

@@ -1,16 +1,16 @@
 import fastify from 'fastify';
-import * as seeders from './seeders/index.js';
-import getApiRoutes from './utilities/file-scan.js';
-import serverPage from './utilities/server-page.js';
-import { dbLoadFromDisk } from './models/db.js';
 import {
-	setEnvironmentFromConfig,
 	getCurrentModel,
 	getResponseRules,
 	getStoredResponsesFile,
 	loadConfig,
+	setEnvironmentFromConfig,
 } from './config/config-loader.js';
+import { dbLoadFromDisk } from './models/db.js';
+import * as seeders from './seeders/index.js';
+import getApiRoutes from './utilities/file-scan.js';
 import { readRuleFile, ruleFiles } from './utilities/response-rules.js';
+import serverPage from './utilities/server-page.js';
 import { loadStoredResponses } from './utilities/stored-responses.js';
 
 // Initialize configuration from .llmockrc.json

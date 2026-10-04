@@ -1,7 +1,6 @@
-import { existsSync } from 'fs';
-import { resolve } from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getConfigDir } from '../config/config-loader.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -13,7 +12,9 @@ type ResponseTemplate = {
 };
 
 type DynamicContent =
-	string | DynamicContent[] | { [key: string]: DynamicContent };
+	| string
+	| DynamicContent[]
+	| { [key: string]: DynamicContent };
 
 export const buildResponse = async (content: DynamicContent) => {
 	const llmName = process.env.LLM_NAME ?? 'openai';
@@ -36,12 +37,11 @@ export const buildResponse = async (content: DynamicContent) => {
 	try {
 		// First try the project folder
 		if (existsSync(cwdTemplatePath)) {
-			const fs = await import('fs');
+			const fs = await import('node:fs');
 			const templateData = fs.readFileSync(cwdTemplatePath, 'utf8');
 			responseTemplate = { default: JSON.parse(templateData) };
 		} else {
 			// Fallback to src directory
-			// eslint-disable-next-line @typescript-eslint/no-implied-eval
 			responseTemplate = (await import(
 				/* @vite-ignore */
 				`../response-templates/${templateFileName}`,

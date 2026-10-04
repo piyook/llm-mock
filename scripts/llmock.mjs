@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'child_process';
+import { execSync, spawn } from 'node:child_process';
 
 const args = process.argv.slice(2);
 const isE2E = process.env.E2E_MODE === 'true';
@@ -13,15 +13,15 @@ const env = { ...process.env };
 // mode), so this wrapper never needs to be detached. Detaching it would open
 // a console window on Windows.
 const server = spawn('node', ['./bin/llmock.js', ...args], {
-  stdio: 'inherit',
-  env,
-  shell: false,
-  windowsHide: true,
+	stdio: 'inherit',
+	env,
+	shell: false,
+	windowsHide: true,
 });
 
 server.on('error', (err) => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
+	console.error('Failed to start server:', err);
+	process.exit(1);
 });
 
 // Normal use: the CLI exits about a second after detaching the server, so
@@ -30,6 +30,6 @@ server.on('error', (err) => {
 server.on('exit', (code) => process.exit(code ?? 0));
 
 if (isE2E) {
-  process.on('SIGTERM', () => server.kill('SIGTERM'));
-  process.on('SIGINT', () => server.kill('SIGINT'));
+	process.on('SIGTERM', () => server.kill('SIGTERM'));
+	process.on('SIGINT', () => server.kill('SIGINT'));
 }

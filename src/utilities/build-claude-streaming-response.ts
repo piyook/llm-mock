@@ -1,4 +1,4 @@
-import { delay, getDelayConfig } from './delay.js';
+import type { MockReply } from '../types.js';
 import {
 	DEFAULT_CLAUDE_MODEL,
 	estimateInputTokens,
@@ -6,7 +6,7 @@ import {
 	newClaudeMessageId,
 	resolveClaudeModel,
 } from './build-claude-response.js';
-import type { MockReply } from '../types.js';
+import { delay, getDelayConfig } from './delay.js';
 
 // Split after each run of whitespace so the pieces join back to `content`
 // exactly (newlines included, which matters for JSON bodies).
