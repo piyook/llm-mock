@@ -1,6 +1,27 @@
-npm run validate-branch-name
+# Git sends "<local ref> <local sha> <remote ref> <remote sha>" per pushed ref on
+# stdin. Validate the remote branch names being pushed, skipping deletions (all-zero
+# local sha) and tags, so detached HEADs and `git push origin other-branch` work.
+branches=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+    case "$remote_ref" in refs/heads/*) branches="$branches ${remote_ref#refs/heads/}" ;; esac
+done
+if [ -n "$branches" ]; then
+    npm run validate-branch-name -- $branches
+fi
+
+# Compare against the real dev (the branch PRs target), not a stale local copy.
+# Fall back to main if dev can't be fetched (e.g. it has been deleted or renamed).
+if git fetch --quiet origin dev 2>/dev/null; then
+    base=origin/dev
+else
+    git fetch --quiet origin main
+    base=origin/main
+fi
 npm run pretty
 npm run lint
+npx fallow audit --base "$base"
+npm run typecheck
 npm audit --omit=dev
 npm run test:unit
 npm run test:e2e

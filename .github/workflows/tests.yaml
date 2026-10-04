@@ -45,8 +45,33 @@ jobs:
             - run: npm ci
             - run: npm audit --omit=dev
 
+    typecheck:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: '24'
+                  cache: 'npm'
+            - run: npm ci
+            - run: npm run typecheck
+
+    fallow:
+        if: github.event_name == 'pull_request'
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: '24'
+                  cache: 'npm'
+            - run: npm ci
+            - run: npx fallow audit --base origin/${{ github.base_ref }}
+
     unit_tests:
-        needs: [lint, prettier, audit]
+        needs: [lint, prettier, audit, typecheck, fallow]
         if: always()
         runs-on: ubuntu-latest
         steps:
