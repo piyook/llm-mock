@@ -1,17 +1,28 @@
-import { execSync } from 'child_process';
+import { execSync } from 'node:child_process';
 
-const branchName = execSync('git rev-parse --abbrev-ref HEAD').toString().trim();
+// Branches to check, in order of preference:
+// - args: the pre-push hook passes the branches being pushed.
+// - GITHUB_HEAD_REF: on PRs, Actions checks out a detached HEAD, so use the PR's source branch.
+// - otherwise the checked-out branch (manual `npm run validate-branch-name`).
+const args = process.argv.slice(2);
+const branchNames = args.length
+	? args
+	: [
+			process.env.GITHUB_HEAD_REF ||
+				execSync('git rev-parse --abbrev-ref HEAD').toString().trim(),
+		];
 
-const valid = /^(main|dev)$|^(feat|fix|hotfix|release|chore)\/.+$/.test(branchName);
+const invalid = branchNames.filter(
+	(name) => !/^(main|dev)$|^(feat|fix|hotfix|release|chore)\/.+$/.test(name),
+);
 
-if (!valid) {
-  console.error(`Error: INVALID BRANCH NAME: use format 'feature|fix|hotfix|release|core/your-branch-name'`);
-  process.exit(1);
+if (invalid.length) {
+	for (const name of invalid) {
+		console.error(
+			`Error: INVALID BRANCH NAME '${name}': use format 'feat|fix|hotfix|release|chore/your-branch-name'`,
+		);
+	}
+	process.exit(1);
 }
 
-console.log(`Validated branch name: ${branchName} - all OK :)`);
-
-// You can set other regex patterns here such as:
-// /^(feature|fix|hotfix|release)\/.+/  - branch has to start with feature/, fix/, release/ or hotfix/
-// /(feature|release|hotfix)\/(JIRA-\d+)/  - it should look like feature/JIRA-1234
-// /(feature|release|hotfix)\/(JIRA-\d+\/)?[a-z-]+/  - it should look like feature/branch-name or include JIRA's code like feature/JIRA-1234/branch-name
+console.log(`Validated branch name: ${branchNames.join(', ')} - all OK :)`);
