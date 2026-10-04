@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
-import { buildResponse } from './build-response.js';
 import type { MockReply } from '../types.js';
+import { buildResponse } from './build-response.js';
 
 export const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5';
 

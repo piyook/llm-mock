@@ -1,5 +1,4 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
-import { expect, test, describe, vi, afterEach } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { validateRequest } from '../../utilities/validate-request.js';
 
 // Mock out imported logger function

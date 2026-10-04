@@ -1,17 +1,17 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { normaliseRequest } from '../../utilities/normalise-request.js';
 import {
 	collectStrings,
 	findMatchingRule,
 	loadRuleContent,
+	type ResponseRule,
 	readRuleFile,
 	ruleFiles,
 	validateResponseRules,
-	type ResponseRule,
 } from '../../utilities/response-rules.js';
-import { normaliseRequest } from '../../utilities/normalise-request.js';
 
 describe('collectStrings', () => {
 	test('collects nested string values and ignores keys and non-strings', () => {

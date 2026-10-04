@@ -77,4 +77,3 @@ export async function fetchUiMeta(): Promise<UiMeta> {
 	}
 	return (await res.json()) as UiMeta;
 }
-

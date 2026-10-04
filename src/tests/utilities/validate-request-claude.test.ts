@@ -1,4 +1,3 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { validateRequest } from '../../utilities/validate-request.js';
 

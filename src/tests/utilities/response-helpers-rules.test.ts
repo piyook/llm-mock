@@ -1,7 +1,6 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadConfig } from '../../config/config-loader.js';
 import { generateResponseContent } from '../../utilities/response-helpers.js';

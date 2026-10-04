@@ -55,7 +55,6 @@ export default async function getApiRoutes(app: FastifyInstance) {
 			// This will be the case if the api.ts file is not found in the directory
 			// or if the file is not in a valid format
 			if (error instanceof Error) {
-				// eslint-disable-next-line unicorn/prefer-type-error -- This is not a type error
 				throw new Error(
 					`
                 ********************************************************************************************************************************

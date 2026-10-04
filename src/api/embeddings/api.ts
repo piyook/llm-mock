@@ -1,7 +1,8 @@
-/* eslint-disable @typescript-eslint/naming-convention */
 import type { FastifyInstance } from 'fastify';
-import { generateMockEmbeddings } from '../../utilities/response-helpers.js';
-import { applyResponseDelay } from '../../utilities/response-helpers.js';
+import {
+	applyResponseDelay,
+	generateMockEmbeddings,
+} from '../../utilities/response-helpers.js';
 
 // Import the default dimensions constant
 const DEFAULT_EMBEDDING_DIMENSIONS =

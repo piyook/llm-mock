@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
-import { delay, getDelayConfig } from './delay.js';
 import { buildResponse } from './build-response.js';
+import { delay, getDelayConfig } from './delay.js';
 
 export interface StreamingChunk {
 	id: string;

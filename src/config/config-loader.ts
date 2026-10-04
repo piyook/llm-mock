@@ -1,8 +1,8 @@
-import { readFileSync, existsSync } from 'fs';
-import { dirname, resolve } from 'path';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import {
-	validateResponseRules,
 	type ResponseRule,
+	validateResponseRules,
 } from '../utilities/response-rules.js';
 import { validateStoredResponsesFile } from '../utilities/stored-responses.js';
 

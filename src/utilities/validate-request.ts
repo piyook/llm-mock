@@ -1,9 +1,8 @@
-import { existsSync } from 'fs';
-import { resolve } from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import logger from './logger.js';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getConfigDir } from '../config/config-loader.js';
+import logger from './logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -54,13 +53,12 @@ export const validateRequest = async (request: any) => {
 		// First try the project folder
 		if (existsSync(cwdTemplatePath)) {
 			console.log(`Loading template from project: ${cwdTemplatePath}`);
-			const fs = await import('fs');
+			const fs = await import('node:fs');
 			const templateData = fs.readFileSync(cwdTemplatePath, 'utf8');
 			requestTemplate = { default: JSON.parse(templateData) };
 		} else {
 			console.log(`Loading template from SRC: ${templateFileName}`);
 			// Fallback to src directory
-			// eslint-disable-next-line @typescript-eslint/no-implied-eval
 			requestTemplate = (await import(
 				/* @vite-ignore */
 				`../request-templates/${templateFileName}`,

@@ -31,8 +31,8 @@ export function getDelayConfig(): {
 	const enabled = min > 0 || max > 0;
 
 	return {
-		min: isNaN(min) ? 0 : min,
-		max: isNaN(max) ? 0 : max,
+		min: Number.isNaN(min) ? 0 : min,
+		max: Number.isNaN(max) ? 0 : max,
 		enabled,
 	};
 }

@@ -1,12 +1,11 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
-import { readFileSync, rmSync, writeFileSync } from 'fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { afterAll, beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Point the log folder at a temp directory so the real log is left alone
 const logDir = await vi.hoisted(async () => {
-	const { mkdtempSync } = await import('fs');
-	const { tmpdir } = await import('os');
-	const { join } = await import('path');
+	const { mkdtempSync } = await import('node:fs');
+	const { tmpdir } = await import('node:os');
+	const { join } = await import('node:path');
 	return mkdtempSync(join(tmpdir(), 'llmock-logger-'));
 });
 

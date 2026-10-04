@@ -1,4 +1,3 @@
-/* eslint-disable  @typescript-eslint/naming-convention */
 import { describe, expect, test } from 'vitest';
 import { normaliseRequest } from '../../utilities/normalise-request.js';
 
