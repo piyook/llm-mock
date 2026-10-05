@@ -17,6 +17,11 @@ export type UiMeta = {
 	responseDelayMaxMs: number;
 	delayStatus: 'ENABLED' | 'DISABLED';
 	streamingStatus: 'ENABLED' | 'DISABLED';
+	chaosStatus: 'ENABLED' | 'DISABLED';
+	chaosFrequency: number;
+	chaosMode: 'every' | 'random';
+	chaosErrorStatus: number;
+	chaosInjected: number;
 	embeddingsEnabled: 'ENABLED' | 'DISABLED';
 	embeddingDimension: number;
 	apiLinks: Array<{ href: string; label: string }>;

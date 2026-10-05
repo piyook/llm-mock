@@ -10,6 +10,7 @@ import {
 import { buildClaudeStaticResponse } from '../../utilities/build-claude-response.js';
 import { handleClaudeStreamingResponse } from '../../utilities/build-claude-streaming-response.js';
 import { shouldStream } from '../../utilities/stream-mode.js';
+import { applyChaos } from '../../utilities/chaos.js';
 
 // Static JSON vs SSE stream is decided per request by shouldStream():
 // - claude preset: the request body's `stream` field
@@ -26,6 +27,9 @@ import { shouldStream } from '../../utilities/stream-mode.js';
 const handleRequest = async (reply: any, body?: unknown) => {
 	// Apply configured response delay for realistic API simulation
 	await applyResponseDelay();
+
+	// Chaos mode: this call may get an error in place of a reply
+	if (applyChaos(reply)) return reply;
 
 	// Generate mock response content (lorem or stored based on configuration)
 	const content = await generateResponseContent(body);

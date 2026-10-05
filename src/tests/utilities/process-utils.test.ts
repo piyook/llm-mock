@@ -68,6 +68,23 @@ describe('parseCliArgs', () => {
 		});
 	});
 
+	test('reads the chaos options', () => {
+		expect(
+			parseCliArgs([
+				'--chaos=true',
+				'--chaosFrequency',
+				'3',
+				'--chaosMode=random',
+				'--chaosStatus=429',
+			]).customSettings,
+		).toEqual({
+			chaos: 'true',
+			chaosFrequency: '3',
+			chaosMode: 'random',
+			chaosStatus: '429',
+		});
+	});
+
 	test('stop takes its port from --port', () => {
 		expect(parseCliArgs(['stop'])).toMatchObject({
 			command: 'stop',
@@ -123,8 +140,32 @@ describe('applyConfigDefaults', () => {
 			stream: true,
 			responseDelay: { min: 300, max: 0 },
 			embeddings: { enabled: false, dimensions: 128 },
+			chaos: { enabled: false, frequency: 1, mode: 'every', status: 500 },
 		});
 		expect(config.server).toEqual({ port: 8001, host: '0.0.0.0' });
+	});
+
+	const withChaos = (chaos: Record<string, unknown>) =>
+		applyConfigDefaults(
+			{ models: { a: { name: 'openai', endpoint: 'chat', chaos } } },
+			'a',
+		);
+
+	test('fills in the chaos settings that are left out', () => {
+		expect(
+			withChaos({ enabled: true, frequency: 3 }).models.a.chaos,
+		).toEqual({ enabled: true, frequency: 3, mode: 'every', status: 500 });
+	});
+
+	test.each([
+		[{ frequency: 0 }, 'chaos.frequency'],
+		[{ frequency: 2.5 }, 'chaos.frequency'],
+		[{ frequency: '3' }, 'chaos.frequency'],
+		[{ mode: 'sometimes' }, 'chaos.mode'],
+		[{ status: 200 }, 'chaos.status'],
+		[{ status: 600 }, 'chaos.status'],
+	])('rejects a chaos setting of %o', (chaos, setting) => {
+		expect(() => withChaos(chaos)).toThrow(setting);
 	});
 
 	test('keeps values that are set', () => {

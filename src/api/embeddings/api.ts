@@ -2,6 +2,7 @@
 import type { FastifyInstance } from 'fastify';
 import { generateMockEmbeddings } from '../../utilities/response-helpers.js';
 import { applyResponseDelay } from '../../utilities/response-helpers.js';
+import { applyChaos } from '../../utilities/chaos.js';
 
 // Import the default dimensions constant
 const DEFAULT_EMBEDDING_DIMENSIONS =
@@ -56,6 +57,10 @@ const validateEmbeddingsRequest = async (request: any) => {
 const handleEmbeddingsRequest = async (request: any, reply: any) => {
 	// Apply configured response delay for realistic API simulation
 	await applyResponseDelay();
+
+	// Chaos mode: this call may get an error in place of a reply. The
+	// embeddings endpoint is OpenAI-shaped whichever preset is active.
+	if (applyChaos(reply, 'openai')) return reply;
 
 	// Extract and parse request parameters
 	// For GET requests, use query params; for POST requests, use body

@@ -8,15 +8,52 @@ const suites = [
   { start: "llmock:start:embeddings",spec: "cypress/e2e/embeddings-spec.cy.ts" },
   { start: "llmock:start:claude",    spec: "cypress/e2e/claude-mock-spec.cy.ts" },
   { start: "llmock:start:stored",    spec: "cypress/e2e/stored-responses-spec.cy.ts" },
+  { start: "llmock:start:chaos",     spec: "cypress/e2e/chaos-spec.cy.ts" },
 ];
 
-const cypress = (spec) => execSync(`npx cypress run --spec "${spec}"`, { stdio: "inherit" });
+// By default only a one-line result per suite is printed, and the full server
+// and Cypress output of a suite is shown only if it fails. E2E_VERBOSE=true
+// prints everything as it happens (used in CI).
+const verbose = process.env.E2E_VERBOSE === 'true';
+const childStdio = verbose ? 'inherit' : ['ignore', 'pipe', 'pipe'];
+const log = (...args) => { if (verbose) console.log(...args); };
+
+// Collects a child's piped output; returns a function giving the text so far.
+// Empty in verbose mode, where the output goes straight to the terminal.
+const capture = (proc) => {
+  const chunks = [];
+  proc.stdout?.on('data', (chunk) => chunks.push(chunk));
+  proc.stderr?.on('data', (chunk) => chunks.push(chunk));
+  return () => Buffer.concat(chunks).toString();
+};
+
+// Runs asynchronously so the server's piped output keeps being drained
+const cypress = (spec) => {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(`npx cypress run --spec "${spec}"`, {
+      stdio: childStdio,
+      shell: true,
+      windowsHide: true,
+    });
+    const output = capture(proc);
+
+    proc.on('error', reject);
+    proc.on('close', (code) => resolve({ code, output: output() }));
+  });
+};
+
+// Test counts from the results box Cypress prints, undefined if not found
+const cypressCount = (output, label) => {
+  const match = new RegExp(`│\\s*${label}:\\s+(\\d+)`).exec(output);
+  return match ? Number(match[1]) : undefined;
+};
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const startServer = (npmScript) => {
   return new Promise((resolve, reject) => {
-    const proc = spawn('npm', ['run', npmScript], {
-      stdio: 'inherit',
+    const proc = spawn(`npm run ${npmScript}`, {
+      stdio: childStdio,
       env: { ...process.env, CONFIG_PATH: '.llmockrc.test.json', E2E_MODE: 'true' },
       shell: true,
       // A new process group lets us kill the tree on Unix. On Windows
@@ -24,6 +61,7 @@ const startServer = (npmScript) => {
       detached: process.platform !== 'win32',
       windowsHide: true,
     });
+    proc.output = capture(proc);
 
     proc.on('error', reject);
     proc.on('exit', (code) => {
@@ -53,10 +91,10 @@ const waitForPortFree = async (port = 8001, maxAttempts = 20) => {
     });
 
     if (free) {
-      console.log(`✓ Port ${port} is free`);
+      log(`✓ Port ${port} is free`);
       return;
     }
-    console.log(`Waiting for port ${port} to be released... (${i + 1}/${maxAttempts})`);
+    log(`Waiting for port ${port} to be released... (${i + 1}/${maxAttempts})`);
     await sleep(1000);
   }
   throw new Error(`Port ${port} was not released after ${maxAttempts} attempts`);
@@ -130,17 +168,18 @@ const healthCheck = async (port = 8001, maxAttempts = 30) => {
         req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
         req.end();
       });
-      console.log(`✓ Server API is responding on port ${port}`);
+      log(`✓ Server API is responding on port ${port}`);
       return true;
     } catch {
       if (i === maxAttempts - 1) throw new Error(`Server failed to respond after ${maxAttempts} attempts`);
-      console.log(`Waiting for server API to start... (${i + 1}/${maxAttempts})`);
+      log(`Waiting for server API to start... (${i + 1}/${maxAttempts})`);
       await sleep(1000);
     }
   }
 };
 
-let failed = false;
+let failedSuites = 0;
+let totalTests = 0;
 let currentProc = null;
 
 const cleanup = async () => {
@@ -151,25 +190,46 @@ process.on('SIGINT', async () => { await cleanup(); process.exit(130); });
 process.on('SIGTERM', async () => { await cleanup(); process.exit(143); });
 
 for (const { start, spec } of suites) {
-  console.log(`\n=== Starting test suite: ${start} ===`);
+  const name = start.split(':').pop();
+  let cypressOutput = '';
+  let error = null;
+
+  log(`\n=== Starting test suite: ${start} ===`);
   try {
     currentProc = await startServer(start);
-    console.log(`✓ Server started for ${start}`);
+    log(`✓ Server started for ${start}`);
     await healthCheck();
-    console.log(`✓ Health check passed for ${start}`);
-    cypress(spec);
-    console.log(`✓ Cypress tests passed for ${start}`);
+    log(`✓ Health check passed for ${start}`);
+    const result = await cypress(spec);
+    cypressOutput = result.output;
+    if (result.code !== 0) throw new Error(`Cypress exited with code ${result.code}`);
   } catch (e) {
-    console.error(`>>> Suite FAILED: ${start}`, e.message);
-    failed = true;
+    error = e;
+    failedSuites++;
   } finally {
-    console.log(`🛑 Stopping server for ${start}`);
-  await stopServer(currentProc);
-  currentProc = null;
-  await waitForPortFree();
-  console.log(`✓ Server stopped for ${start}`);
+    log(`🛑 Stopping server for ${start}`);
+    const serverOutput = currentProc?.output() ?? '';
+    await stopServer(currentProc);
+    currentProc = null;
+    await waitForPortFree();
+    log(`✓ Server stopped for ${start}`);
+
+    const passing = cypressCount(cypressOutput, 'Passing');
+    const failing = cypressCount(cypressOutput, 'Failing');
+    totalTests += cypressCount(cypressOutput, 'Tests') ?? 0;
+
+    if (error) {
+      const counts = passing === undefined ? '' : `  ${passing} passed, ${failing} failed`;
+      console.error(`✗ ${name}${counts}  (${error.message})`);
+      if (serverOutput) console.error(`\n--- ${name}: server output ---\n${serverOutput}`);
+      if (cypressOutput) console.error(`\n--- ${name}: Cypress output ---\n${cypressOutput}`);
+    } else {
+      console.log(`✓ ${name}${passing === undefined ? '' : `  ${passing} passed`}`);
+    }
   }
 }
 
-console.log('\n=== All test suites completed ===');
-process.exit(failed ? 1 : 0);
+const passedSuites = suites.length - failedSuites;
+const tests = totalTests > 0 ? ` (${totalTests} tests)` : '';
+console.log(`\n=== ${passedSuites} of ${suites.length} suites passed${tests} ===`);
+process.exit(failedSuites > 0 ? 1 : 0);

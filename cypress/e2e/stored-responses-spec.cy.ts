@@ -54,6 +54,12 @@ describe('Mock LLM Spec for configured stored responses', () => {
             });
     });
 
+    it('shows chaos as off when the preset does not set it', () => {
+        cy.visit('/');
+        cy.get('[cy-data="chaos_status"]').should('contain', 'DISABLED');
+        cy.get('[cy-data="chaos_frequency"]').should('not.exist');
+    });
+
     it('opens the request log in the dashboard viewer', () => {
         cy.visit('/');
         cy.get('[cy-data="request_log_link"]').click();

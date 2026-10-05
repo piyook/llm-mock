@@ -20,6 +20,8 @@ vi.mock('env-paths', () => ({ default: () => ({ log: logDir }) }));
 
 const { default: serverPage } = await import('../../utilities/server-page.js');
 const { logPath } = await import('../../utilities/logger.js');
+const { resetChaos, shouldInjectError } =
+	await import('../../utilities/chaos.js');
 
 const require = createRequire(import.meta.url);
 const bundled: string[] = require('../../data/data.json').map(
@@ -137,6 +139,46 @@ describe('dashboard routes for stored responses and response rules', () => {
 		const { body } = await get('/ui-meta');
 
 		expect(body.version).toBe(require('../../../package.json').version);
+	});
+
+	test('ui-meta reports chaos as off by default', async () => {
+		const { body } = await get('/ui-meta');
+
+		expect(body).toMatchObject({
+			chaosStatus: 'DISABLED',
+			chaosFrequency: 1,
+			chaosMode: 'every',
+			chaosErrorStatus: 500,
+			chaosInjected: 0,
+		});
+	});
+
+	test('ui-meta reports the chaos settings and the errors sent', async () => {
+		const settings = {
+			CHAOS_ENABLED: 'true',
+			CHAOS_FREQUENCY: '2',
+			CHAOS_MODE: 'random',
+			CHAOS_STATUS: '429',
+		};
+		Object.assign(process.env, settings);
+		vi.spyOn(Math, 'random').mockReturnValue(0);
+		try {
+			shouldInjectError();
+
+			const { body } = await get('/ui-meta');
+
+			expect(body).toMatchObject({
+				chaosStatus: 'ENABLED',
+				chaosFrequency: 2,
+				chaosMode: 'random',
+				chaosErrorStatus: 429,
+				chaosInjected: 1,
+			});
+		} finally {
+			vi.restoreAllMocks();
+			resetChaos();
+			for (const key of Object.keys(settings)) delete process.env[key];
+		}
 	});
 
 	test('ui-request-log reports the log file, and null when nothing is logged', async () => {

@@ -16,6 +16,14 @@ export interface EmbeddingsConfig {
 	dimensions: number;
 }
 
+export interface ChaosConfig {
+	enabled: boolean;
+	// X in "1 in X calls"; 1 fails every call
+	frequency: number;
+	mode: 'every' | 'random';
+	status: number;
+}
+
 export interface ModelConfig {
 	name: string;
 	model: string;
@@ -34,6 +42,8 @@ export interface ModelConfig {
 	responseRules?: ResponseRule[];
 	// Optional: JSON file of texts that `responseType: "stored"` picks from
 	storedResponsesFile?: string;
+	// Optional: answer some calls with an HTTP error (off unless enabled)
+	chaos?: Partial<ChaosConfig>;
 }
 
 export interface ServerConfig {
@@ -256,6 +266,19 @@ export function setEnvironmentFromConfig(modelName?: string): void {
 	process.env.RESPONSE_DELAY_MAX =
 		process.env.RESPONSE_DELAY_MAX ||
 		modelConfig.responseDelay.max.toString();
+
+	// Chaos - only set if not already set by CLI
+	process.env.CHAOS_ENABLED =
+		process.env.CHAOS_ENABLED ||
+		(modelConfig.chaos?.enabled ? 'true' : 'false');
+	process.env.CHAOS_FREQUENCY =
+		process.env.CHAOS_FREQUENCY ||
+		(modelConfig.chaos?.frequency ?? 1).toString();
+	process.env.CHAOS_MODE =
+		process.env.CHAOS_MODE || (modelConfig.chaos?.mode ?? 'every');
+	process.env.CHAOS_STATUS =
+		process.env.CHAOS_STATUS ||
+		(modelConfig.chaos?.status ?? 500).toString();
 
 	// Embeddings - only set if not already set by CLI
 	process.env.ENABLE_EMBEDDINGS_MOCK =

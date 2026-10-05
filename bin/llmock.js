@@ -53,6 +53,10 @@ OPTIONS:
   --stream=<bool>          Enable streaming responses (true/false)
   --delayMin=<ms>          Minimum response delay in milliseconds
   --delayMax=<ms>          Maximum response delay in milliseconds
+  --chaos=<bool>           Answer some calls with an HTTP error (true/false)
+  --chaosFrequency=<num>   Fail 1 in <num> calls (default: 1, every call)
+  --chaosMode=<mode>       every (each <num>th call) or random (1 in <num> chance)
+  --chaosStatus=<code>     HTTP status of the error (default: 500)
   --embeddings=<bool>      Enable embeddings mock (true/false)
   --embeddingDimensions=<num> Embedding vector dimensions
   --foreground            Run server in foreground (for Docker use)
@@ -63,6 +67,7 @@ EXAMPLES:
   llmock start --port=3000 --host=localhost # Custom server settings
   llmock start --debug=true --stream=true   # Enable debug and streaming
   llmock start --delayMin=1000 --delayMax=2000 # Custom response delays
+  llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429 # Every 3rd call fails with a 429
   llmock stop                               # Stop running server on default port
   llmock stop --port=3000                   # Stop server on port 3000
   llmock config                              # Show current configuration
@@ -95,6 +100,9 @@ MODEL: ${selectedModel}
   Debug: ${modelConfig.debug}
   Stream: ${modelConfig.stream}
   Response Delay: ${modelConfig.responseDelay.min}ms - ${modelConfig.responseDelay.max}ms
+  Chaos Enabled: ${modelConfig.chaos.enabled}
+  Chaos Frequency: 1 in ${modelConfig.chaos.frequency} calls (${modelConfig.chaos.mode})
+  Chaos Error Status: ${modelConfig.chaos.status}
   Embeddings Enabled: ${modelConfig.embeddings.enabled}
   Embedding Dimensions: ${modelConfig.embeddings.dimensions}
 
@@ -310,6 +318,13 @@ function setEnvironmentVariables(config, modelName, configPath) {
   // Response delays (with custom overrides)
   process.env.RESPONSE_DELAY_MIN = customSettings.delayMin || modelConfig.responseDelay.min.toString();
   process.env.RESPONSE_DELAY_MAX = customSettings.delayMax || modelConfig.responseDelay.max.toString();
+
+  // Chaos (with custom overrides)
+  process.env.CHAOS_ENABLED = (customSettings.chaos !== undefined ?
+    customSettings.chaos === 'true' : modelConfig.chaos.enabled) ? 'true' : 'false';
+  process.env.CHAOS_FREQUENCY = customSettings.chaosFrequency || modelConfig.chaos.frequency.toString();
+  process.env.CHAOS_MODE = customSettings.chaosMode || modelConfig.chaos.mode;
+  process.env.CHAOS_STATUS = customSettings.chaosStatus || modelConfig.chaos.status.toString();
   
   // Embeddings (with custom overrides)
   process.env.ENABLE_EMBEDDINGS_MOCK = (customSettings.embeddings !== undefined ? 

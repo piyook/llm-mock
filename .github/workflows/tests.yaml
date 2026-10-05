@@ -82,4 +82,7 @@ jobs:
             - name: Verify Cypress
               run: npx cypress verify
 
+            # Full server and Cypress output in the CI log (local runs print a summary)
             - run: npm run test:e2e
+              env:
+                  E2E_VERBOSE: 'true'
