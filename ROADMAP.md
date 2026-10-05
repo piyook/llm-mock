@@ -4,7 +4,7 @@
 
 The table lists 15 features that would move llmock from "returns lorem or canned text" to "scripts realistic agent conversations". This plan sizes each one against the code as it was at 3.8.1, explains what each is for, and puts them in a build order. Rows that have changed since are marked with the version that changed them.
 
-Summary: about a third of the table is already partly built. The real gaps are **tool calls**, **turn-aware matching**, **runtime control from tests** and **record/replay**. **Error injection** was a gap too; its first part shipped in 3.9.0 as chaos mode (see row 9). Nearly everything depends on two small refactors, so those go first.
+Summary: about a third of the table is already partly built. The real gaps are **tool calls**, **turn-aware matching**, **runtime control from tests** and **record/replay**. **Error injection** was a gap too; its first part shipped in 3.9.0 as chaos mode (see row 9). Nearly everything depends on two small refactors, which went first and are done (Phase 0).
 
 Sizes: **S** = up to 1 day, **M** = 2-3 days, **L** = 4-7 days. These are rough estimates for one person, including unit tests, Cypress e2e, README/`llms.txt` and dashboard updates.
 
@@ -48,10 +48,12 @@ Sizes: **S** = up to 1 day, **M** = 2-3 days, **L** = 4-7 days. These are rough 
 
 ## Build order
 
-### Phase 0: two refactors everything else needs (M)
+### Phase 0: two refactors everything else needs (M): done
 
-- **Request normaliser** (new `src/utilities/normalise-request.ts`): turns an OpenAI / Claude / Gemini body into one shape: `{ model, systemText, lastUserText, turnIndex, hasToolResult, allText }`. Per-provider extraction (OpenAI `system`/`developer` roles, Claude top-level `system`, Gemini `systemInstruction`). Reuses `collectStrings` from `src/utilities/response-rules.ts` for `allText`.
-- **Reply object**: `generateResponseContent` in `src/utilities/response-helpers.ts` returns `string`, and that string is threaded through `handleRequest` (`src/api/completions/api.ts`) into all four builders. Change it to `{ text, toolCalls?, stopReason?, error?, ruleId? }`. No behaviour change yet.
+Both are on `dev` and not yet in a release. Behaviour is unchanged; they are the groundwork for Phases 1 and 2.
+
+- **Request normaliser** (`normaliseRequest` in `src/utilities/normalise-request.ts`): turns an OpenAI / Claude / Gemini body into one shape: `{ model, systemText, lastUserText, turnIndex, hasToolResult, allText }`. Per-provider extraction (OpenAI `system`/`developer` roles, Claude top-level `system`, Gemini `systemInstruction`). Response rules now match against its `allText`.
+- **Reply object** (`MockReply` in `src/types.ts`): `generateResponseContent` in `src/utilities/response-helpers.ts` returns `{ text, toolCalls?, stopReason?, error?, ruleId? }` in place of a string, and `handleRequest` (`src/api/completions/api.ts`) passes it to all four builders. Only `text` is produced and used so far.
 
 ### Phase 1: matching, #2 #7 #8 #3 #12 and the schema half of #1 (M)
 
@@ -103,7 +105,7 @@ Order by demand: OpenAI Responses API (`/v1/responses`), then serving several fo
 
 ## Totals and suggested cut
 
-- Phases 0-2 (about 2 weeks): fixes the documented multi-turn problem and adds tool calls. This is the highest-value slice and makes llmock usable for agent testing.
+- Phases 0-2 (about 2 weeks; Phase 0 is done): fixes the documented multi-turn problem and adds tool calls. This is the highest-value slice and makes llmock usable for agent testing.
 - Phases 3-5 (about 2 more weeks): resilience testing and per-test control.
 - Phase 6 (about 1 week), Phase 7 (2-3 days per provider).
 - All of it except extra providers: roughly 5-7 weeks.
