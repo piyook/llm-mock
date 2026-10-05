@@ -76,12 +76,17 @@ describe('parseCliArgs', () => {
 				'3',
 				'--chaosMode=random',
 				'--chaosStatus=429',
+				'--chaosKind=stream-stall',
+				'--chaosAfterChunks',
+				'0',
 			]).customSettings,
 		).toEqual({
 			chaos: 'true',
 			chaosFrequency: '3',
 			chaosMode: 'random',
 			chaosStatus: '429',
+			chaosKind: 'stream-stall',
+			chaosAfterChunks: '0',
 		});
 	});
 
@@ -140,7 +145,14 @@ describe('applyConfigDefaults', () => {
 			stream: true,
 			responseDelay: { min: 300, max: 0 },
 			embeddings: { enabled: false, dimensions: 128 },
-			chaos: { enabled: false, frequency: 1, mode: 'every', status: 500 },
+			chaos: {
+				enabled: false,
+				frequency: 1,
+				mode: 'every',
+				status: 500,
+				kind: 'http',
+				afterChunks: 2,
+			},
 		});
 		expect(config.server).toEqual({ port: 8001, host: '0.0.0.0' });
 	});
@@ -154,7 +166,17 @@ describe('applyConfigDefaults', () => {
 	test('fills in the chaos settings that are left out', () => {
 		expect(
 			withChaos({ enabled: true, frequency: 3 }).models.a.chaos,
-		).toEqual({ enabled: true, frequency: 3, mode: 'every', status: 500 });
+		).toEqual({
+			enabled: true,
+			frequency: 3,
+			mode: 'every',
+			status: 500,
+			kind: 'http',
+			afterChunks: 2,
+		});
+		expect(
+			withChaos({ kind: 'stream-error', afterChunks: 0 }).models.a.chaos,
+		).toMatchObject({ kind: 'stream-error', afterChunks: 0 });
 	});
 
 	test.each([
@@ -164,6 +186,13 @@ describe('applyConfigDefaults', () => {
 		[{ mode: 'sometimes' }, 'chaos.mode'],
 		[{ status: 200 }, 'chaos.status'],
 		[{ status: 600 }, 'chaos.status'],
+		[{ kind: 'stream' }, 'chaos.kind'],
+		[{ kind: 'STREAM-DROP' }, 'chaos.kind'],
+		[{ kind: 3 }, 'chaos.kind'],
+		[{ afterChunks: -1 }, 'chaos.afterChunks'],
+		[{ afterChunks: 1.5 }, 'chaos.afterChunks'],
+		[{ afterChunks: '2' }, 'chaos.afterChunks'],
+		[{ afterChunks: null }, 'chaos.afterChunks'],
 	])('rejects a chaos setting of %o', (chaos, setting) => {
 		expect(() => withChaos(chaos)).toThrow(setting);
 	});

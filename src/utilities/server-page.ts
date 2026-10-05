@@ -9,7 +9,7 @@ import {
 } from '../config/config-loader.js';
 import { clearLog, logPath, maxLogEntries } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
-import { readRuleFile, ruleFiles } from './response-rules.js';
+import { readRuleFile, ruleFailure, ruleFiles } from './response-rules.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
@@ -176,10 +176,13 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			: null;
 
 		// Rules in config order (first match wins), each with every file it
-		// can reply with
+		// can reply with, how its reply ends, and how it fails (null if it
+		// replies)
 		const responseRules = getResponseRules().rules.map((rule) => ({
 			match: rule.match,
 			files: ruleFiles(rule),
+			stopReason: rule.stopReason ?? 'end',
+			fail: ruleFailure(rule) ?? null,
 		}));
 
 		const responseDelayMinMs =
@@ -245,6 +248,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			chaosFrequency: chaos.frequency,
 			chaosMode: chaos.mode,
 			chaosErrorStatus: chaos.status,
+			chaosKind: chaos.kind,
+			chaosAfterChunks: chaos.afterChunks,
 			chaosInjected: getChaosStats().injected,
 			embeddingsEnabled: embeddingsEnabled ? 'ENABLED' : 'DISABLED',
 			embeddingDimension,

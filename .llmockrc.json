@@ -23,7 +23,9 @@
         "enabled": false,
         "frequency": 1,
         "mode": "every",
-        "status": 500
+        "status": 500,
+        "kind": "http",
+        "afterChunks": 2
       }
     },
     "gemini": {
@@ -48,7 +50,9 @@
         "enabled": false,
         "frequency": 1,
         "mode": "every",
-        "status": 500
+        "status": 500,
+        "kind": "http",
+        "afterChunks": 2
       }
     },
     "streaming": {
@@ -73,7 +77,9 @@
         "enabled": false,
         "frequency": 1,
         "mode": "every",
-        "status": 500
+        "status": 500,
+        "kind": "http",
+        "afterChunks": 2
       }
     },
     "embeddings": {
@@ -98,7 +104,9 @@
         "enabled": false,
         "frequency": 1,
         "mode": "every",
-        "status": 500
+        "status": 500,
+        "kind": "http",
+        "afterChunks": 2
       }
     },
     "claude": {
@@ -123,7 +131,9 @@
         "enabled": false,
         "frequency": 1,
         "mode": "every",
-        "status": 500
+        "status": 500,
+        "kind": "http",
+        "afterChunks": 2
       }
     }
   },

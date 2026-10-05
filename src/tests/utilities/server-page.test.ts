@@ -86,6 +86,11 @@ describe('dashboard routes for stored responses and response rules', () => {
 							{
 								match: 'WANT_MISSING',
 								file: 'fixtures/missing.txt',
+								stopReason: 'max_tokens',
+							},
+							{
+								match: 'WANT_FAILURE',
+								fail: { kind: 'stream-drop', afterChunks: 0 },
 							},
 						],
 					}),
@@ -149,6 +154,8 @@ describe('dashboard routes for stored responses and response rules', () => {
 			chaosFrequency: 1,
 			chaosMode: 'every',
 			chaosErrorStatus: 500,
+			chaosKind: 'http',
+			chaosAfterChunks: 2,
 			chaosInjected: 0,
 		});
 	});
@@ -159,6 +166,8 @@ describe('dashboard routes for stored responses and response rules', () => {
 			CHAOS_FREQUENCY: '2',
 			CHAOS_MODE: 'random',
 			CHAOS_STATUS: '429',
+			CHAOS_KIND: 'stream-stall',
+			CHAOS_AFTER_CHUNKS: '0',
 		};
 		Object.assign(process.env, settings);
 		vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -172,6 +181,8 @@ describe('dashboard routes for stored responses and response rules', () => {
 				chaosFrequency: 2,
 				chaosMode: 'random',
 				chaosErrorStatus: 429,
+				chaosKind: 'stream-stall',
+				chaosAfterChunks: 0,
 				chaosInjected: 1,
 			});
 		} finally {
@@ -219,12 +230,31 @@ describe('dashboard routes for stored responses and response rules', () => {
 		expect(body.storedResponsesFile).toBe('fixtures/stored.json');
 		expect(body.storedResponsesCount).toBe(stored.length);
 		expect(body.responseRules).toEqual([
-			{ match: 'WANT_TEXT', files: ['fixtures/text.txt'] },
+			{
+				match: 'WANT_TEXT',
+				files: ['fixtures/text.txt'],
+				stopReason: 'end',
+				fail: null,
+			},
 			{
 				match: 'WANT_POOL',
 				files: ['fixtures/pool-a.txt', 'fixtures/pool-b.txt'],
+				stopReason: 'end',
+				fail: null,
 			},
-			{ match: 'WANT_MISSING', files: ['fixtures/missing.txt'] },
+			{
+				match: 'WANT_MISSING',
+				files: ['fixtures/missing.txt'],
+				stopReason: 'max_tokens',
+				fail: null,
+			},
+			// A rule that only fails: no files, and the defaults filled in
+			{
+				match: 'WANT_FAILURE',
+				files: [],
+				stopReason: 'end',
+				fail: { kind: 'stream-drop', status: 500, afterChunks: 0 },
+			},
 		]);
 	});
 
@@ -243,7 +273,7 @@ describe('dashboard routes for stored responses and response rules', () => {
 			const { body } = await get('/ui-meta');
 
 			expect(body.storedResponsesFile).toBeNull();
-			expect(body.responseRules).toHaveLength(3);
+			expect(body.responseRules).toHaveLength(4);
 		} finally {
 			process.env.MOCK_LLM_RESPONSE_TYPE = 'stored';
 		}

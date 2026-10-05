@@ -10,8 +10,21 @@ import {
 	getResponseRules,
 	getStoredResponsesFile,
 } from '../config/config-loader.js';
-import { findMatchingRule, loadRuleContent } from './response-rules.js';
+import {
+	findMatchingRule,
+	loadRuleContent,
+	ruleFailure,
+	ruleFiles,
+} from './response-rules.js';
 import { loadStoredResponses } from './stored-responses.js';
+import { applyStopReason } from './stop-reason.js';
+import {
+	failStream,
+	streamedCount,
+	type CallFailure,
+	type StreamFailure,
+} from './chaos.js';
+import type { MockReply } from '../types.js';
 import type { FastifyReply } from 'fastify';
 
 // Default embedding dimension constant
@@ -19,29 +32,46 @@ const DEFAULT_EMBEDDING_DIMENSIONS =
 	Number(process.env?.EMBEDDING_DIMENSION) || 128;
 
 /**
- * Fixture text for this request if a configured response rule matches it,
+ * Fixture reply for this request if a configured response rule matches it,
  * otherwise undefined (a normal response is generated instead).
  */
-const getRuleContent = (requestBody: unknown): string | undefined => {
+const getRuleReply = (requestBody: unknown): MockReply | undefined => {
 	const { rules, baseDir } = getResponseRules();
 	const rule = findMatchingRule(rules, requestBody);
+	// A rule that only fails has no fixture: the reply is generated as usual
+	if (!rule || ruleFiles(rule).length === 0) return undefined;
 
-	return rule ? loadRuleContent(rule, baseDir) : undefined;
+	return {
+		text: loadRuleContent(rule, baseDir),
+		...(rule.stopReason && { stopReason: rule.stopReason }),
+	};
 };
 
 /**
- * Generates mock LLM response content based on configuration
+ * How this request fails if the response rule it matches has `fail`,
+ * otherwise undefined.
+ */
+export const getRuleFailure = (
+	requestBody: unknown,
+): CallFailure | undefined => {
+	const rule = findMatchingRule(getResponseRules().rules, requestBody);
+
+	return rule && ruleFailure(rule);
+};
+
+/**
+ * Generates the mock LLM reply based on configuration
  * Supports response rules (fixture files), lorem ipsum and stored response types
  *
  * @param requestBody - Parsed request body, used to match response rules
- * @returns Promise<string> Generated content text
+ * @returns Promise<MockReply> The reply, with the generated text in `text`
  */
 export const generateResponseContent = async (
 	requestBody?: unknown,
-): Promise<string> => {
+): Promise<MockReply> => {
 	// A matching responseRules entry wins over the configured response type
-	const ruleContent = getRuleContent(requestBody);
-	if (ruleContent !== undefined) return ruleContent;
+	const ruleReply = getRuleReply(requestBody);
+	if (ruleReply !== undefined) return ruleReply;
 
 	let content = '';
 
@@ -76,36 +106,59 @@ export const generateResponseContent = async (
 		}
 	}
 
-	return content;
+	return { text: content };
 };
 
 /**
  * Builds a static JSON response using the response template
- * Replaces DYNAMIC_CONTENT_HERE with generated content
+ * Replaces DYNAMIC_CONTENT_HERE with the reply's text, then writes in the
+ * reply's stop reason if it has one
  *
- * @param content - The content to inject into the template
+ * @param mockReply - The reply whose text is injected into the template
  * @returns Promise<object> Complete static response object
  */
-export const buildStaticResponse = async (content: string) => {
-	return await buildResponse(content);
+export const buildStaticResponse = async (mockReply: MockReply) => {
+	return applyStopReason(
+		await buildResponse(mockReply.text),
+		process.env.LLM_NAME ?? 'openai',
+		mockReply.stopReason,
+	);
 };
 
 /**
  * Handles streaming response with proper SSE format
- * Converts content to streaming chunks and sends them with appropriate headers
+ * Converts the reply's text to streaming chunks and sends them with appropriate headers
  *
- * @param content - The content to stream
+ * @param mockReply - The reply whose text is streamed
  * @param reply - Fastify reply object
+ * @param failure - Chaos: fail the stream part-way through (see chaos.ts)
  * @returns Promise<void>
  */
 export const handleStreamingResponse = async (
-	content: string,
+	mockReply: MockReply,
 	reply: FastifyReply,
+	failure?: StreamFailure,
 ) => {
 	try {
-		const chunks = await generateStreamingChunks(content);
+		const chunks = await generateStreamingChunks(
+			mockReply.text,
+			mockReply.stopReason,
+		);
 
 		setStreamingHeaders(reply);
+
+		if (failure) {
+			// The role chunk and some content chunks, then the failure in
+			// place of the finish_reason chunk and [DONE]
+			const sent = chunks.slice(
+				0,
+				1 + streamedCount(chunks.length - 3, failure),
+			);
+			await streamWithDelay(sent, reply, false);
+			failStream(reply, failure, 'openai');
+			return reply;
+		}
+
 		await streamWithDelay(chunks, reply);
 
 		return reply;

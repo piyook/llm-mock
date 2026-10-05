@@ -110,6 +110,24 @@
             "cypress/fixtures/mock-rules/pool-a.txt",
             "cypress/fixtures/mock-rules/pool-b.txt"
           ]
+        },
+        {
+          "match": "E2E_FIXTURE_CUT_OFF",
+          "file": "cypress/fixtures/mock-rules/cut-off.txt",
+          "stopReason": "max_tokens"
+        },
+        {
+          "match": "E2E_FIXTURE_REFUSED",
+          "file": "cypress/fixtures/mock-rules/refused.txt",
+          "stopReason": "refusal"
+        },
+        {
+          "match": "E2E_FIXTURE_FAIL",
+          "fail": {
+            "kind": "stream-error",
+            "status": 529,
+            "afterChunks": 1
+          }
         }
       ]
     },
@@ -162,6 +180,39 @@
         "frequency": 2,
         "mode": "every",
         "status": 529
+      }
+    },
+    "chaos-stream": {
+      "name": "claude",
+      "model": "claude-opus-5-5",
+      "endpoint": "v1/messages",
+      "responseType": "lorem",
+      "maxLoremParas": 8,
+      "validateRequests": true,
+      "logRequests": false,
+      "debug": false,
+      "stream": false,
+      "responseDelay": {
+        "min": 0,
+        "max": 0
+      },
+      "embeddings": {
+        "enabled": false,
+        "dimensions": 128
+      },
+      "responseRules": [
+        {
+          "match": "E2E_FIXTURE_TEXT",
+          "file": "cypress/fixtures/mock-rules/plain-reply.txt"
+        }
+      ],
+      "chaos": {
+        "enabled": true,
+        "frequency": 2,
+        "mode": "every",
+        "status": 529,
+        "kind": "stream-error",
+        "afterChunks": 1
       }
     }
   },

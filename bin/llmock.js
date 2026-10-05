@@ -53,10 +53,12 @@ OPTIONS:
   --stream=<bool>          Enable streaming responses (true/false)
   --delayMin=<ms>          Minimum response delay in milliseconds
   --delayMax=<ms>          Maximum response delay in milliseconds
-  --chaos=<bool>           Answer some calls with an HTTP error (true/false)
+  --chaos=<bool>           Fail some calls (true/false)
   --chaosFrequency=<num>   Fail 1 in <num> calls (default: 1, every call)
   --chaosMode=<mode>       every (each <num>th call) or random (1 in <num> chance)
   --chaosStatus=<code>     HTTP status of the error (default: 500)
+  --chaosKind=<kind>       http (default), stream-error, stream-drop or stream-stall
+  --chaosAfterChunks=<num> Content deltas a stream sends before it fails (default: 2)
   --embeddings=<bool>      Enable embeddings mock (true/false)
   --embeddingDimensions=<num> Embedding vector dimensions
   --foreground            Run server in foreground (for Docker use)
@@ -68,6 +70,7 @@ EXAMPLES:
   llmock start --debug=true --stream=true   # Enable debug and streaming
   llmock start --delayMin=1000 --delayMax=2000 # Custom response delays
   llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429 # Every 3rd call fails with a 429
+  llmock start --chaos=true --chaosKind=stream-drop --chaosAfterChunks=1 # Streams are cut after 1 delta
   llmock stop                               # Stop running server on default port
   llmock stop --port=3000                   # Stop server on port 3000
   llmock config                              # Show current configuration
@@ -103,6 +106,7 @@ MODEL: ${selectedModel}
   Chaos Enabled: ${modelConfig.chaos.enabled}
   Chaos Frequency: 1 in ${modelConfig.chaos.frequency} calls (${modelConfig.chaos.mode})
   Chaos Error Status: ${modelConfig.chaos.status}
+  Chaos Kind: ${modelConfig.chaos.kind} (streams fail after ${modelConfig.chaos.afterChunks} deltas)
   Embeddings Enabled: ${modelConfig.embeddings.enabled}
   Embedding Dimensions: ${modelConfig.embeddings.dimensions}
 
@@ -325,6 +329,8 @@ function setEnvironmentVariables(config, modelName, configPath) {
   process.env.CHAOS_FREQUENCY = customSettings.chaosFrequency || modelConfig.chaos.frequency.toString();
   process.env.CHAOS_MODE = customSettings.chaosMode || modelConfig.chaos.mode;
   process.env.CHAOS_STATUS = customSettings.chaosStatus || modelConfig.chaos.status.toString();
+  process.env.CHAOS_KIND = customSettings.chaosKind || modelConfig.chaos.kind;
+  process.env.CHAOS_AFTER_CHUNKS = customSettings.chaosAfterChunks || modelConfig.chaos.afterChunks.toString();
   
   // Embeddings (with custom overrides)
   process.env.ENABLE_EMBEDDINGS_MOCK = (customSettings.embeddings !== undefined ? 

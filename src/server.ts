@@ -12,6 +12,7 @@ import {
 } from './config/config-loader.js';
 import { readRuleFile, ruleFiles } from './utilities/response-rules.js';
 import { loadStoredResponses } from './utilities/stored-responses.js';
+import { releaseStalledOnClose } from './utilities/chaos.js';
 
 // Initialize configuration from .llmockrc.json
 // Use config path from CLI if available, otherwise look in current working directory
@@ -40,6 +41,9 @@ if (storedFile && process.env.MOCK_LLM_RESPONSE_TYPE === 'stored') {
 }
 
 const app = fastify({ logger: false });
+
+// A connection held open by chaos must not keep the server from stopping
+releaseStalledOnClose(app);
 
 const { apiRoutes } = await getApiRoutes(app);
 

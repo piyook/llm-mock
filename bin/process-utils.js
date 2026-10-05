@@ -88,6 +88,9 @@ export function parseCliArgs(args) {
   return parsed;
 }
 
+// What a failing call gets; the server's own list is in src/utilities/chaos.ts
+const CHAOS_KINDS = ['http', 'stream-error', 'stream-drop', 'stream-stall'];
+
 /**
  * Fills in the optional settings of a model preset and the server block, so
  * a short preset in .llmockrc.json works. `name` and `endpoint` are required.
@@ -114,10 +117,18 @@ export function applyConfigDefaults(config, modelName) {
     ...preset,
     responseDelay: { min: 0, max: 0, ...preset.responseDelay },
     embeddings: { enabled: false, dimensions: 128, ...preset.embeddings },
-    chaos: { enabled: false, frequency: 1, mode: 'every', status: 500, ...preset.chaos },
+    chaos: {
+      enabled: false,
+      frequency: 1,
+      mode: 'every',
+      status: 500,
+      kind: 'http',
+      afterChunks: 2,
+      ...preset.chaos,
+    },
   };
 
-  const { frequency, mode, status } = model.chaos;
+  const { frequency, mode, status, kind, afterChunks } = model.chaos;
   if (!Number.isInteger(frequency) || frequency < 1) {
     throw new Error(`Model "${modelName}": chaos.frequency must be a whole number of 1 or more`);
   }
@@ -126,6 +137,12 @@ export function applyConfigDefaults(config, modelName) {
   }
   if (!Number.isInteger(status) || status < 400 || status > 599) {
     throw new Error(`Model "${modelName}": chaos.status must be an HTTP error status (400 to 599)`);
+  }
+  if (!CHAOS_KINDS.includes(kind)) {
+    throw new Error(`Model "${modelName}": chaos.kind must be one of: ${CHAOS_KINDS.join(', ')}`);
+  }
+  if (!Number.isInteger(afterChunks) || afterChunks < 0) {
+    throw new Error(`Model "${modelName}": chaos.afterChunks must be a whole number of 0 or more`);
   }
 
   return {

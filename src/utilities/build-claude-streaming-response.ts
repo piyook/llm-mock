@@ -6,6 +6,13 @@ import {
 	newClaudeMessageId,
 	resolveClaudeModel,
 } from './build-claude-response.js';
+import {
+	claudeRefusalStopDetails,
+	toWireStopReason,
+	type StopReason,
+} from './stop-reason.js';
+import { failStream, streamedCount, type StreamFailure } from './chaos.js';
+import type { MockReply } from '../types.js';
 
 // Split after each run of whitespace so the pieces join back to `content`
 // exactly (newlines included, which matters for JSON bodies).
@@ -36,11 +43,13 @@ const toEvent = (type: string, payload: Record<string, unknown>) =>
  * @param content - Full text to stream
  * @param model - Model name to echo in message_start
  * @param inputTokens - Reported input_tokens
+ * @param stopReason - How the reply ends; a refusal also carries stop_details
  */
 export const generateClaudeStreamingChunks = (
 	content: string,
 	model: string = DEFAULT_CLAUDE_MODEL,
 	inputTokens: number = 1,
+	stopReason: StopReason = 'end',
 ): string[] => {
 	const id = newClaudeMessageId();
 	const outputTokens = estimateTokens(content);
@@ -75,7 +84,13 @@ export const generateClaudeStreamingChunks = (
 		),
 		toEvent('content_block_stop', { index: 0 }),
 		toEvent('message_delta', {
-			delta: { stop_reason: 'end_turn', stop_sequence: null },
+			delta: {
+				stop_reason: toWireStopReason('claude', stopReason),
+				stop_sequence: null,
+				...(stopReason === 'refusal' && {
+					stop_details: claudeRefusalStopDetails,
+				}),
+			},
 			usage: { output_tokens: outputTokens },
 		}),
 		toEvent('message_stop', {}),
@@ -84,11 +99,13 @@ export const generateClaudeStreamingChunks = (
 
 /**
  * Writes SSE events with the configured delay spread across them, then ends
- * the response. Stops early if the client disconnects (e.g. the SDK aborts).
+ * the response unless `end` is false. Stops early if the client disconnects
+ * (e.g. the SDK aborts).
  */
 export const streamClaudeEvents = async (
 	events: string[],
 	reply: any,
+	end: boolean = true,
 ): Promise<void> => {
 	const delayConfig = getDelayConfig();
 	const perEventDelay = delayConfig.enabled
@@ -99,28 +116,33 @@ export const streamClaudeEvents = async (
 		if (reply.raw.destroyed) return;
 
 		reply.raw.write(`${event}\n\n`);
-		if (index < events.length - 1) {
+		// A stream left open has more to come, so it waits after its last
+		// event too
+		if (index < events.length - 1 || !end) {
 			await delay(perEventDelay, perEventDelay);
 		}
 	}
 
-	reply.raw.end();
+	if (end) reply.raw.end();
 };
 
 /**
- * Sends a Claude-style SSE stream for `content`. Headers are written on the
- * raw response because the events are written to it directly.
+ * Sends a Claude-style SSE stream for the reply's text. Headers are written
+ * on the raw response because the events are written to it directly. With a
+ * chaos `failure` the stream is cut part-way through (see chaos.ts).
  */
 export const handleClaudeStreamingResponse = async (
-	content: string,
+	mockReply: MockReply,
 	reply: any,
 	body?: unknown,
+	failure?: StreamFailure,
 ): Promise<void> => {
 	try {
 		const events = generateClaudeStreamingChunks(
-			content,
+			mockReply.text,
 			resolveClaudeModel(body),
 			estimateInputTokens(body),
+			mockReply.stopReason,
 		);
 
 		reply.hijack();
@@ -130,6 +152,19 @@ export const handleClaudeStreamingResponse = async (
 			Connection: 'keep-alive',
 			'Access-Control-Allow-Origin': '*',
 		});
+
+		if (failure) {
+			// message_start, content_block_start and some deltas, then the
+			// failure in place of the three closing events
+			const sent = events.slice(
+				0,
+				2 + streamedCount(events.length - 5, failure),
+			);
+			await streamClaudeEvents(sent, reply, false);
+			failStream(reply, failure, 'claude');
+			return;
+		}
+
 		await streamClaudeEvents(events, reply);
 	} catch (error) {
 		console.error('Claude streaming error:', error);

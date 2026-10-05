@@ -7,6 +7,7 @@ import {
 	findMatchingRule,
 	loadRuleContent,
 	readRuleFile,
+	ruleFailure,
 	ruleFiles,
 	validateResponseRules,
 } from '../../utilities/response-rules.js';
@@ -166,7 +167,98 @@ describe('ruleFiles and readRuleFile', () => {
 	});
 });
 
+describe('ruleFailure', () => {
+	test('is undefined for a rule that replies', () => {
+		expect(ruleFailure({ match: 'x', file: 'a.txt' })).toBeUndefined();
+	});
+
+	test('fills in the chaos defaults', () => {
+		expect(ruleFailure({ match: 'x', fail: {} })).toEqual({
+			kind: 'http',
+			status: 500,
+			afterChunks: 2,
+		});
+	});
+
+	test('keeps what the rule sets', () => {
+		expect(
+			ruleFailure({
+				match: 'x',
+				fail: { kind: 'stream-error', status: 529, afterChunks: 0 },
+			}),
+		).toEqual({ kind: 'stream-error', status: 529, afterChunks: 0 });
+	});
+
+	test('a rule that only fails has no files', () => {
+		expect(ruleFiles({ match: 'x', fail: {} })).toEqual([]);
+	});
+});
+
 describe('validateResponseRules', () => {
+	test.each([
+		['with no fixture', { match: 'a', fail: {} }],
+		['with a file', { match: 'a', file: 'b.txt', fail: { status: 429 } }],
+		[
+			'with files',
+			{ match: 'a', files: ['b.txt'], fail: { kind: 'stream-drop' } },
+		],
+		[
+			'with every setting',
+			{
+				match: 'a',
+				fail: { kind: 'stream-stall', status: 599, afterChunks: 0 },
+			},
+		],
+	])('accepts a fail rule %s', (_name, rule) => {
+		expect(validateResponseRules([rule])).toEqual([rule]);
+	});
+
+	test.each([
+		['fail not an object', { fail: true }, /\[0\]\.fail must be an object/],
+		['fail null', { fail: null }, /\[0\]\.fail must be an object/],
+		['fail an array', { fail: [] }, /\[0\]\.fail must be an object/],
+		[
+			'unknown fail kind',
+			{ fail: { kind: 'timeout' } },
+			/\[0\]\.fail\.kind must be one of: http, stream-error, stream-drop, stream-stall/,
+		],
+		[
+			'fail status too low',
+			{ fail: { status: 200 } },
+			/\[0\]\.fail\.status/,
+		],
+		[
+			'fail status too high',
+			{ fail: { status: 600 } },
+			/\[0\]\.fail\.status/,
+		],
+		[
+			'fail status as text',
+			{ fail: { status: '429' } },
+			/\[0\]\.fail\.status/,
+		],
+		[
+			'negative afterChunks',
+			{ fail: { afterChunks: -1 } },
+			/\[0\]\.fail\.afterChunks/,
+		],
+		[
+			'fractional afterChunks',
+			{ fail: { afterChunks: 1.5 } },
+			/\[0\]\.fail\.afterChunks/,
+		],
+		[
+			'a bad fail beside a good file',
+			{ file: 'b.txt', fail: { kind: 'nope' } },
+			/\[0\]\.fail\.kind/,
+		],
+		['an empty file beside a fail', { file: '', fail: {} }, /\[0\]\.file/],
+	])('rejects %s', (_name, rule, message) => {
+		expect(() => validateResponseRules([{ match: 'a', ...rule }])).toThrow(
+			message,
+		);
+	});
+
 	test('treats undefined as no rules', () => {
 		expect(validateResponseRules(undefined)).toEqual([]);
 	});
@@ -180,6 +272,17 @@ describe('validateResponseRules', () => {
 		const rules = [{ match: 'a', files: ['b.txt', 'c.txt'] }];
 		expect(validateResponseRules(rules)).toEqual(rules);
 	});
+
+	test.each(['end', 'max_tokens', 'refusal'])(
+		'accepts a stopReason of "%s" on a file or a files rule',
+		(stopReason) => {
+			const rules = [
+				{ match: 'a', file: 'b.txt', stopReason },
+				{ match: 'c', files: ['d.txt', 'e.txt'], stopReason },
+			];
+			expect(validateResponseRules(rules)).toEqual(rules);
+		},
+	);
 
 	test.each([
 		['not an array', { match: 'a', file: 'b' }, /must be an array/],
@@ -201,6 +304,21 @@ describe('validateResponseRules', () => {
 			'non-string in files',
 			[{ match: 'a', files: ['b', 3] }],
 			/\[0\]\.files/,
+		],
+		[
+			'unknown stopReason',
+			[{ match: 'a', file: 'b', stopReason: 'length' }],
+			/\[0\]\.stopReason must be one of: end, max_tokens, refusal/,
+		],
+		[
+			'stopReason in the wrong case',
+			[{ match: 'a', files: ['b'], stopReason: 'MAX_TOKENS' }],
+			/\[0\]\.stopReason/,
+		],
+		[
+			'non-string stopReason',
+			[{ match: 'a', file: 'b', stopReason: null }],
+			/\[0\]\.stopReason/,
 		],
 	])('rejects %s', (_name, rules, message) => {
 		expect(() => validateResponseRules(rules)).toThrow(message);

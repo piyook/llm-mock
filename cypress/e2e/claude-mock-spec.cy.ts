@@ -240,6 +240,182 @@ describe('Mock LLM Spec for Claude (Anthropic Messages API)', () => {
             });
         });
 
+        it('ends a reply the way its rule says, not streamed', () => {
+            cy.request({
+                method: 'POST',
+                url,
+                body: ruleBody('E2E_FIXTURE_CUT_OFF'),
+            }).then((response) => {
+                expect(response.body.stop_reason).to.eq('max_tokens');
+                expect(response.body).not.to.have.property('stop_details');
+                expect(response.body.content[0].text).to.match(/except$/);
+            });
+
+            cy.request({
+                method: 'POST',
+                url,
+                body: ruleBody('E2E_FIXTURE_REFUSED'),
+            }).then((response) => {
+                expect(response.body.stop_reason).to.eq('refusal');
+                expect(response.body.stop_details).to.deep.eq({
+                    type: 'refusal',
+                    category: null,
+                    explanation: null,
+                });
+            });
+
+            // A rule with no stopReason ends normally
+            cy.request({
+                method: 'POST',
+                url,
+                body: ruleBody('E2E_FIXTURE_TEXT'),
+            }).then((response) => {
+                expect(response.body.stop_reason).to.eq('end_turn');
+                expect(response.body).not.to.have.property('stop_details');
+            });
+        });
+
+        it('ends a streamed reply the way its rule says', () => {
+            const messageDelta = (marker: string) =>
+                cy
+                    .request({
+                        method: 'POST',
+                        url,
+                        body: ruleBody(marker, { stream: true }),
+                    })
+                    .then((response) => {
+                        const events = parseSse(response.body as string);
+                        expect(events.at(-1)?.event).to.eq('message_stop');
+                        return events.find((e) => e.event === 'message_delta')
+                            ?.data.delta;
+                    });
+
+            messageDelta('E2E_FIXTURE_CUT_OFF').should('deep.eq', {
+                stop_reason: 'max_tokens',
+                stop_sequence: null,
+            });
+            messageDelta('E2E_FIXTURE_REFUSED').should('deep.eq', {
+                stop_reason: 'refusal',
+                stop_sequence: null,
+                stop_details: {
+                    type: 'refusal',
+                    category: null,
+                    explanation: null,
+                },
+            });
+            messageDelta('E2E_FIXTURE_TEXT').should('deep.eq', {
+                stop_reason: 'end_turn',
+                stop_sequence: null,
+            });
+        });
+
+        it('reports each rule\'s stop reason and shows it on the dashboard', () => {
+            cy.request('/ui-meta')
+                .its('body.responseRules')
+                .then((rules: Array<{ match: string; stopReason: string }>) => {
+                    expect(
+                        rules.map((rule) => [rule.match, rule.stopReason]),
+                    ).to.deep.eq([
+                        ['E2E_FIXTURE_JSON', 'end'],
+                        ['E2E_FIXTURE_TEXT', 'end'],
+                        ['E2E_FIXTURE_POOL', 'end'],
+                        ['E2E_FIXTURE_CUT_OFF', 'max_tokens'],
+                        ['E2E_FIXTURE_REFUSED', 'refusal'],
+                        ['E2E_FIXTURE_FAIL', 'end'],
+                    ]);
+                });
+
+            cy.visit('/');
+            cy.get('[cy-data="response_rules_count"]').should(
+                'contain',
+                '6 rules',
+            );
+            // Only a rule that does not end normally says how it ends
+            cy.get('[cy-data="rule_stop_reason"]').should('have.length', 2);
+            cy.get('[cy-data="rule_stop_reason"]')
+                .eq(0)
+                .should('have.text', 'max_tokens');
+            cy.get('[cy-data="rule_stop_reason"]')
+                .eq(1)
+                .should('have.text', 'refusal');
+        });
+
+        it('fails only the calls that match a rule with fail', () => {
+            // Chaos is off in this preset: the rule fails its calls anyway
+            cy.request({
+                method: 'POST',
+                url,
+                body: ruleBody('E2E_FIXTURE_FAIL', { stream: true }),
+            }).then((response) => {
+                const events = parseSse(response.body as string);
+
+                expect(response.status).to.eq(200);
+                expect(response.headers['x-llmock-chaos']).to.eq('true');
+                expect(events.map((e) => e.event)).to.deep.eq([
+                    'message_start',
+                    'content_block_start',
+                    'content_block_delta',
+                    'error',
+                ]);
+                expect(events.at(-1)?.data).to.deep.eq({
+                    type: 'error',
+                    error: {
+                        type: 'overloaded_error',
+                        message: 'llmock chaos: simulated 529 error',
+                    },
+                });
+            });
+
+            // Not streamed, a stream-error is the HTTP error
+            cy.request({
+                method: 'POST',
+                url,
+                failOnStatusCode: false,
+                body: ruleBody('E2E_FIXTURE_FAIL'),
+            }).then((response) => {
+                expect(response.status).to.eq(529);
+                expect(response.headers['x-llmock-chaos']).to.eq('true');
+                expect(response.body.error.type).to.eq('overloaded_error');
+            });
+
+            // The next call, which matches another rule, is untouched
+            cy.request({
+                method: 'POST',
+                url,
+                body: ruleBody('E2E_FIXTURE_TEXT'),
+            }).then((response) => {
+                expect(response.status).to.eq(200);
+                expect(response.headers).not.to.have.property('x-llmock-chaos');
+            });
+        });
+
+        it('reports how a rule fails and shows it on the dashboard', () => {
+            cy.request('/ui-meta')
+                .its('body.responseRules')
+                .then((rules: Array<{ match: string; fail: unknown }>) => {
+                    expect(rules.at(-1)).to.deep.include({
+                        match: 'E2E_FIXTURE_FAIL',
+                        files: [],
+                        fail: {
+                            kind: 'stream-error',
+                            status: 529,
+                            afterChunks: 1,
+                        },
+                    });
+                    expect(rules[0].fail).to.eq(null);
+                });
+
+            cy.visit('/');
+            // Only the rule that fails says so, and it has no file to open
+            cy.get('[cy-data="rule_fail"]')
+                .should('have.length', 1)
+                .and('have.text', 'stream-error 529 after 1 delta');
+            cy.get('[cy-data="rule_fail"]')
+                .closest('.rule')
+                .find('[cy-data="rule_file_link"]')
+                .should('not.exist');
+        });
+
         it('generates normal text when no rule matches', () => {
             cy.readFile(fixturePath).then((fixture) => {
                 cy.request({

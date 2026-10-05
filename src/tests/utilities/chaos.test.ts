@@ -18,6 +18,8 @@ beforeEach(() => {
 	delete process.env.CHAOS_FREQUENCY;
 	delete process.env.CHAOS_MODE;
 	delete process.env.CHAOS_STATUS;
+	delete process.env.CHAOS_KIND;
+	delete process.env.CHAOS_AFTER_CHUNKS;
 	resetChaos();
 });
 
@@ -37,6 +39,8 @@ describe('getChaosConfig', () => {
 			frequency: 1,
 			mode: 'every',
 			status: 500,
+			kind: 'http',
+			afterChunks: 2,
 		});
 	});
 
@@ -45,12 +49,16 @@ describe('getChaosConfig', () => {
 		process.env.CHAOS_FREQUENCY = '4';
 		process.env.CHAOS_MODE = 'random';
 		process.env.CHAOS_STATUS = '429';
+		process.env.CHAOS_KIND = 'stream-drop';
+		process.env.CHAOS_AFTER_CHUNKS = '0';
 
 		expect(getChaosConfig()).toEqual({
 			enabled: true,
 			frequency: 4,
 			mode: 'random',
 			status: 429,
+			kind: 'stream-drop',
+			afterChunks: 0,
 		});
 	});
 
@@ -78,6 +86,37 @@ describe('getChaosConfig', () => {
 		process.env.CHAOS_MODE = 'sometimes';
 
 		expect(getChaosConfig().mode).toBe('every');
+	});
+
+	test.each(['stream-error', 'stream-drop', 'stream-stall', 'http'])(
+		'reads a kind of "%s"',
+		(setting) => {
+			process.env.CHAOS_KIND = setting;
+
+			expect(getChaosConfig().kind).toBe(setting);
+		},
+	);
+
+	test.each(['stream', 'drop', '', 'stream_error'])(
+		'a kind of "%s" falls back to http',
+		(setting) => {
+			process.env.CHAOS_KIND = setting;
+
+			expect(getChaosConfig().kind).toBe('http');
+		},
+	);
+
+	test.each([
+		['0', 0],
+		['7', 7],
+		['-1', 2],
+		['1.5', 2],
+		['abc', 2],
+		['', 2],
+	])('an afterChunks of "%s" becomes %i', (setting, expected) => {
+		process.env.CHAOS_AFTER_CHUNKS = setting;
+
+		expect(getChaosConfig().afterChunks).toBe(expected);
 	});
 });
 

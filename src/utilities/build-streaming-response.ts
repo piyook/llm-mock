@@ -1,6 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { delay, getDelayConfig } from './delay.js';
 import { buildResponse } from './build-response.js';
+import { toWireStopReason, type StopReason } from './stop-reason.js';
 
 export interface StreamingChunk {
 	id: string;
@@ -13,7 +14,7 @@ export interface StreamingChunk {
 			role?: string;
 			content?: string;
 		};
-		finish_reason: 'stop' | null;
+		finish_reason: string | null;
 	}>;
 }
 
@@ -34,10 +35,12 @@ export interface StreamingChunk {
  * - Uses same created timestamp and model as static template
  *
  * @param content - The full content to be streamed
+ * @param stopReason - How the reply ends, if a response rule set it
  * @returns Promise<string[]> Array of SSE-formatted chunks
  */
 export const generateStreamingChunks = async (
 	content: string,
+	stopReason?: StopReason,
 ): Promise<string[]> => {
 	const chunks: string[] = [];
 
@@ -100,8 +103,13 @@ export const generateStreamingChunks = async (
 	}
 
 	// Final chunk with finish_reason (OpenAI format requirement)
-	// Extract finish_reason from static template or default to stop
-	const finishReason = staticResponse.choices?.[0]?.finish_reason || 'stop';
+	// Extract finish_reason from static template or default to stop. A rule's
+	// stop reason other than a normal end wins; the stream is OpenAI-shaped
+	// whichever preset is active.
+	const finishReason =
+		stopReason && stopReason !== 'end'
+			? toWireStopReason('openai', stopReason)
+			: staticResponse.choices?.[0]?.finish_reason || 'stop';
 	const finalChunk: StreamingChunk = {
 		id: `${baseId}-final`,
 		object: 'chat.completion.chunk',
@@ -111,7 +119,7 @@ export const generateStreamingChunks = async (
 			{
 				index: 0,
 				delta: {}, // Empty delta for final chunk
-				finish_reason: finishReason as 'stop',
+				finish_reason: finishReason,
 			},
 		],
 	};
@@ -154,11 +162,13 @@ export const setStreamingHeaders = (reply: any) => {
  *
  * @param chunks - Array of SSE-formatted chunks to stream
  * @param reply - Fastify reply object
+ * @param end - End the response after the last chunk (false leaves it open)
  * @returns Promise<void>
  */
 export const streamWithDelay = async (
 	chunks: string[],
 	reply: any,
+	end: boolean = true,
 ): Promise<void> => {
 	const delayConfig = getDelayConfig();
 
@@ -178,5 +188,5 @@ export const streamWithDelay = async (
 		}
 	}
 
-	reply.raw.end();
+	if (end) reply.raw.end();
 };
