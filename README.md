@@ -16,11 +16,29 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - [Why LLMock?](#why-llmock)
 - [Quick Start](#quick-start)
 - [Installation Options](#installation-options)
+  - [CLI options](#cli-options)
 - [Configuration](#configuration)
+  - [Configuration file](#configuration-file-llmockrcjson)
+  - [Adding custom models](#adding-custom-models)
+  - [Response types](#response-types)
+  - [Response rules (fixture replies)](#response-rules-fixture-replies)
+  - [Streaming responses](#streaming-responses)
+  - [Response delay simulation](#response-delay-simulation)
+  - [Chaos mode (error simulation)](#chaos-mode-error-simulation)
+  - [Custom API paths](#custom-api-paths)
 - [Features](#features)
+  - [Dashboard](#dashboard)
+  - [Request validation](#request-validation)
+  - [Request logging](#request-logging)
 - [Integration Guide](#integration-guide)
+  - [Chat completions](#chat-completions)
+  - [Embeddings API](#embeddings-api)
+  - [Using with LangChain](#using-with-langchain)
 - [Supporting Different LLM Providers](#supporting-different-llm-providers)
+  - [Anthropic (Claude Messages API)](#anthropic-claude-messages-api)
+  - [Creating a custom provider template](#creating-a-custom-provider-template)
 - [Docker Support](#docker-support)
+  - [Standalone Docker setup](#standalone-docker-setup-no-scaffolding)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
@@ -34,6 +52,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - **Offline capable** — works without internet connectivity
 - **Full visibility** — complete request logging and a live dashboard
 - **Realistic simulation** — configurable delays, SSE streaming, and mock embeddings
+- **Intermittent errors** — chaos mode fails every call or 1 in X calls with a 429, 500 or any other error status, to test retries and error handling
 - **OpenAI-compatible** — works with ChatGPT, Grok, Llama, DeepSeek, Gemini, and any OpenAI-style API
 - **Anthropic Messages API** — built-in `claude` preset with the SDK's streaming event format
 - **Fixture replies** — return canned text or JSON for requests that contain a chosen string
@@ -125,6 +144,33 @@ All CLI flags support both `--key=value` and `--key value` formats and override 
 
 `llmock start` returns once the server is answering. If the server cannot start (for example a config error), or one is already running on that port, it exits with an error instead; run with `--foreground` to see the server's own output.
 
+### CLI options
+
+Each option overrides the matching setting of the selected preset for that run:
+
+| Option | Overrides | Value |
+|---|---|---|
+| `--model` | `defaultModel` | Name of a preset in `.llmockrc.json` |
+| `--port` / `--host` | `server.port` / `server.host` | Port number / address |
+| `--endpoint` | `endpoint` | Path without a leading slash |
+| `--responseType` | `responseType` | `lorem` or `stored` |
+| `--maxLoremParas` | `maxLoremParas` | Number |
+| `--validateRequests` | `validateRequests` | `true` or `false` |
+| `--logRequests` | `logRequests` | `true` or `false` |
+| `--maxLoggedRequests` | `maxLoggedRequests` | `1` to `100` |
+| `--debug` | `debug` | `true` or `false` |
+| `--stream` | `stream` | `true` or `false` |
+| `--delayMin` / `--delayMax` | `responseDelay.min` / `.max` | Milliseconds |
+| `--chaos` | `chaos.enabled` | `true` or `false` |
+| `--chaosFrequency` | `chaos.frequency` | Whole number, `1` or more |
+| `--chaosMode` | `chaos.mode` | `every` or `random` |
+| `--chaosStatus` | `chaos.status` | `400` to `599` |
+| `--embeddings` | `embeddings.enabled` | `true` or `false` |
+| `--embeddingDimensions` | `embeddings.dimensions` | Number |
+| `--foreground` | | No value; keeps the server attached (see below) |
+
+`llmock help` prints the same list. `responseRules` and `storedResponsesFile` can only be set in the config file.
+
 ### Foreground Mode
 
 For Docker containers or when you want the server to stay attached to your terminal:
@@ -178,6 +224,12 @@ The config file is read once at startup, so restart the server after changing it
       "embeddings": {
         "enabled": true,
         "dimensions": 128
+      },
+      "chaos": {
+        "enabled": false,
+        "frequency": 1,
+        "mode": "every",
+        "status": 500
       }
     }
   },
@@ -422,7 +474,7 @@ Once running, open `http://localhost:8001` for the live dashboard:
 | `http://localhost:8001` | Main dashboard |
 | `http://localhost:8001/ping` | Health check |
 
-The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged request. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
+The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged requests. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
 
 With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with; click a file to read its contents. With no rules set, the box shows a blank rule with a note pointing to the setting.
 
@@ -650,7 +702,7 @@ curl http://localhost:8001/v1/messages \
 Behaviour:
 
 - **Request validation** requires only `model`, `max_tokens` and `messages`. Extra fields (`system`, `output_config`, `temperature`, ...) are accepted.
-- **Streaming is per request.** `"stream": true` returns Anthropic SSE events in order: `message_start`, `content_block_start`, `content_block_delta` (text deltas that rejoin to the full text), `content_block_stop`, `message_delta` (`stop_reason: "end_turn"`), `message_stop`. Otherwise a single `message` object is returned.
+- **Streaming is per request.** `"stream": true` returns Anthropic SSE events in order: `message_start`, `content_block_start`, `content_block_delta` (text deltas that rejoin to the full text), `content_block_stop`, `message_delta` (`stop_reason: "end_turn"`), `message_stop`. Otherwise a single `message` object is returned. The preset's `stream` setting is ignored.
 - **Responses** have a unique `msg_` id, echo the requested `model`, and report estimated `usage` (about 4 characters per token).
 - [Response rules](#response-rules-fixture-replies) and [stored responses](#response-types) work here too. Rules match against `system` as well as `messages`.
 
@@ -864,7 +916,11 @@ Confirm the server is running and the port matches `.llmockrc.json`. Open `http:
 
 Run `llmock start --foreground` with the same options to see the server's output. If it reports a server already running on the port, run `llmock stop` (with `--port` if it isn't 8001) first.
 
-The server refuses to start on a malformed `responseRules` entry, or on a `storedResponsesFile` that is missing or not valid; the message names the setting and the file.
+The server refuses to start on a malformed `responseRules` entry, or on a `storedResponsesFile` that is missing or not valid; the message names the setting and the file. It also refuses a `chaos` setting that is not valid (see [Chaos mode](#chaos-mode-error-simulation)).
+
+**Calls fail with a 500 or another error you didn't expect**
+
+Check whether chaos is on: the **Chaos** box on the dashboard shows `ENABLED`, and a chaos error carries the header `x-llmock-chaos: true`. Set `"chaos": { "enabled": false }` in the preset (or drop `--chaos=true`) and restart.
 
 **Port already in use**
 
