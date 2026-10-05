@@ -23,6 +23,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
   - [Response types](#response-types)
   - [Response rules (fixture replies)](#response-rules-fixture-replies)
     - [Truncated and refused replies](#truncated-and-refused-replies-stopreason)
+    - [Failing one prompt](#failing-one-prompt-fail)
   - [Streaming responses](#streaming-responses)
   - [Response delay simulation](#response-delay-simulation)
   - [Chaos mode (error simulation)](#chaos-mode-error-simulation)
@@ -262,7 +263,7 @@ The config file is read once at startup, so restart the server after changing it
 | `debug` | Enable verbose console logging |
 | `stream` | Return SSE streaming responses (the `claude` preset decides per request instead) |
 | `responseDelay.min/max` | Response delay range in milliseconds |
-| `responseRules` | Optional list of `{ match, file }` or `{ match, files }` fixture replies, each with an optional `stopReason` (see [Response rules](#response-rules-fixture-replies)) |
+| `responseRules` | Optional list of `{ match, file }` or `{ match, files }` fixture replies, each with an optional `stopReason`, or `{ match, fail }` to fail the calls that match (see [Response rules](#response-rules-fixture-replies)) |
 | `chaos.enabled` | Fail some calls (see [Chaos mode](#chaos-mode-error-simulation)) |
 | `chaos.frequency` | Fail 1 in this many calls (default `1`, every call) |
 | `chaos.mode` | `"every"` (each Xth call, the default) or `"random"` (a 1 in X chance per call) |
@@ -386,6 +387,33 @@ A real model does not always finish its answer: it can run out of tokens, or dec
 - It works with `file` and `files`, and with static and streamed replies. In a `claude` stream the value is in the `message_delta` event; in an OpenAI-style stream it is the last chunk's `finish_reason`. A streamed `gemini` reply is OpenAI-style, so it carries the `openai` value.
 - A refused `claude` reply also carries the `stop_details` object the Anthropic API sends with a refusal: `{ "type": "refusal", "category": null, "explanation": null }`.
 - A rule without `stopReason` behaves exactly as before. Any other value stops the server at startup.
+
+#### Failing one prompt (`fail`)
+
+[Chaos mode](#chaos-mode-error-simulation) fails 1 in X calls, whichever they are. To fail one particular prompt and leave the rest alone, give a rule `fail`:
+
+```json
+{
+  "responseRules": [
+    { "match": "Summarise the Q3 report", "fail": { "kind": "stream-error", "status": 529, "afterChunks": 1 } },
+    { "match": "Translate this", "fail": { "status": 429 } }
+  ]
+}
+```
+
+| `fail` setting | What it does | Default |
+|---|---|---|
+| `kind` | `"http"`, `"stream-error"`, `"stream-drop"` or `"stream-stall"`, as in [Stream failures](#stream-failures) | `"http"` |
+| `status` | HTTP status of the error, `400` to `599` | `500` |
+| `afterChunks` | How many content deltas a failing stream sends first | `2` |
+
+- Every call that matches the rule fails, whether or not chaos is on. Every other call is untouched, so your tests do not depend on the order the calls arrive in.
+- The call gets exactly what a failing chaos call of that `kind` gets: the same error bodies, the `x-llmock-chaos: true` header, and the same handling of a call that did not ask for a stream.
+- All three settings are optional: `"fail": {}` is an HTTP 500. They are the rule's own; nothing is taken from the preset's `chaos`.
+- A rule with `fail` needs no `file` or `files`. Add one to choose the text a `stream-*` failure sends before it fails; without one that text is a normal generated reply.
+- The rule fails every time, so a client that retries the same prompt fails again. To have a retry succeed, use chaos with `frequency: 2`.
+- These failures are added to the dashboard's chaos count, but do not shift which of the other calls chaos fails.
+- A `fail` that is not valid stops the server at startup.
 
 ### Streaming responses
 
@@ -573,7 +601,7 @@ Once running, open `http://localhost:8001` for the live dashboard:
 
 The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged requests. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
 
-With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, and how the reply ends when the rule sets a `stopReason` other than `end`; click a file to read its contents. With no rules set, the box shows a blank rule with a note pointing to the setting.
+With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. With no rules set, the box shows a blank rule with a note pointing to the setting.
 
 ### Available endpoints
 
@@ -801,7 +829,7 @@ Behaviour:
 - **Request validation** requires only `model`, `max_tokens` and `messages`. Extra fields (`system`, `output_config`, `temperature`, ...) are accepted.
 - **Streaming is per request.** `"stream": true` returns Anthropic SSE events in order: `message_start`, `content_block_start`, `content_block_delta` (text deltas that rejoin to the full text), `content_block_stop`, `message_delta` (`stop_reason: "end_turn"`), `message_stop`. Otherwise a single `message` object is returned. The preset's `stream` setting is ignored.
 - **Stop reasons.** A reply ends with `end_turn` unless its response rule sets a [`stopReason`](#truncated-and-refused-replies-stopreason) of `max_tokens` or `refusal`. A refusal also carries `stop_details`.
-- **Mid-stream failures.** [Chaos mode](#stream-failures) can fail a stream part-way through with an `event: error`, a cut connection or a stall.
+- **Mid-stream failures.** [Chaos mode](#stream-failures) can fail a stream part-way through with an `event: error`, a cut connection or a stall. A response rule with [`fail`](#failing-one-prompt-fail) does the same for one prompt.
 - **Responses** have a unique `msg_` id, echo the requested `model`, and report estimated `usage` (about 4 characters per token).
 - [Response rules](#response-rules-fixture-replies) and [stored responses](#response-types) work here too. Rules match against `system` as well as `messages`.
 

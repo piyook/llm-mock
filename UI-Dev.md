@@ -27,7 +27,7 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
   - `chaosStatus`, `chaosFrequency`, `chaosMode`, `chaosErrorStatus`, `chaosKind`, `chaosAfterChunks` (the chaos settings) and `chaosInjected` (calls failed since the server started)
   - `apiLinks` (resolved API URLs based on `LLM_URL_ENDPOINT`)
   - `storedResponsesCount` / `storedResponsesFile` (when the response type is `stored`)
-  - `responseRules` (each rule's `match`, the `files` it replies with and its `stopReason`)
+  - `responseRules` (each rule's `match`, the `files` it replies with, its `stopReason` and its `fail` settings, `null` if it replies)
 
 - The viewer dialog reads file contents from `/ui-stored-responses` and `/ui-rule-file?rule=<i>&file=<j>`, and the most recent logged requests (10 unless `maxLoggedRequests` is set) from `/ui-request-log`, shown one at a time. **Clear logs** sends `DELETE /ui-request-log`.
 
