@@ -8,6 +8,7 @@ const suites = [
   { start: "llmock:start:embeddings",spec: "cypress/e2e/embeddings-spec.cy.ts" },
   { start: "llmock:start:claude",    spec: "cypress/e2e/claude-mock-spec.cy.ts" },
   { start: "llmock:start:stored",    spec: "cypress/e2e/stored-responses-spec.cy.ts" },
+  { start: "llmock:start:chaos",     spec: "cypress/e2e/chaos-spec.cy.ts" },
 ];
 
 // By default only a one-line result per suite is printed, and the full server

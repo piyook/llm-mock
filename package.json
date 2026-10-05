@@ -72,6 +72,7 @@
 		"llmock:start:embeddings": "node scripts/llmock.mjs start --model=embeddings",
 		"llmock:start:claude": "node scripts/llmock.mjs start --model=claude",
 		"llmock:start:stored": "node scripts/llmock.mjs start --model=stored",
+		"llmock:start:chaos": "node scripts/llmock.mjs start --model=chaos",
 		"llmock:stop": "node bin/llmock.js stop"
 	},
 	"dependencies": {

@@ -18,6 +18,12 @@
       "embeddings": {
         "enabled": true,
         "dimensions": 128
+      },
+      "chaos": {
+        "enabled": false,
+        "frequency": 1,
+        "mode": "every",
+        "status": 500
       }
     },
     "gemini": {
@@ -37,6 +43,12 @@
       "embeddings": {
         "enabled": true,
         "dimensions": 128
+      },
+      "chaos": {
+        "enabled": false,
+        "frequency": 1,
+        "mode": "every",
+        "status": 500
       }
     },
     "claude": {
@@ -56,6 +68,12 @@
       "embeddings": {
         "enabled": false,
         "dimensions": 128
+      },
+      "chaos": {
+        "enabled": false,
+        "frequency": 1,
+        "mode": "every",
+        "status": 500
       }
     },
     "streaming": {
@@ -75,6 +93,12 @@
       "embeddings": {
         "enabled": true,
         "dimensions": 128
+      },
+      "chaos": {
+        "enabled": false,
+        "frequency": 1,
+        "mode": "every",
+        "status": 500
       }
     },
     "embeddings": {
@@ -94,6 +118,12 @@
       "embeddings": {
         "enabled": true,
         "dimensions": 256
+      },
+      "chaos": {
+        "enabled": false,
+        "frequency": 1,
+        "mode": "every",
+        "status": 500
       }
     }
   },

@@ -10,6 +10,7 @@ import {
 import { clearLog, logPath, maxLogEntries } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { readRuleFile, ruleFiles } from './response-rules.js';
+import { getChaosConfig, getChaosStats } from './chaos.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 
@@ -199,6 +200,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		const embeddingDimension =
 			Number(process.env?.EMBEDDING_DIMENSION) || 128;
 
+		const chaos = getChaosConfig();
+
 		// Create unique API links to avoid Svelte duplicate key errors
 		const apiLinksSet = new Set<string>();
 
@@ -238,6 +241,11 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			responseDelayMaxMs,
 			delayStatus,
 			streamingStatus,
+			chaosStatus: chaos.enabled ? 'ENABLED' : 'DISABLED',
+			chaosFrequency: chaos.frequency,
+			chaosMode: chaos.mode,
+			chaosErrorStatus: chaos.status,
+			chaosInjected: getChaosStats().injected,
 			embeddingsEnabled: embeddingsEnabled ? 'ENABLED' : 'DISABLED',
 			embeddingDimension,
 			apiLinks,

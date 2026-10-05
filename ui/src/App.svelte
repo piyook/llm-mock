@@ -156,6 +156,14 @@
 		return min === max ? `${min}ms` : `${min}–${max}ms`;
 	}
 
+	// How often a call fails: "Every call", "Every 3 calls" or "Random, 1 in 3"
+	function chaosFrequencyLabel(m: UiMeta): string {
+		if (m.chaosFrequency <= 1) return 'Every call';
+		return m.chaosMode === 'random'
+			? `Random, 1 in ${m.chaosFrequency}`
+			: `Every ${m.chaosFrequency} calls`;
+	}
+
 	async function refresh() {
 		try {
 			const [m, p] = await Promise.all([fetchUiMeta(), fetchPing()]);
@@ -272,6 +280,36 @@
 				</div>
 			{/if}
 		</div>
+	</section>
+
+	<section class="card" cy-data="chaos">
+		<h2>Chaos</h2>
+		<div class="grid">
+			<div class="kv">
+				<span class="muted">Chaos</span>
+				<span class="badge" cy-data="chaos_status">{meta?.chaosStatus ?? 'DISABLED'}</span>
+			</div>
+			{#if meta?.chaosStatus === 'ENABLED'}
+				<div class="kv">
+					<span class="muted">Error Frequency</span>
+					<span class="badge" cy-data="chaos_frequency">{chaosFrequencyLabel(meta)}</span>
+				</div>
+				<div class="kv">
+					<span class="muted">Error Status</span>
+					<span class="badge" cy-data="chaos_error_status">{meta.chaosErrorStatus}</span>
+				</div>
+				<div class="kv">
+					<span class="muted">Errors Injected</span>
+					<span class="badge" cy-data="chaos_injected">{meta.chaosInjected}</span>
+				</div>
+			{/if}
+		</div>
+		<p class="muted cardNote" cy-data="chaos_note">
+			Chaos answers some calls with an HTTP error in place of a reply. Set
+			<code>chaos</code> (<code>enabled</code>, <code>frequency</code>, <code>mode</code>,
+			<code>status</code>) in the model preset in <code>.llmockrc.json</code>, or start
+			with <code>--chaos=true --chaosFrequency=&lt;num&gt;</code>.
+		</p>
 	</section>
 
 	<section class="card" cy-data="response_rules">

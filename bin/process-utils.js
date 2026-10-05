@@ -114,7 +114,19 @@ export function applyConfigDefaults(config, modelName) {
     ...preset,
     responseDelay: { min: 0, max: 0, ...preset.responseDelay },
     embeddings: { enabled: false, dimensions: 128, ...preset.embeddings },
+    chaos: { enabled: false, frequency: 1, mode: 'every', status: 500, ...preset.chaos },
   };
+
+  const { frequency, mode, status } = model.chaos;
+  if (!Number.isInteger(frequency) || frequency < 1) {
+    throw new Error(`Model "${modelName}": chaos.frequency must be a whole number of 1 or more`);
+  }
+  if (mode !== 'every' && mode !== 'random') {
+    throw new Error(`Model "${modelName}": chaos.mode must be "every" or "random"`);
+  }
+  if (!Number.isInteger(status) || status < 400 || status > 599) {
+    throw new Error(`Model "${modelName}": chaos.status must be an HTTP error status (400 to 599)`);
+  }
 
   return {
     ...config,
