@@ -2,9 +2,9 @@
 
 ## Context
 
-The table lists 15 features that would move llmock from "returns lorem or canned text" to "scripts realistic agent conversations". This plan sizes each one against the code as it is at 3.8.1, explains what each is for, and puts them in a build order.
+The table lists 15 features that would move llmock from "returns lorem or canned text" to "scripts realistic agent conversations". This plan sizes each one against the code as it was at 3.8.1, explains what each is for, and puts them in a build order. Rows that have changed since are marked with the version that changed them.
 
-Summary: about a third of the table is already partly built. The real gaps are **tool calls**, **turn-aware matching**, **error injection**, **runtime control from tests** and **record/replay**. Nearly everything depends on two small refactors, so those go first.
+Summary: about a third of the table is already partly built. The real gaps are **tool calls**, **turn-aware matching**, **runtime control from tests** and **record/replay**. **Error injection** was a gap too; its first part shipped in 3.9.0 as chaos mode (see row 9). Nearly everything depends on two small refactors, so those go first.
 
 Sizes: **S** = up to 1 day, **M** = 2-3 days, **L** = 4-7 days. These are rough estimates for one person, including unit tests, Cypress e2e, README/`llms.txt` and dashboard updates.
 
@@ -20,9 +20,9 @@ Sizes: **S** = up to 1 day, **M** = 2-3 days, **L** = 4-7 days. These are rough 
 | 6 | Record & replay | None | Upstream proxy, SSE collapse, fixture writer | L |
 | 7 | Model matching | Accidental (substring also hits `model`) | Dedicated `match.model` + suffix normalisation | S |
 | 8 | System matching | Accidental (same) | Dedicated `match.systemMessage`, per-provider extraction | S |
-| 9 | Chaos | None | Error bodies, timeouts, mid-stream drops | M |
+| 9 | Chaos | Partial (3.9.0): `chaos: { enabled, frequency, mode, status }` fails every call or 1 in X calls (counter or random) with a provider-shaped error body and `retry-after`, on the chat and embeddings routes; shown on the dashboard | Timeouts, malformed bodies, mid-stream drops, forcing an outcome per request, scripted errors from rules | S-M |
 | 10 | Programmatic API | None; `server.ts` is a top-level script driven by `process.env` | See Phase 5 | M (HTTP) / L (in-process) |
-| 11 | Richer CLI | Mostly there: start/stop/config + 15 flags | New flags as features land, `validate` command | S |
+| 11 | Richer CLI | Mostly there: start/stop/config + 19 flags | New flags as features land, `validate` command | S |
 | 12 | Validation | Partial: shape checks + missing-file warnings at boot | Shadowing/duplicate detection | S |
 | 13 | Metrics | Request log only (validated requests) | Matched-rule id in log, `/metrics` | S |
 | 14 | More providers | OpenAI chat, Claude, Gemini, embeddings, custom templates | One preset per process; no Responses API, Ollama, Bedrock | M each, Bedrock L |
@@ -38,7 +38,7 @@ Sizes: **S** = up to 1 day, **M** = 2-3 days, **L** = 4-7 days. These are rough 
 6. **Record & replay**: run once against the real API, save the replies as fixtures, replay in CI. *Scenario:* a 40-step agent run nobody wants to hand-write fixtures for; also zero token cost in CI.
 7. **Model matching**: *Scenario:* app uses a cheap model to classify and a large one to answer, with overlapping prompts; each needs its own reply. Normalising `gpt-4o-2024-08-06` → `gpt-4o` stops fixtures breaking on version bumps.
 8. **System matching**: *Scenario:* one server backs a "support" persona and a "sales" persona that receive identical user text.
-9. **Chaos**: *Scenario:* proving your retry/backoff works on 429 and 529, that a stream cut mid-reply doesn't leave the UI hung, that malformed JSON is caught.
+9. **Chaos**: *Scenario:* proving your retry/backoff works on 429 and 529 (possible since 3.9.0), that a stream cut mid-reply doesn't leave the UI hung, that malformed JSON is caught.
 10. **Programmatic API**: set replies from inside a test rather than a shared config file. *Scenario:* `mock.addRule(...)` in `beforeEach`, `mock.requests()` to assert what your app actually sent.
 11. **CLI**: *Scenario:* `llmock start --fixtures ./fixtures --record --latency 200` in a CI step, `llmock validate` as a pre-commit check.
 12. **Validation**: *Scenario:* a broad rule placed above a specific one silently swallows it and a test passes for the wrong reason; boot prints "rule 3 can never match, shadowed by rule 1".
@@ -69,10 +69,15 @@ Extend `responseRules` rather than adding a parallel fixtures system, so existin
 - Streaming: `build-streaming-response.ts` (indexed `tool_calls` deltas with split `arguments`) and `build-claude-streaming-response.ts` (`input_json_delta`, multiple content blocks).
 - Most of the effort is wire-format accuracy; verify against the real OpenAI and Anthropic SDKs, not hand-written assertions.
 
-### Phase 3: streaming fidelity #5 and chaos #9 (M + M)
+### Phase 3: streaming fidelity #5 and the rest of chaos #9 (M + S-M)
 
 - Replace the duplicated per-chunk delay in `streamWithDelay` / `streamClaudeEvents` with one pacing helper in `src/utilities/delay.ts`: `ttft`, `tps`, `jitter`. Honour the request's `stream` flag for the openai format (`stream-mode.ts`), add the `include_usage` chunk, and give Gemini its own stream shape.
-- Chaos: preset `chaos: { errorRate, status, timeoutRate, malformedRate, disconnectRate }` plus an `X-LLMock-Chaos` header to force one outcome deterministically. Provider-shaped error bodies and `retry-after`. Mid-stream disconnect hooks into the same pacing helper, which is why these two ship together. Rules can also return `response.error` for a scripted failure.
+- Chaos, already shipped in 3.9.0 (`src/utilities/chaos.ts`, one `applyChaos(reply)` call in each of the two route handlers): preset `chaos: { enabled, frequency, mode, status }` and the `--chaos`, `--chaosFrequency`, `--chaosMode`, `--chaosStatus` flags. `frequency` is X in "1 in X calls"; `mode` is `every` (a counter, deterministic) or `random`. Provider-shaped error bodies, `retry-after` on 429/503/529, an `x-llmock-chaos: true` response header, a Chaos card on the dashboard and the settings in `/ui-meta`.
+- Chaos, still to do. Extend that shape rather than adding a second one (this replaces the earlier `errorRate` / `timeoutRate` / `malformedRate` / `disconnectRate` sketch):
+  - More failure kinds beside the HTTP error: a timeout (never answer, or answer after a set wait), a malformed body, and a mid-stream disconnect. A `chaos.type` setting, or a list to pick from at random, selects them; `frequency` and `mode` keep deciding which calls fail. The mid-stream disconnect hooks into the pacing helper above, which is why it waits for this phase.
+  - An `X-LLMock-Chaos` request header to force one outcome on one call, whatever the counter says.
+  - Rules returning `response.error` for a scripted failure (needs the reply object from Phase 0, where `error` is already reserved).
+  - The call counter is per server; scoping it per test belongs with `X-Test-Id` in Phase 5.
 
 ### Phase 4: metrics #13 and CLI #11 (S + S)
 
