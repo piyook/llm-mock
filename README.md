@@ -22,9 +22,11 @@ A lightweight local server that simulates LLM APIs for development and testing. 
   - [Adding custom models](#adding-custom-models)
   - [Response types](#response-types)
   - [Response rules (fixture replies)](#response-rules-fixture-replies)
+    - [Truncated and refused replies](#truncated-and-refused-replies-stopreason)
   - [Streaming responses](#streaming-responses)
   - [Response delay simulation](#response-delay-simulation)
   - [Chaos mode (error simulation)](#chaos-mode-error-simulation)
+    - [Stream failures](#stream-failures)
   - [Custom API paths](#custom-api-paths)
 - [Features](#features)
   - [Dashboard](#dashboard)
@@ -165,6 +167,8 @@ Each option overrides the matching setting of the selected preset for that run:
 | `--chaosFrequency` | `chaos.frequency` | Whole number, `1` or more |
 | `--chaosMode` | `chaos.mode` | `every` or `random` |
 | `--chaosStatus` | `chaos.status` | `400` to `599` |
+| `--chaosKind` | `chaos.kind` | `http`, `stream-error`, `stream-drop` or `stream-stall` |
+| `--chaosAfterChunks` | `chaos.afterChunks` | Whole number, `0` or more |
 | `--embeddings` | `embeddings.enabled` | `true` or `false` |
 | `--embeddingDimensions` | `embeddings.dimensions` | Number |
 | `--foreground` | | No value; keeps the server attached (see below) |
@@ -229,7 +233,9 @@ The config file is read once at startup, so restart the server after changing it
         "enabled": false,
         "frequency": 1,
         "mode": "every",
-        "status": 500
+        "status": 500,
+        "kind": "http",
+        "afterChunks": 2
       }
     }
   },
@@ -256,11 +262,13 @@ The config file is read once at startup, so restart the server after changing it
 | `debug` | Enable verbose console logging |
 | `stream` | Return SSE streaming responses (the `claude` preset decides per request instead) |
 | `responseDelay.min/max` | Response delay range in milliseconds |
-| `responseRules` | Optional list of `{ match, file }` or `{ match, files }` fixture replies (see [Response rules](#response-rules-fixture-replies)) |
-| `chaos.enabled` | Answer some calls with an HTTP error (see [Chaos mode](#chaos-mode-error-simulation)) |
+| `responseRules` | Optional list of `{ match, file }` or `{ match, files }` fixture replies, each with an optional `stopReason` (see [Response rules](#response-rules-fixture-replies)) |
+| `chaos.enabled` | Fail some calls (see [Chaos mode](#chaos-mode-error-simulation)) |
 | `chaos.frequency` | Fail 1 in this many calls (default `1`, every call) |
 | `chaos.mode` | `"every"` (each Xth call, the default) or `"random"` (a 1 in X chance per call) |
 | `chaos.status` | HTTP status of the error, `400` to `599` (default `500`) |
+| `chaos.kind` | What a failing call gets: `"http"` (an HTTP error, the default), `"stream-error"`, `"stream-drop"` or `"stream-stall"` (see [Stream failures](#stream-failures)) |
+| `chaos.afterChunks` | How many content deltas a failing stream sends first, `0` or more (default `2`) |
 | `embeddings.enabled` | Enable the `/v1/embeddings` endpoint |
 | `embeddings.dimensions` | Embedding vector size |
 | `server.port` / `server.host` | Port and address the server listens on (`8001`, `0.0.0.0`) |
@@ -355,6 +363,30 @@ With a request whose message contains `Classify this support ticket`, the server
 - A malformed rule stops the server at startup. An unreadable fixture (including any entry of `files`) logs a warning at startup, and a request that needs it returns an error rather than falling back to generated text.
 - Works with every preset and with both static and streamed replies.
 
+#### Truncated and refused replies (`stopReason`)
+
+A real model does not always finish its answer: it can run out of tokens, or decline. To test how your app handles that, give a rule a `stopReason`:
+
+```json
+{
+  "responseRules": [
+    { "match": "Summarise this", "file": "fixtures/cut-off.txt", "stopReason": "max_tokens" },
+    { "match": "Write the exploit", "file": "fixtures/refused.txt", "stopReason": "refusal" }
+  ]
+}
+```
+
+| `stopReason` | `claude` | `openai` (and custom templates) | `gemini` |
+|---|---|---|---|
+| `end` (the default) | `stop_reason: "end_turn"` | `finish_reason: "stop"` | `finishReason: "STOP"` |
+| `max_tokens` | `stop_reason: "max_tokens"` | `finish_reason: "length"` | `finishReason: "MAX_TOKENS"` |
+| `refusal` | `stop_reason: "refusal"` | `finish_reason: "content_filter"` | `finishReason: "SAFETY"` |
+
+- The reply text is still the fixture, exactly as written. LLMock does not shorten it, so write a fixture that stops part-way through a sentence (or part-way through a JSON object, to test your parser).
+- It works with `file` and `files`, and with static and streamed replies. In a `claude` stream the value is in the `message_delta` event; in an OpenAI-style stream it is the last chunk's `finish_reason`. A streamed `gemini` reply is OpenAI-style, so it carries the `openai` value.
+- A refused `claude` reply also carries the `stop_details` object the Anthropic API sends with a refusal: `{ "type": "refusal", "category": null, "explanation": null }`.
+- A rule without `stopReason` behaves exactly as before. Any other value stops the server at startup.
+
 ### Streaming responses
 
 Enable OpenAI-style Server-Sent Events (SSE) streaming in your config or via CLI:
@@ -401,7 +433,7 @@ Set both values to `0` for instant responses. The server picks a random value in
 
 ### Chaos mode (error simulation)
 
-Turn on chaos to have some calls answered with an HTTP error in place of a reply, so you can test retries, backoff and error handling:
+Turn on chaos to have some calls fail, so you can test retries, backoff and error handling. By default a failing call is answered with an HTTP error in place of a reply:
 
 ```json
 {
@@ -419,10 +451,12 @@ llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429
 | `frequency` | `--chaosFrequency` | Fail 1 in this many calls. `1` fails every call | `1` |
 | `mode` | `--chaosMode` | `"every"` fails calls X, 2X, 3X and so on, which is repeatable. `"random"` gives each call a 1 in X chance of failing | `"every"` |
 | `status` | `--chaosStatus` | HTTP status of the error, `400` to `599` | `500` |
+| `kind` | `--chaosKind` | What a failing call gets: `"http"`, `"stream-error"`, `"stream-drop"` or `"stream-stall"` (see [Stream failures](#stream-failures)) | `"http"` |
+| `afterChunks` | `--chaosAfterChunks` | How many content deltas a failing stream sends before it fails | `2` |
 
 - Chaos applies to the chat endpoint and `/v1/embeddings`, which share one call count. The dashboard, `/ping` and the `/ui-*` routes never fail.
 - Only a call that would have succeeded is counted. An invalid request still gets its `400`.
-- The response delay runs first, then the error is sent. A streamed call that fails gets the same JSON error, with no stream.
+- The response delay runs first, then the error is sent. A streamed call that fails gets the same JSON error, with no stream (unless `kind` says otherwise, see [Stream failures](#stream-failures)).
 - The error body has the shape the preset's provider uses, so your client's own error parsing runs:
 
   | Preset `name` | Error body |
@@ -433,8 +467,71 @@ llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429
 
   `/v1/embeddings` always uses the `openai` shape.
 - A `429`, `503` or `529` carries `retry-after: 1`. Every chaos error carries `x-llmock-chaos: true`, so a test can tell it from a real failure.
-- A `frequency`, `mode` or `status` in the config file that is not valid stops the server at startup.
-- The **Chaos** box on the dashboard shows the settings and how many errors have been sent since the server started.
+- A `frequency`, `mode`, `status`, `kind` or `afterChunks` in the config file that is not valid stops the server at startup.
+- The **Chaos** box on the dashboard shows the settings and how many calls have been failed since the server started.
+
+#### Stream failures
+
+An HTTP error is the easy failure to handle. The one that catches streaming apps out is a reply that starts and then dies. Set `kind` to have a failing call do that:
+
+```json
+{
+  "chaos": { "enabled": true, "frequency": 2, "kind": "stream-error", "afterChunks": 2 }
+}
+```
+
+```bash
+llmock start --model=claude --chaos=true --chaosFrequency=2 --chaosKind=stream-error
+```
+
+| `kind` | What a failing streamed call gets |
+|---|---|
+| `http` | The HTTP error described above, with no stream. This is the default |
+| `stream-error` | The stream starts, sends `afterChunks` content deltas, then sends the provider's in-stream error and ends |
+| `stream-drop` | The stream starts, sends `afterChunks` content deltas, then the connection is cut with nothing more sent |
+| `stream-stall` | The stream starts, sends `afterChunks` content deltas, then goes silent. The connection stays open until your client gives up |
+
+With the settings above, every 2nd streamed call to the `claude` preset looks like this:
+
+```
+event: message_start
+data: {"type":"message_start","message":{...}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Lorem ipsum "}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"dolor sit "}}
+
+event: error
+data: {"type":"error","error":{"type":"api_error","message":"llmock chaos: simulated 500 error"}}
+```
+
+- `frequency` and `mode` still decide which calls fail, and the dashboard's count includes these failures.
+- The stream has status `200`, because its headers have gone before it fails, and carries `x-llmock-chaos: true`. None of the closing events are sent: no `message_stop` for `claude`, no `data: [DONE]` for an OpenAI-style stream.
+- `afterChunks` counts content deltas. `0` fails straight after the opening events. If the reply has fewer deltas than `afterChunks`, the stream fails after the last one. A reply is split into about 5 deltas.
+- For `claude` the in-stream error is an `event: error` whose error `type` follows `status` (`rate_limit_error` for 429, `overloaded_error` for 529, otherwise `api_error`). An OpenAI-style stream (`openai`, `gemini` and custom templates) gets a `data:` line holding the `openai` error body.
+- A failing call that did not ask for a stream has no stream to cut. With `stream-error` it gets the HTTP error. With `stream-drop` the connection is cut without an answer, and with `stream-stall` it is held open without one. This includes `/v1/embeddings`.
+- `stream-stall` never times out on the server, so give the client you are testing a timeout. Stalled connections are dropped when the server stops.
+
+With the Anthropic SDK, a `stream-error` call makes the stream throw:
+
+```js
+const stream = client.messages.stream({
+  model: 'claude-opus-5-5',
+  max_tokens: 256,
+  messages: [{ role: 'user', content: 'Hello' }],
+});
+
+try {
+  await stream.finalMessage();
+} catch (error) {
+  // The text received before the failure is incomplete: discard it and retry
+}
+```
 
 ### Custom API paths
 
@@ -476,7 +573,7 @@ Once running, open `http://localhost:8001` for the live dashboard:
 
 The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged requests. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
 
-With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with; click a file to read its contents. With no rules set, the box shows a blank rule with a note pointing to the setting.
+With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, and how the reply ends when the rule sets a `stopReason` other than `end`; click a file to read its contents. With no rules set, the box shows a blank rule with a note pointing to the setting.
 
 ### Available endpoints
 
@@ -703,6 +800,8 @@ Behaviour:
 
 - **Request validation** requires only `model`, `max_tokens` and `messages`. Extra fields (`system`, `output_config`, `temperature`, ...) are accepted.
 - **Streaming is per request.** `"stream": true` returns Anthropic SSE events in order: `message_start`, `content_block_start`, `content_block_delta` (text deltas that rejoin to the full text), `content_block_stop`, `message_delta` (`stop_reason: "end_turn"`), `message_stop`. Otherwise a single `message` object is returned. The preset's `stream` setting is ignored.
+- **Stop reasons.** A reply ends with `end_turn` unless its response rule sets a [`stopReason`](#truncated-and-refused-replies-stopreason) of `max_tokens` or `refusal`. A refusal also carries `stop_details`.
+- **Mid-stream failures.** [Chaos mode](#stream-failures) can fail a stream part-way through with an `event: error`, a cut connection or a stall.
 - **Responses** have a unique `msg_` id, echo the requested `model`, and report estimated `usage` (about 4 characters per token).
 - [Response rules](#response-rules-fixture-replies) and [stored responses](#response-types) work here too. Rules match against `system` as well as `messages`.
 
