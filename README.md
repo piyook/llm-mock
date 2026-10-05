@@ -205,11 +205,15 @@ The config file is read once at startup, so restart the server after changing it
 | `stream` | Return SSE streaming responses (the `claude` preset decides per request instead) |
 | `responseDelay.min/max` | Response delay range in milliseconds |
 | `responseRules` | Optional list of `{ match, file }` or `{ match, files }` fixture replies (see [Response rules](#response-rules-fixture-replies)) |
+| `chaos.enabled` | Answer some calls with an HTTP error (see [Chaos mode](#chaos-mode-error-simulation)) |
+| `chaos.frequency` | Fail 1 in this many calls (default `1`, every call) |
+| `chaos.mode` | `"every"` (each Xth call, the default) or `"random"` (a 1 in X chance per call) |
+| `chaos.status` | HTTP status of the error, `400` to `599` (default `500`) |
 | `embeddings.enabled` | Enable the `/v1/embeddings` endpoint |
 | `embeddings.dimensions` | Embedding vector size |
 | `server.port` / `server.host` | Port and address the server listens on (`8001`, `0.0.0.0`) |
 
-Only `name` and `endpoint` are required in a preset. Anything left out uses: `responseType` `lorem`, `maxLoremParas` 8, `maxLoggedRequests` 10, no delay, and validation, logging, debug, streaming and embeddings off.
+Only `name` and `endpoint` are required in a preset. Anything left out uses: `responseType` `lorem`, `maxLoremParas` 8, `maxLoggedRequests` 10, no delay, and validation, logging, debug, streaming, embeddings and chaos off.
 
 ### Adding custom models
 
@@ -343,6 +347,43 @@ Set both values to `0` for instant responses. The server picks a random value in
 | Slow / timeout testing | 3000 | 8000 |
 | Fixed delay | 1000 | 1000 |
 
+### Chaos mode (error simulation)
+
+Turn on chaos to have some calls answered with an HTTP error in place of a reply, so you can test retries, backoff and error handling:
+
+```json
+{
+  "chaos": { "enabled": true, "frequency": 3, "mode": "every", "status": 429 }
+}
+```
+
+```bash
+llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429
+```
+
+| Setting | CLI flag | Meaning | Default |
+|---|---|---|---|
+| `enabled` | `--chaos` | Chaos on or off | `false` |
+| `frequency` | `--chaosFrequency` | Fail 1 in this many calls. `1` fails every call | `1` |
+| `mode` | `--chaosMode` | `"every"` fails calls X, 2X, 3X and so on, which is repeatable. `"random"` gives each call a 1 in X chance of failing | `"every"` |
+| `status` | `--chaosStatus` | HTTP status of the error, `400` to `599` | `500` |
+
+- Chaos applies to the chat endpoint and `/v1/embeddings`, which share one call count. The dashboard, `/ping` and the `/ui-*` routes never fail.
+- Only a call that would have succeeded is counted. An invalid request still gets its `400`.
+- The response delay runs first, then the error is sent. A streamed call that fails gets the same JSON error, with no stream.
+- The error body has the shape the preset's provider uses, so your client's own error parsing runs:
+
+  | Preset `name` | Error body |
+  |---|---|
+  | `openai` (and custom templates) | `{ "error": { "message", "type", "param", "code" } }` |
+  | `claude` | `{ "type": "error", "error": { "type", "message" } }` with `rate_limit_error` (429), `overloaded_error` (529) or `api_error` |
+  | `gemini` | `{ "error": { "code", "message", "status" } }` with `RESOURCE_EXHAUSTED` (429), `UNAVAILABLE` (503) or `INTERNAL` |
+
+  `/v1/embeddings` always uses the `openai` shape.
+- A `429`, `503` or `529` carries `retry-after: 1`. Every chaos error carries `x-llmock-chaos: true`, so a test can tell it from a real failure.
+- A `frequency`, `mode` or `status` in the config file that is not valid stops the server at startup.
+- The **Chaos** box on the dashboard shows the settings and how many errors have been sent since the server started.
+
 ### Custom API paths
 
 Set the endpoint to match any provider's path structure:
@@ -381,7 +422,7 @@ Once running, open `http://localhost:8001` for the live dashboard:
 | `http://localhost:8001` | Main dashboard |
 | `http://localhost:8001/ping` | Health check |
 
-The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged request. Settings are grouped into **Connect**, **Model**, **Responses**, **Response rules**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
+The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged request. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
 
 With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with; click a file to read its contents. With no rules set, the box shows a blank rule with a note pointing to the setting.
 

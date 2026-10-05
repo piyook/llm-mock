@@ -9,7 +9,7 @@ Describes the llmock version this file ships with (read it from `node_modules/ll
 - One server process serves **one preset** (a named entry in `.llmockrc.json` → `models`). A preset fixes the chat route, the wire format, and the reply behaviour. To mock two providers at once, run two servers on two ports.
 - Config is read once at startup. Any change to `.llmockrc.json` needs `stop` + `start`. Fixture files and the stored responses file are re-read on every request, so editing them needs no restart.
 - No auth: API keys and headers are ignored (SDKs still need a non-empty dummy key).
-- Replies are text only. There are no tool calls, no error/rate-limit simulation, no token counting endpoint.
+- Replies are text only. There are no tool calls and no token counting endpoint. HTTP errors are simulated only with `chaos` on (see Chaos).
 
 ## Run it
 
@@ -88,10 +88,14 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `embeddings.dimensions` | number | 128 | Default vector length. |
 | `responseRules` | `{match, file}[]` or `{match, files}[]` | none | See Fixture replies. |
 | `storedResponsesFile` | string | none | JSON file of texts for `responseType: "stored"`. See Stored replies. |
+| `chaos.enabled` | boolean | false | Answer some calls with an HTTP error. See Chaos. |
+| `chaos.frequency` | integer ≥ 1 | 1 | Fail 1 in this many calls. `1` fails every call. |
+| `chaos.mode` | `"every"` \| `"random"` | `every` | `every`: calls X, 2X, 3X… fail (deterministic). `random`: each call fails with probability 1/X. |
+| `chaos.status` | 400–599 | 500 | HTTP status of the error. |
 | `server.port` | number | 8001 | Listen port. |
 | `server.host` | string | `0.0.0.0` | Bind address. Use `127.0.0.1` to keep the mock off the network; keep `0.0.0.0` in Docker. |
 
-CLI flags override the selected preset for one run: `--model --port --host --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. Booleans must be the literal `true`/`false`; every flag except `--foreground` needs a value.
+CLI flags override the selected preset for one run: `--model --port --host --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. Booleans must be the literal `true`/`false`; every flag except `--foreground` needs a value.
 
 ## Fixture replies (`responseRules`)
 
@@ -155,6 +159,24 @@ Streaming is per request: SSE if and only if the body has `"stream": true`. Even
 
 **Timing**: every reply waits a random `responseDelay` first. Streams then add at least 50 ms between events, even with delay `0`/`0`, so a streamed reply takes roughly 0.5 s minimum.
 
+## Chaos (`chaos`)
+
+The way to test retries, backoff and error handling: some calls get an HTTP error in place of a reply.
+
+- Off unless `chaos.enabled` is true (or `--chaos=true`). Example: `"chaos": { "enabled": true, "frequency": 3, "mode": "every", "status": 429 }` fails calls 3, 6, 9… with a 429.
+- Use `mode: "every"` for deterministic tests: the count starts at 0 when the server starts, so with `frequency: 2` the 1st call succeeds and the 2nd fails. `frequency: 1` fails every call. `mode: "random"` fails each call with probability 1/`frequency`.
+- One count is shared by the chat route (POST and GET) and `/v1/embeddings`. `/ping`, `/` and the `/ui-*` routes never fail and are not counted. A request that fails validation gets its usual `400` and is not counted.
+- The `responseDelay` wait happens first. A failing call that asked for a stream gets the JSON error, not SSE.
+- Error body by preset `name`:
+  - `openai` and custom names: `{"error":{"message","type","param":null,"code"}}`; `type` is `rate_limit_error` (`code` `rate_limit_exceeded`) for 429, else `server_error` (`code` `null`).
+  - `claude`: `{"type":"error","error":{"type","message"}}`; `type` is `rate_limit_error` (429), `overloaded_error` (529), else `api_error`.
+  - `gemini`: `{"error":{"code":<status>,"message","status"}}`; `status` is `RESOURCE_EXHAUSTED` (429), `UNAVAILABLE` (503), else `INTERNAL`.
+  - `/v1/embeddings` always uses the `openai` shape.
+- Headers: every chaos error has `x-llmock-chaos: true`; 429, 503 and 529 also have `retry-after: 1`.
+- In the config file, a `frequency` that is not an integer ≥ 1, a `mode` other than `every`/`random`, or a `status` outside 400–599 → server refuses to start. An invalid CLI flag value falls back to the default instead.
+- `GET /ui-meta` → `chaosStatus` (`ENABLED`/`DISABLED`), `chaosFrequency`, `chaosMode`, `chaosErrorStatus`, and `chaosInjected` (errors sent since startup).
+- Not simulated: timeouts, dropped connections, errors part-way through a stream, malformed bodies.
+
 ## Custom formats (templates)
 
 To change a response envelope or the required request keys, or to mock a provider with another JSON shape, add templates beside `.llmockrc.json`:
@@ -180,7 +202,7 @@ To change a response envelope or the required request keys, or to mock a provide
 ## Limits to design around
 
 - CORS: only streamed replies carry `Access-Control-Allow-Origin`, and there is no `OPTIONS` handler. Browser code calling the mock cross-origin will fail preflight; call it from a server/test process or through your dev-server proxy.
-- Not mocked: tool/function calls, images, multiple choices (`n`), stop reasons other than stop/end_turn, HTTP error or rate-limit responses, `/v1/models`, `/v1/messages/count_tokens`.
+- Not mocked: tool/function calls, images, multiple choices (`n`), stop reasons other than stop/end_turn, timeouts and mid-stream failures, `/v1/models`, `/v1/messages/count_tokens`.
 
 ## Recipes
 
@@ -197,6 +219,8 @@ export const stopMock = () => execSync('npx llmock stop --port=8001');
 ```
 
 Fast deterministic tests: `"responseDelay": {"min": 0, "max": 0}`, one `responseRules` entry per scenario keyed on a unique marker string in the prompt.
+
+Retry tests: `"chaos": {"enabled": true, "frequency": 2, "status": 429}` makes every 2nd call fail, so a client that retries once always succeeds. Run it as its own preset (or with `--chaos=true`) so other tests are unaffected.
 
 Varied replies: `"responseType": "stored"` with `"storedResponsesFile": "fixtures/replies.json"` for every unmatched request, or a rule with `files` for one kind of request. Assert on membership of the pool, not on one exact text.
 

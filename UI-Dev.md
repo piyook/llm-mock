@@ -24,6 +24,7 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
   - `llmName`
   - `mockResponseType`
   - `responseDelayMinMs` / `responseDelayMaxMs`
+  - `chaosStatus`, `chaosFrequency`, `chaosMode`, `chaosErrorStatus` (the chaos settings) and `chaosInjected` (errors sent since the server started)
   - `apiLinks` (resolved API URLs based on `LLM_URL_ENDPOINT`)
   - `storedResponsesCount` / `storedResponsesFile` (when the response type is `stored`)
   - `responseRules` (each rule's `match` and the `files` it replies with)

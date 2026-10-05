@@ -36,6 +36,7 @@ The server configuration is in `.llmockrc.json`. You can modify:
 - Server host and port
 - Logging settings
 - Response delays
+- Chaos mode (`chaos`): answer 1 in X calls with an HTTP error to test retries and error handling
 - Endpoint paths
 
 ## Customizing Responses
