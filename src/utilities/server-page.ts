@@ -176,10 +176,11 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			: null;
 
 		// Rules in config order (first match wins), each with every file it
-		// can reply with
+		// can reply with and how its reply ends
 		const responseRules = getResponseRules().rules.map((rule) => ({
 			match: rule.match,
 			files: ruleFiles(rule),
+			stopReason: rule.stopReason ?? 'end',
 		}));
 
 		const responseDelayMinMs =
@@ -245,6 +246,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			chaosFrequency: chaos.frequency,
 			chaosMode: chaos.mode,
 			chaosErrorStatus: chaos.status,
+			chaosKind: chaos.kind,
+			chaosAfterChunks: chaos.afterChunks,
 			chaosInjected: getChaosStats().injected,
 			embeddingsEnabled: embeddingsEnabled ? 'ENABLED' : 'DISABLED',
 			embeddingDimension,

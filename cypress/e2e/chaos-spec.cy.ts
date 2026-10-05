@@ -28,6 +28,8 @@ describe('Mock LLM Spec for chaos mode', () => {
             chaosFrequency: 2,
             chaosMode: 'every',
             chaosErrorStatus: 529,
+            chaosKind: 'http',
+            chaosAfterChunks: 2,
         });
     });
 
@@ -124,6 +126,9 @@ describe('Mock LLM Spec for chaos mode', () => {
                     'contain',
                     '529',
                 );
+                cy.get('[cy-data="chaos_kind"]').should('have.text', 'http');
+                // Only a kind that fails streams says when it cuts them
+                cy.get('[cy-data="chaos_after_chunks"]').should('not.exist');
                 cy.get('[cy-data="chaos_injected"]').should(
                     'have.text',
                     String(injected),

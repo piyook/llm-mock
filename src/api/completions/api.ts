@@ -28,36 +28,51 @@ const handleRequest = async (reply: any, body?: unknown) => {
 	// Apply configured response delay for realistic API simulation
 	await applyResponseDelay();
 
-	// Chaos mode: this call may get an error in place of a reply
-	if (applyChaos(reply)) return reply;
+	// Static JSON or an SSE stream (see shouldStream for the rules)
+	const streaming = shouldStream(
+		process.env?.LLM_NAME,
+		body,
+		process.env?.STREAM,
+	);
 
-	// Generate mock response content (lorem or stored based on configuration)
-	const content = await generateResponseContent(body);
+	// Chaos mode: this call may get an error in place of a reply, or a
+	// stream that fails part-way through
+	const chaos = applyChaos(reply, process.env?.LLM_NAME, streaming);
+	if (chaos === true) return reply;
+	const streamFailure = chaos || undefined;
 
-	// Route to appropriate response handler (see shouldStream for the rules)
-	if (!shouldStream(process.env?.LLM_NAME, body, process.env?.STREAM)) {
+	// Generate the mock reply (rule fixture, lorem or stored based on configuration)
+	const mockReply = await generateResponseContent(body);
+
+	// Route to appropriate response handler
+	if (!streaming) {
 		// === STATIC MODE ===
 		// Returns single JSON response matching OpenAI chat.completion format
 		// Uses openai_res.json template with DYNAMIC_CONTENT_HERE replacement
 		// The claude preset adds a unique id, echoed model and token usage
 		const response =
 			process.env?.LLM_NAME === 'claude'
-				? await buildClaudeStaticResponse(content, body)
-				: await buildStaticResponse(content);
+				? await buildClaudeStaticResponse(mockReply, body)
+				: await buildStaticResponse(mockReply);
 		return reply.send(response);
 	}
 
 	if (process.env?.LLM_NAME === 'claude') {
 		// === CLAUDE STREAMING MODE ===
 		// Anthropic Messages SSE events (message_start ... message_stop)
-		return await handleClaudeStreamingResponse(content, reply, body);
+		return await handleClaudeStreamingResponse(
+			mockReply,
+			reply,
+			body,
+			streamFailure,
+		);
 	}
 
 	// === STREAMING MODE ===
 	// Returns OpenAI-style Server-Sent Events stream with chat.completion.chunk events
 	// Streaming format is compatible with OpenAI chat-completions streaming API
 	// Content is split into multiple chunks with proper SSE headers and timing
-	return await handleStreamingResponse(content, reply);
+	return await handleStreamingResponse(mockReply, reply, streamFailure);
 };
 
 function handler(app: FastifyInstance, pathName: string) {

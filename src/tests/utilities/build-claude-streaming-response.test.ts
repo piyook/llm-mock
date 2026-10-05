@@ -209,10 +209,14 @@ describe('handleClaudeStreamingResponse', () => {
 	test('sends SSE headers on the raw response and streams the content', async () => {
 		const reply = makeReply();
 
-		await handleClaudeStreamingResponse('hello streamed world', reply, {
-			model: 'claude-x',
-			messages: [{ role: 'user', content: 'hi' }],
-		});
+		await handleClaudeStreamingResponse(
+			{ text: 'hello streamed world' },
+			reply,
+			{
+				model: 'claude-x',
+				messages: [{ role: 'user', content: 'hi' }],
+			},
+		);
 
 		expect(reply.hijack).toHaveBeenCalled();
 		expect(reply.raw.writeHead).toHaveBeenCalledWith(
@@ -236,7 +240,7 @@ describe('handleClaudeStreamingResponse', () => {
 		});
 
 		await expect(
-			handleClaudeStreamingResponse('hi', reply),
+			handleClaudeStreamingResponse({ text: 'hi' }, reply),
 		).resolves.toBeUndefined();
 		expect(reply.raw.end).toHaveBeenCalled();
 		spy.mockRestore();

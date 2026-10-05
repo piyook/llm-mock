@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { isStopReason, stopReasons, type StopReason } from './stop-reason.js';
 
 /**
  * A response rule returns the contents of `file` instead of generated text
@@ -14,11 +15,15 @@ import { resolve } from 'path';
  *
  * Paths are resolved relative to the folder holding the config file. A rule
  * has either `file` or `files`, never both.
+ *
+ * `stopReason` sets how the reply ends (see stop-reason.ts); the reply text is
+ * still the fixture exactly as written.
  */
 export interface ResponseRule {
 	match: string;
 	file?: string;
 	files?: string[];
+	stopReason?: StopReason;
 }
 
 /**
@@ -101,10 +106,17 @@ export const validateResponseRules = (rules: unknown): ResponseRule[] => {
 	}
 
 	for (const [index, rule] of rules.entries()) {
-		const { match, file, files } = (rule ?? {}) as Partial<ResponseRule>;
+		const { match, file, files, stopReason } = (rule ??
+			{}) as Partial<ResponseRule>;
 		if (typeof match !== 'string' || match === '') {
 			throw new TypeError(
 				`responseRules[${index}].match must be a non-empty string`,
+			);
+		}
+
+		if (stopReason !== undefined && !isStopReason(stopReason)) {
+			throw new TypeError(
+				`responseRules[${index}].stopReason must be one of: ${stopReasons.join(', ')}`,
 			);
 		}
 

@@ -164,6 +164,12 @@
 			: `Every ${m.chaosFrequency} calls`;
 	}
 
+	// When a failing stream is cut: "Straight away", "After 1 delta" or "After 3 deltas"
+	function chaosAfterChunksLabel(m: UiMeta): string {
+		if (m.chaosAfterChunks === 0) return 'Straight away';
+		return `After ${m.chaosAfterChunks} ${m.chaosAfterChunks === 1 ? 'delta' : 'deltas'}`;
+	}
+
 	async function refresh() {
 		try {
 			const [m, p] = await Promise.all([fetchUiMeta(), fetchPing()]);
@@ -299,16 +305,27 @@
 					<span class="badge" cy-data="chaos_error_status">{meta.chaosErrorStatus}</span>
 				</div>
 				<div class="kv">
+					<span class="muted">Failure Kind</span>
+					<span class="badge" cy-data="chaos_kind">{meta.chaosKind}</span>
+				</div>
+				{#if meta.chaosKind !== 'http'}
+					<div class="kv">
+						<span class="muted">Streams Fail</span>
+						<span class="badge" cy-data="chaos_after_chunks">{chaosAfterChunksLabel(meta)}</span>
+					</div>
+				{/if}
+				<div class="kv">
 					<span class="muted">Errors Injected</span>
 					<span class="badge" cy-data="chaos_injected">{meta.chaosInjected}</span>
 				</div>
 			{/if}
 		</div>
 		<p class="muted cardNote" cy-data="chaos_note">
-			Chaos answers some calls with an HTTP error in place of a reply. Set
-			<code>chaos</code> (<code>enabled</code>, <code>frequency</code>, <code>mode</code>,
-			<code>status</code>) in the model preset in <code>.llmockrc.json</code>, or start
-			with <code>--chaos=true --chaosFrequency=&lt;num&gt;</code>.
+			Chaos answers some calls with an HTTP error in place of a reply, or fails a
+			stream part-way through. Set <code>chaos</code> (<code>enabled</code>,
+			<code>frequency</code>, <code>mode</code>, <code>status</code>, <code>kind</code>,
+			<code>afterChunks</code>) in the model preset in <code>.llmockrc.json</code>, or
+			start with <code>--chaos=true --chaosFrequency=&lt;num&gt;</code>.
 		</p>
 	</section>
 
@@ -345,6 +362,12 @@
 								{file}
 							</button>
 						{/each}
+						{#if rule.stopReason !== 'end'}
+							<span class="muted">
+								Ends with
+								<span class="badge" cy-data="rule_stop_reason">{rule.stopReason}</span>
+							</span>
+						{/if}
 					</div>
 				</div>
 			{:else}

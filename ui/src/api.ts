@@ -8,7 +8,11 @@ export type UiMeta = {
 	maxLoremParas: number | null;
 	storedResponsesCount: number | null;
 	storedResponsesFile: string | null;
-	responseRules: Array<{ match: string; files: string[] }>;
+	responseRules: Array<{
+		match: string;
+		files: string[];
+		stopReason: 'end' | 'max_tokens' | 'refusal';
+	}>;
 	validateRequests: string;
 	logRequests: string;
 	maxLoggedRequests: number;
@@ -21,6 +25,8 @@ export type UiMeta = {
 	chaosFrequency: number;
 	chaosMode: 'every' | 'random';
 	chaosErrorStatus: number;
+	chaosKind: 'http' | 'stream-error' | 'stream-drop' | 'stream-stall';
+	chaosAfterChunks: number;
 	chaosInjected: number;
 	embeddingsEnabled: 'ENABLED' | 'DISABLED';
 	embeddingDimension: number;

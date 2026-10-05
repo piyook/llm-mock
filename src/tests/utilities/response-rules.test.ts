@@ -181,6 +181,17 @@ describe('validateResponseRules', () => {
 		expect(validateResponseRules(rules)).toEqual(rules);
 	});
 
+	test.each(['end', 'max_tokens', 'refusal'])(
+		'accepts a stopReason of "%s" on a file or a files rule',
+		(stopReason) => {
+			const rules = [
+				{ match: 'a', file: 'b.txt', stopReason },
+				{ match: 'c', files: ['d.txt', 'e.txt'], stopReason },
+			];
+			expect(validateResponseRules(rules)).toEqual(rules);
+		},
+	);
+
 	test.each([
 		['not an array', { match: 'a', file: 'b' }, /must be an array/],
 		['empty match', [{ match: '', file: 'b' }], /\[0\]\.match/],
@@ -201,6 +212,21 @@ describe('validateResponseRules', () => {
 			'non-string in files',
 			[{ match: 'a', files: ['b', 3] }],
 			/\[0\]\.files/,
+		],
+		[
+			'unknown stopReason',
+			[{ match: 'a', file: 'b', stopReason: 'length' }],
+			/\[0\]\.stopReason must be one of: end, max_tokens, refusal/,
+		],
+		[
+			'stopReason in the wrong case',
+			[{ match: 'a', files: ['b'], stopReason: 'MAX_TOKENS' }],
+			/\[0\]\.stopReason/,
+		],
+		[
+			'non-string stopReason',
+			[{ match: 'a', file: 'b', stopReason: null }],
+			/\[0\]\.stopReason/,
 		],
 	])('rejects %s', (_name, rules, message) => {
 		expect(() => validateResponseRules(rules)).toThrow(message);

@@ -22,6 +22,10 @@ export interface ChaosConfig {
 	frequency: number;
 	mode: 'every' | 'random';
 	status: number;
+	// What a failing call gets (default http: an HTTP error)
+	kind: 'http' | 'stream-error' | 'stream-drop' | 'stream-stall';
+	// Content deltas a stream sends before a stream-* kind fails it
+	afterChunks: number;
 }
 
 export interface ModelConfig {
@@ -42,7 +46,8 @@ export interface ModelConfig {
 	responseRules?: ResponseRule[];
 	// Optional: JSON file of texts that `responseType: "stored"` picks from
 	storedResponsesFile?: string;
-	// Optional: answer some calls with an HTTP error (off unless enabled)
+	// Optional: fail some calls, with an HTTP error or part-way through a
+	// stream (off unless enabled)
 	chaos?: Partial<ChaosConfig>;
 }
 
@@ -279,6 +284,11 @@ export function setEnvironmentFromConfig(modelName?: string): void {
 	process.env.CHAOS_STATUS =
 		process.env.CHAOS_STATUS ||
 		(modelConfig.chaos?.status ?? 500).toString();
+	process.env.CHAOS_KIND =
+		process.env.CHAOS_KIND || (modelConfig.chaos?.kind ?? 'http');
+	process.env.CHAOS_AFTER_CHUNKS =
+		process.env.CHAOS_AFTER_CHUNKS ||
+		(modelConfig.chaos?.afterChunks ?? 2).toString();
 
 	// Embeddings - only set if not already set by CLI
 	process.env.ENABLE_EMBEDDINGS_MOCK =

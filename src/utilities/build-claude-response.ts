@@ -1,5 +1,7 @@
 import { faker } from '@faker-js/faker';
 import { buildResponse } from './build-response.js';
+import { applyStopReason } from './stop-reason.js';
+import type { MockReply } from '../types.js';
 
 export const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5';
 
@@ -45,23 +47,29 @@ export type ClaudeMessage = Record<string, unknown> & {
 /**
  * Builds the non-streaming Messages response from the claude response
  * template (so a project-level template still applies), then fills in the
- * per-request fields: unique id, echoed model and estimated token usage.
+ * per-request fields: unique id, echoed model and estimated token usage, and
+ * the reply's stop reason if it has one.
  */
 export const buildClaudeStaticResponse = async (
-	content: string,
+	mockReply: MockReply,
 	body?: unknown,
 ): Promise<ClaudeMessage> => {
+	const content = mockReply.text;
 	const template = (await buildResponse(content)) as Record<string, unknown>;
 
-	return {
-		...template,
-		id: newClaudeMessageId(),
-		model: resolveClaudeModel(body),
-		usage: {
-			input_tokens: estimateInputTokens(body),
-			output_tokens: estimateTokens(content),
-			cache_creation_input_tokens: 0,
-			cache_read_input_tokens: 0,
+	return applyStopReason(
+		{
+			...template,
+			id: newClaudeMessageId(),
+			model: resolveClaudeModel(body),
+			usage: {
+				input_tokens: estimateInputTokens(body),
+				output_tokens: estimateTokens(content),
+				cache_creation_input_tokens: 0,
+				cache_read_input_tokens: 0,
+			},
 		},
-	};
+		'claude',
+		mockReply.stopReason,
+	);
 };

@@ -86,6 +86,7 @@ describe('dashboard routes for stored responses and response rules', () => {
 							{
 								match: 'WANT_MISSING',
 								file: 'fixtures/missing.txt',
+								stopReason: 'max_tokens',
 							},
 						],
 					}),
@@ -149,6 +150,8 @@ describe('dashboard routes for stored responses and response rules', () => {
 			chaosFrequency: 1,
 			chaosMode: 'every',
 			chaosErrorStatus: 500,
+			chaosKind: 'http',
+			chaosAfterChunks: 2,
 			chaosInjected: 0,
 		});
 	});
@@ -159,6 +162,8 @@ describe('dashboard routes for stored responses and response rules', () => {
 			CHAOS_FREQUENCY: '2',
 			CHAOS_MODE: 'random',
 			CHAOS_STATUS: '429',
+			CHAOS_KIND: 'stream-stall',
+			CHAOS_AFTER_CHUNKS: '0',
 		};
 		Object.assign(process.env, settings);
 		vi.spyOn(Math, 'random').mockReturnValue(0);
@@ -172,6 +177,8 @@ describe('dashboard routes for stored responses and response rules', () => {
 				chaosFrequency: 2,
 				chaosMode: 'random',
 				chaosErrorStatus: 429,
+				chaosKind: 'stream-stall',
+				chaosAfterChunks: 0,
 				chaosInjected: 1,
 			});
 		} finally {
@@ -219,12 +226,21 @@ describe('dashboard routes for stored responses and response rules', () => {
 		expect(body.storedResponsesFile).toBe('fixtures/stored.json');
 		expect(body.storedResponsesCount).toBe(stored.length);
 		expect(body.responseRules).toEqual([
-			{ match: 'WANT_TEXT', files: ['fixtures/text.txt'] },
+			{
+				match: 'WANT_TEXT',
+				files: ['fixtures/text.txt'],
+				stopReason: 'end',
+			},
 			{
 				match: 'WANT_POOL',
 				files: ['fixtures/pool-a.txt', 'fixtures/pool-b.txt'],
+				stopReason: 'end',
 			},
-			{ match: 'WANT_MISSING', files: ['fixtures/missing.txt'] },
+			{
+				match: 'WANT_MISSING',
+				files: ['fixtures/missing.txt'],
+				stopReason: 'max_tokens',
+			},
 		]);
 	});
 
