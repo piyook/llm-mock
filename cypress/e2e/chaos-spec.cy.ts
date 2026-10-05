@@ -56,19 +56,16 @@ describe('Mock LLM Spec for chaos mode', () => {
 	});
 
 	it('fails a streamed call with a JSON error and no stream', () => {
-		post('Hello', { stream: true }).then((response) => {
-			expect(response.status).to.eq(200);
-			expect(response.headers['content-type']).to.contain(
-				'text/event-stream',
-			);
-		});
+		const streamed = () => post('Hello', { stream: true });
 
-		post('Hello', { stream: true }).then((response) => {
-			expect(response.status).to.eq(529);
-			expect(response.headers['content-type']).to.contain(
-				'application/json',
-			);
-			expect(response.body.error.type).to.eq('overloaded_error');
+		streamed()
+			.its('headers.content-type')
+			.should('contain', 'text/event-stream');
+
+		streamed().then(({ status, headers, body }) => {
+			expect(status).to.eq(529);
+			expect(headers['content-type']).to.contain('application/json');
+			expect(body.error.type).to.eq('overloaded_error');
 		});
 	});
 

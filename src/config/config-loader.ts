@@ -228,6 +228,21 @@ export function getCurrentModel(): string | null {
 	return currentModelCache;
 }
 
+// Chaos settings - only set if not already set by CLI
+function setChaosEnvironment(chaos: Partial<ChaosConfig> = {}): void {
+	const {
+		enabled = false,
+		frequency = 1,
+		mode = 'every',
+		status = 500,
+	} = chaos;
+
+	process.env.CHAOS_ENABLED ||= enabled ? 'true' : 'false';
+	process.env.CHAOS_FREQUENCY ||= frequency.toString();
+	process.env.CHAOS_MODE ||= mode;
+	process.env.CHAOS_STATUS ||= status.toString();
+}
+
 export function setEnvironmentFromConfig(modelName?: string): void {
 	const modelConfig = getModelConfig(modelName);
 	const config = loadConfig();
@@ -267,18 +282,7 @@ export function setEnvironmentFromConfig(modelName?: string): void {
 		process.env.RESPONSE_DELAY_MAX ||
 		modelConfig.responseDelay.max.toString();
 
-	// Chaos - only set if not already set by CLI
-	process.env.CHAOS_ENABLED =
-		process.env.CHAOS_ENABLED ||
-		(modelConfig.chaos?.enabled ? 'true' : 'false');
-	process.env.CHAOS_FREQUENCY =
-		process.env.CHAOS_FREQUENCY ||
-		(modelConfig.chaos?.frequency ?? 1).toString();
-	process.env.CHAOS_MODE =
-		process.env.CHAOS_MODE || (modelConfig.chaos?.mode ?? 'every');
-	process.env.CHAOS_STATUS =
-		process.env.CHAOS_STATUS ||
-		(modelConfig.chaos?.status ?? 500).toString();
+	setChaosEnvironment(modelConfig.chaos);
 
 	// Embeddings - only set if not already set by CLI
 	process.env.ENABLE_EMBEDDINGS_MOCK =

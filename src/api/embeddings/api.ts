@@ -48,6 +48,24 @@ const validateEmbeddingsRequest = async (request: any) => {
 };
 
 /**
+ * Extracts the embeddings parameters of a request, with their defaults
+ * For GET requests, uses query params; for POST requests, uses the body
+ */
+const embeddingsParams = (request: any) => {
+	const source = request.body || request.query || {};
+	const {
+		model = 'text-embedding-ada-002',
+		input = 'Default embedding text',
+		dimensions = DEFAULT_EMBEDDING_DIMENSIONS,
+	} = source as any;
+
+	// Normalize input to array (handle both string and array inputs)
+	const inputArray = Array.isArray(input) ? input : [input];
+
+	return { model, inputArray, dimensions };
+};
+
+/**
  * Handles the embeddings request processing logic
  * Applies delay, generates mock embeddings, and returns appropriate response
  *
@@ -63,17 +81,7 @@ const handleEmbeddingsRequest = async (request: any, reply: any) => {
 	// embeddings endpoint is OpenAI-shaped whichever preset is active.
 	if (applyChaos(reply, 'openai')) return reply;
 
-	// Extract and parse request parameters
-	// For GET requests, use query params; for POST requests, use body
-	const source = request.body || request.query || {};
-	const {
-		model = 'text-embedding-ada-002',
-		input = 'Default embedding text',
-		dimensions = DEFAULT_EMBEDDING_DIMENSIONS,
-	} = source as any;
-
-	// Normalize input to array (handle both string and array inputs)
-	const inputArray = Array.isArray(input) ? input : [input];
+	const { model, inputArray, dimensions } = embeddingsParams(request);
 
 	// Generate mock embeddings using the helper function
 	const embeddingsResponse = await generateMockEmbeddings(
