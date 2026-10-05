@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { validateRequest } from '../../utilities/validate-request.js';
 import {
 	generateResponseContent,
+	getRuleFailure,
 	buildStaticResponse,
 	handleStreamingResponse,
 	applyResponseDelay,
@@ -10,7 +11,7 @@ import {
 import { buildClaudeStaticResponse } from '../../utilities/build-claude-response.js';
 import { handleClaudeStreamingResponse } from '../../utilities/build-claude-streaming-response.js';
 import { shouldStream } from '../../utilities/stream-mode.js';
-import { applyChaos } from '../../utilities/chaos.js';
+import { applyChaos, applyRuleFailure } from '../../utilities/chaos.js';
 
 // Static JSON vs SSE stream is decided per request by shouldStream():
 // - claude preset: the request body's `stream` field
@@ -35,9 +36,13 @@ const handleRequest = async (reply: any, body?: unknown) => {
 		process.env?.STREAM,
 	);
 
-	// Chaos mode: this call may get an error in place of a reply, or a
-	// stream that fails part-way through
-	const chaos = applyChaos(reply, process.env?.LLM_NAME, streaming);
+	// A response rule with `fail` fails every call that matches it. Otherwise
+	// chaos mode decides: this call may get an error in place of a reply, or
+	// a stream that fails part-way through
+	const ruleFailure = getRuleFailure(body);
+	const chaos = ruleFailure
+		? applyRuleFailure(reply, ruleFailure, process.env?.LLM_NAME, streaming)
+		: applyChaos(reply, process.env?.LLM_NAME, streaming);
 	if (chaos === true) return reply;
 	const streamFailure = chaos || undefined;
 

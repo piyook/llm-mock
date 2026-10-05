@@ -12,6 +12,11 @@ export type UiMeta = {
 		match: string;
 		files: string[];
 		stopReason: 'end' | 'max_tokens' | 'refusal';
+		fail: {
+			kind: 'http' | 'stream-error' | 'stream-drop' | 'stream-stall';
+			status: number;
+			afterChunks: number;
+		} | null;
 	}>;
 	validateRequests: string;
 	logRequests: string;

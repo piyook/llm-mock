@@ -120,6 +120,14 @@
           "match": "E2E_FIXTURE_REFUSED",
           "file": "cypress/fixtures/mock-rules/refused.txt",
           "stopReason": "refusal"
+        },
+        {
+          "match": "E2E_FIXTURE_FAIL",
+          "fail": {
+            "kind": "stream-error",
+            "status": 529,
+            "afterChunks": 1
+          }
         }
       ]
     },

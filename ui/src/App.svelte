@@ -170,6 +170,15 @@
 		return `After ${m.chaosAfterChunks} ${m.chaosAfterChunks === 1 ? 'delta' : 'deltas'}`;
 	}
 
+	// How a failing rule fails, e.g. "http 529" or "stream-drop after 2 deltas".
+	// Only the kinds that send an error have a status worth showing.
+	function ruleFailLabel(fail: NonNullable<UiMeta['responseRules'][number]['fail']>): string {
+		if (fail.kind === 'http') return `http ${fail.status}`;
+		const status = fail.kind === 'stream-error' ? ` ${fail.status}` : '';
+		const deltas = `${fail.afterChunks} ${fail.afterChunks === 1 ? 'delta' : 'deltas'}`;
+		return `${fail.kind}${status} after ${deltas}`;
+	}
+
 	async function refresh() {
 		try {
 			const [m, p] = await Promise.all([fetchUiMeta(), fetchPing()]);
@@ -338,8 +347,8 @@
 		</div>
 		<p class="muted" style="margin: 0 0 12px 0;">
 			A request containing the text on the left gets the file's contents as its
-			reply, instead of a {meta?.mockResponseType || 'generated'} response. The first
-			matching rule wins.
+			reply, instead of a {meta?.mockResponseType || 'generated'} response, or fails if
+			the rule says so. The first matching rule wins.
 		</p>
 		<div class="rules" class:scrollList={ruleCount > SCROLL_AFTER}>
 			{#each meta?.responseRules ?? [] as rule, ruleIndex (ruleIndex)}
@@ -349,9 +358,11 @@
 						<code>{rule.match}</code>
 					</div>
 					<div class="ruleFiles">
-						<span class="muted">
-							{rule.files.length > 1 ? 'Replies with one of, at random' : 'Replies with'}
-						</span>
+						{#if rule.files.length > 0}
+							<span class="muted">
+								{rule.files.length > 1 ? 'Replies with one of, at random' : 'Replies with'}
+							</span>
+						{/if}
 						{#each rule.files as file, fileIndex (fileIndex)}
 							<button
 								class="fileLink"
@@ -366,6 +377,12 @@
 							<span class="muted">
 								Ends with
 								<span class="badge" cy-data="rule_stop_reason">{rule.stopReason}</span>
+							</span>
+						{/if}
+						{#if rule.fail}
+							<span class="muted">
+								Fails with
+								<span class="badge" cy-data="rule_fail">{ruleFailLabel(rule.fail)}</span>
 							</span>
 						{/if}
 					</div>

@@ -88,6 +88,10 @@ describe('dashboard routes for stored responses and response rules', () => {
 								file: 'fixtures/missing.txt',
 								stopReason: 'max_tokens',
 							},
+							{
+								match: 'WANT_FAILURE',
+								fail: { kind: 'stream-drop', afterChunks: 0 },
+							},
 						],
 					}),
 					bare: preset(),
@@ -230,16 +234,26 @@ describe('dashboard routes for stored responses and response rules', () => {
 				match: 'WANT_TEXT',
 				files: ['fixtures/text.txt'],
 				stopReason: 'end',
+				fail: null,
 			},
 			{
 				match: 'WANT_POOL',
 				files: ['fixtures/pool-a.txt', 'fixtures/pool-b.txt'],
 				stopReason: 'end',
+				fail: null,
 			},
 			{
 				match: 'WANT_MISSING',
 				files: ['fixtures/missing.txt'],
 				stopReason: 'max_tokens',
+				fail: null,
+			},
+			// A rule that only fails: no files, and the defaults filled in
+			{
+				match: 'WANT_FAILURE',
+				files: [],
+				stopReason: 'end',
+				fail: { kind: 'stream-drop', status: 500, afterChunks: 0 },
 			},
 		]);
 	});
@@ -259,7 +273,7 @@ describe('dashboard routes for stored responses and response rules', () => {
 			const { body } = await get('/ui-meta');
 
 			expect(body.storedResponsesFile).toBeNull();
-			expect(body.responseRules).toHaveLength(3);
+			expect(body.responseRules).toHaveLength(4);
 		} finally {
 			process.env.MOCK_LLM_RESPONSE_TYPE = 'stored';
 		}

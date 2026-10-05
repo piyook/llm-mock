@@ -1,6 +1,12 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { isStopReason, stopReasons, type StopReason } from './stop-reason.js';
+import {
+	chaosKinds,
+	defaultChaosAfterChunks,
+	defaultChaosStatus,
+	type CallFailure,
+} from './chaos.js';
 
 /**
  * A response rule returns the contents of `file` instead of generated text
@@ -18,12 +24,21 @@ import { isStopReason, stopReasons, type StopReason } from './stop-reason.js';
  *
  * `stopReason` sets how the reply ends (see stop-reason.ts); the reply text is
  * still the fixture exactly as written.
+ *
+ * `fail` makes every matching request fail instead, the way chaos fails a
+ * call (see chaos.ts), whether or not chaos is on:
+ *
+ *   "responseRules": [{ "match": "some text", "fail": { "kind": "stream-drop" } }]
+ *
+ * A rule with `fail` needs no fixture. Without one, a stream that fails
+ * part-way through sends the start of a generated reply.
  */
 export interface ResponseRule {
 	match: string;
 	file?: string;
 	files?: string[];
 	stopReason?: StopReason;
+	fail?: Partial<CallFailure>;
 }
 
 /**
@@ -59,9 +74,21 @@ export const findMatchingRule = (
 
 /**
  * Every fixture file a rule can reply with: its `files`, or its single `file`.
+ * Empty for a rule that only fails.
  */
 export const ruleFiles = (rule: ResponseRule): string[] =>
-	rule.files ?? [rule.file as string];
+	rule.files ?? (rule.file === undefined ? [] : [rule.file]);
+
+/**
+ * How a rule's matching requests fail, with the defaults filled in, or
+ * undefined for a rule that replies.
+ */
+export const ruleFailure = (rule: ResponseRule): CallFailure | undefined =>
+	rule.fail && {
+		kind: rule.fail.kind ?? 'http',
+		status: rule.fail.status ?? defaultChaosStatus,
+		afterChunks: rule.fail.afterChunks ?? defaultChaosAfterChunks,
+	};
 
 /**
  * Reads one of a rule's fixtures exactly as written (a trailing newline in
@@ -94,6 +121,44 @@ export const loadRuleContent = (rule: ResponseRule, baseDir: string) => {
 	return readRuleFile(rule, file, baseDir);
 };
 
+// Checks a rule's `fail`: each setting is optional, and held to the same
+// limits as its chaos counterpart
+const validateRuleFail = (fail: unknown, index: number): void => {
+	if (typeof fail !== 'object' || fail === null || Array.isArray(fail)) {
+		throw new TypeError(`responseRules[${index}].fail must be an object`);
+	}
+
+	const { kind, status, afterChunks } = fail as Record<string, unknown>;
+
+	if (kind !== undefined && !chaosKinds.includes(kind as never)) {
+		throw new TypeError(
+			`responseRules[${index}].fail.kind must be one of: ${chaosKinds.join(', ')}`,
+		);
+	}
+
+	if (
+		status !== undefined &&
+		!(
+			Number.isInteger(status) &&
+			Number(status) >= 400 &&
+			Number(status) <= 599
+		)
+	) {
+		throw new TypeError(
+			`responseRules[${index}].fail.status must be an integer from 400 to 599`,
+		);
+	}
+
+	if (
+		afterChunks !== undefined &&
+		!(Number.isInteger(afterChunks) && Number(afterChunks) >= 0)
+	) {
+		throw new TypeError(
+			`responseRules[${index}].fail.afterChunks must be an integer of 0 or more`,
+		);
+	}
+};
+
 /**
  * Checks the shape of configured rules; an empty `match` would match every
  * request, so it is rejected.
@@ -106,7 +171,7 @@ export const validateResponseRules = (rules: unknown): ResponseRule[] => {
 	}
 
 	for (const [index, rule] of rules.entries()) {
-		const { match, file, files, stopReason } = (rule ??
+		const { match, file, files, stopReason, fail } = (rule ??
 			{}) as Partial<ResponseRule>;
 		if (typeof match !== 'string' || match === '') {
 			throw new TypeError(
@@ -119,6 +184,8 @@ export const validateResponseRules = (rules: unknown): ResponseRule[] => {
 				`responseRules[${index}].stopReason must be one of: ${stopReasons.join(', ')}`,
 			);
 		}
+
+		if (fail !== undefined) validateRuleFail(fail, index);
 
 		if (files !== undefined) {
 			if (file !== undefined) {
@@ -139,6 +206,9 @@ export const validateResponseRules = (rules: unknown): ResponseRule[] => {
 
 			continue;
 		}
+
+		// A rule that fails can do without a fixture
+		if (fail !== undefined && file === undefined) continue;
 
 		if (typeof file !== 'string' || file === '') {
 			throw new TypeError(

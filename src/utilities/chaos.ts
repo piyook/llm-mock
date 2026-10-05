@@ -41,9 +41,18 @@ export interface StreamFailure {
 	status: number;
 }
 
+/**
+ * How one call fails. The chaos settings hold one for every failing call; a
+ * response rule's `fail` holds one for the calls that match it.
+ */
+export type CallFailure = Pick<
+	ChaosSettings,
+	'kind' | 'status' | 'afterChunks'
+>;
+
 const defaultChaosFrequency = 1;
-const defaultChaosStatus = 500;
-const defaultChaosAfterChunks = 2;
+export const defaultChaosStatus = 500;
+export const defaultChaosAfterChunks = 2;
 
 // Statuses a client is expected to wait on before retrying
 const retryAfterStatuses = new Set([429, 503, 529]);
@@ -198,22 +207,18 @@ export function failStream(
 }
 
 /**
- * Fails this call if it is one that fails. Returns:
- * - false: not a failing call, carry on
+ * Fails a call the way `failure` says. Returns:
  * - true: the reply has been dealt with, so the caller stops there
  * - a StreamFailure: the caller starts the stream and its handler fails it
  *   part-way through. Only for a call that asked for a stream (`streaming`)
  *   while a stream-* kind is set.
  */
-export function applyChaos(
+function failCall(
 	reply: FastifyReply,
-	llmName: string | undefined = process.env?.LLM_NAME,
-	streaming: boolean = false,
-): boolean | StreamFailure {
-	if (!shouldInjectError()) return false;
-
-	const { status, kind, afterChunks } = getChaosConfig();
-
+	{ kind, status, afterChunks }: CallFailure,
+	llmName: string | undefined,
+	streaming: boolean,
+): true | StreamFailure {
 	if (kind !== 'http' && streaming) {
 		// The stream's headers go out with a 200 before it fails. Set on the
 		// raw response because that is what the stream handlers write to.
@@ -241,6 +246,36 @@ export function applyChaos(
 	reply.send(buildChaosError(llmName, status));
 
 	return true;
+}
+
+/**
+ * Fails this call if it is one that fails. Returns false if it is not (carry
+ * on), otherwise what failCall returns.
+ */
+export function applyChaos(
+	reply: FastifyReply,
+	llmName: string | undefined = process.env?.LLM_NAME,
+	streaming: boolean = false,
+): boolean | StreamFailure {
+	if (!shouldInjectError()) return false;
+
+	return failCall(reply, getChaosConfig(), llmName, streaming);
+}
+
+/**
+ * Fails a call that matched a response rule with `fail`. It fails whether or
+ * not chaos is on, and is left out of the chaos call count, so it does not
+ * move which of the other calls fail. It is counted as a failure.
+ */
+export function applyRuleFailure(
+	reply: FastifyReply,
+	failure: CallFailure,
+	llmName: string | undefined = process.env?.LLM_NAME,
+	streaming: boolean = false,
+): true | StreamFailure {
+	injected++;
+
+	return failCall(reply, failure, llmName, streaming);
 }
 
 export function getChaosStats(): { calls: number; injected: number } {

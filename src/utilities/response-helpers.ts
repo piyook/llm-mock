@@ -10,10 +10,20 @@ import {
 	getResponseRules,
 	getStoredResponsesFile,
 } from '../config/config-loader.js';
-import { findMatchingRule, loadRuleContent } from './response-rules.js';
+import {
+	findMatchingRule,
+	loadRuleContent,
+	ruleFailure,
+	ruleFiles,
+} from './response-rules.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { applyStopReason } from './stop-reason.js';
-import { failStream, streamedCount, type StreamFailure } from './chaos.js';
+import {
+	failStream,
+	streamedCount,
+	type CallFailure,
+	type StreamFailure,
+} from './chaos.js';
 import type { MockReply } from '../types.js';
 import type { FastifyReply } from 'fastify';
 
@@ -28,12 +38,25 @@ const DEFAULT_EMBEDDING_DIMENSIONS =
 const getRuleReply = (requestBody: unknown): MockReply | undefined => {
 	const { rules, baseDir } = getResponseRules();
 	const rule = findMatchingRule(rules, requestBody);
-	if (!rule) return undefined;
+	// A rule that only fails has no fixture: the reply is generated as usual
+	if (!rule || ruleFiles(rule).length === 0) return undefined;
 
 	return {
 		text: loadRuleContent(rule, baseDir),
 		...(rule.stopReason && { stopReason: rule.stopReason }),
 	};
+};
+
+/**
+ * How this request fails if the response rule it matches has `fail`,
+ * otherwise undefined.
+ */
+export const getRuleFailure = (
+	requestBody: unknown,
+): CallFailure | undefined => {
+	const rule = findMatchingRule(getResponseRules().rules, requestBody);
+
+	return rule && ruleFailure(rule);
 };
 
 /**

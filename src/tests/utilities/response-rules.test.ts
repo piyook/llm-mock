@@ -7,6 +7,7 @@ import {
 	findMatchingRule,
 	loadRuleContent,
 	readRuleFile,
+	ruleFailure,
 	ruleFiles,
 	validateResponseRules,
 } from '../../utilities/response-rules.js';
@@ -166,7 +167,98 @@ describe('ruleFiles and readRuleFile', () => {
 	});
 });
 
+describe('ruleFailure', () => {
+	test('is undefined for a rule that replies', () => {
+		expect(ruleFailure({ match: 'x', file: 'a.txt' })).toBeUndefined();
+	});
+
+	test('fills in the chaos defaults', () => {
+		expect(ruleFailure({ match: 'x', fail: {} })).toEqual({
+			kind: 'http',
+			status: 500,
+			afterChunks: 2,
+		});
+	});
+
+	test('keeps what the rule sets', () => {
+		expect(
+			ruleFailure({
+				match: 'x',
+				fail: { kind: 'stream-error', status: 529, afterChunks: 0 },
+			}),
+		).toEqual({ kind: 'stream-error', status: 529, afterChunks: 0 });
+	});
+
+	test('a rule that only fails has no files', () => {
+		expect(ruleFiles({ match: 'x', fail: {} })).toEqual([]);
+	});
+});
+
 describe('validateResponseRules', () => {
+	test.each([
+		['with no fixture', { match: 'a', fail: {} }],
+		['with a file', { match: 'a', file: 'b.txt', fail: { status: 429 } }],
+		[
+			'with files',
+			{ match: 'a', files: ['b.txt'], fail: { kind: 'stream-drop' } },
+		],
+		[
+			'with every setting',
+			{
+				match: 'a',
+				fail: { kind: 'stream-stall', status: 599, afterChunks: 0 },
+			},
+		],
+	])('accepts a fail rule %s', (_name, rule) => {
+		expect(validateResponseRules([rule])).toEqual([rule]);
+	});
+
+	test.each([
+		['fail not an object', { fail: true }, /\[0\]\.fail must be an object/],
+		['fail null', { fail: null }, /\[0\]\.fail must be an object/],
+		['fail an array', { fail: [] }, /\[0\]\.fail must be an object/],
+		[
+			'unknown fail kind',
+			{ fail: { kind: 'timeout' } },
+			/\[0\]\.fail\.kind must be one of: http, stream-error, stream-drop, stream-stall/,
+		],
+		[
+			'fail status too low',
+			{ fail: { status: 200 } },
+			/\[0\]\.fail\.status/,
+		],
+		[
+			'fail status too high',
+			{ fail: { status: 600 } },
+			/\[0\]\.fail\.status/,
+		],
+		[
+			'fail status as text',
+			{ fail: { status: '429' } },
+			/\[0\]\.fail\.status/,
+		],
+		[
+			'negative afterChunks',
+			{ fail: { afterChunks: -1 } },
+			/\[0\]\.fail\.afterChunks/,
+		],
+		[
+			'fractional afterChunks',
+			{ fail: { afterChunks: 1.5 } },
+			/\[0\]\.fail\.afterChunks/,
+		],
+		[
+			'a bad fail beside a good file',
+			{ file: 'b.txt', fail: { kind: 'nope' } },
+			/\[0\]\.fail\.kind/,
+		],
+		['an empty file beside a fail', { file: '', fail: {} }, /\[0\]\.file/],
+	])('rejects %s', (_name, rule, message) => {
+		expect(() => validateResponseRules([{ match: 'a', ...rule }])).toThrow(
+			message,
+		);
+	});
+
 	test('treats undefined as no rules', () => {
 		expect(validateResponseRules(undefined)).toEqual([]);
 	});

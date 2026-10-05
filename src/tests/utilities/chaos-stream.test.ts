@@ -73,6 +73,24 @@ beforeAll(async () => {
 					name: 'claude',
 					endpoint: 'chat',
 					responseRules: [
+						{ match: 'FAIL_HTTP', fail: { status: 429 } },
+						{ match: 'FAIL_DEFAULT', fail: {} },
+						{
+							match: 'FAIL_ERROR',
+							file: 'fixtures/reply.txt',
+							fail: {
+								kind: 'stream-error',
+								status: 429,
+								afterChunks: 1,
+							},
+						},
+						// No fixture: the stream sends generated text
+						{ match: 'FAIL_DROP', fail: { kind: 'stream-drop' } },
+						{
+							match: 'FAIL_STALL',
+							file: 'fixtures/reply.txt',
+							fail: { kind: 'stream-stall', afterChunks: 0 },
+						},
 						{ match: 'WANT_TEXT', file: 'fixtures/reply.txt' },
 					],
 				},
@@ -126,7 +144,12 @@ afterEach(() => {
 const post = (
 	format: 'claude' | 'openai' | 'gemini',
 	stream: boolean,
-	{ path = '/chat', quietMs = 400, targetPort = port } = {},
+	{
+		path = '/chat',
+		quietMs = 400,
+		targetPort = port,
+		content = 'WANT_TEXT',
+	} = {},
 ): Promise<Outcome> => {
 	process.env.LLM_NAME = format;
 	// The claude format streams when the request asks; the others follow
@@ -137,8 +160,8 @@ const post = (
 		model: 'test-model',
 		max_tokens: 16,
 		stream,
-		input: 'WANT_TEXT',
-		messages: [{ role: 'user', content: 'WANT_TEXT' }],
+		input: content,
+		messages: [{ role: 'user', content }],
 	});
 
 	return new Promise((resolve) => {
@@ -601,6 +624,151 @@ describe('which calls fail', () => {
 			process.env.RESPONSE_DELAY_MIN = '0';
 			process.env.RESPONSE_DELAY_MAX = '0';
 		}
+	});
+});
+
+describe('a response rule with fail', () => {
+	const rateLimited = {
+		type: 'error',
+		error: {
+			type: 'rate_limit_error',
+			message: 'llmock chaos: simulated 429 error',
+		},
+	};
+
+	beforeEach(() => {
+		process.env.CHAOS_ENABLED = 'false';
+	});
+
+	test('fails the call that matches it with chaos off, and no other', async () => {
+		const failed = await post('claude', false, { content: 'FAIL_HTTP' });
+		const other = await post('claude', false);
+
+		expect(failed.status).toBe(429);
+		expect(failed.headers['x-llmock-chaos']).toBe('true');
+		expect(failed.headers['retry-after']).toBe('1');
+		expect(JSON.parse(failed.text)).toEqual(rateLimited);
+		expect(other.status).toBe(200);
+		expect(other.headers).not.toHaveProperty('x-llmock-chaos');
+		expect(JSON.parse(other.text).content[0].text).toBe(fixture);
+		// Counted as a failure, but not as a call chaos could have failed
+		expect(getChaosStats()).toEqual({ calls: 0, injected: 1 });
+	});
+
+	test('fails every time it matches', async () => {
+		for (let i = 0; i < 3; i++) {
+			const outcome = await post('claude', true, {
+				content: 'FAIL_HTTP',
+			});
+			expect(outcome.status).toBe(429);
+		}
+	});
+
+	test('an empty fail is an HTTP 500', async () => {
+		const outcome = await post('claude', true, { content: 'FAIL_DEFAULT' });
+
+		expect(outcome.status).toBe(500);
+		expect(JSON.parse(outcome.text).error.type).toBe('api_error');
+	});
+
+	test('stream-error cuts a claude stream of its fixture with the error event', async () => {
+		const outcome = await post('claude', true, { content: 'FAIL_ERROR' });
+		const events = sseEvents(outcome.text);
+
+		expect(outcome.status).toBe(200);
+		expect(outcome.headers['x-llmock-chaos']).toBe('true');
+		expect(outcome.ended).toBe('end');
+		expect(events.map((e) => e.event)).toEqual([
+			'message_start',
+			'content_block_start',
+			'content_block_delta',
+			'error',
+		]);
+		expect(claudeText(events)).toEqual(['one two ']);
+		expect(events.at(-1)?.data).toEqual(rateLimited);
+	});
+
+	test('stream-error cuts an OpenAI-style stream with the error and no [DONE]', async () => {
+		const outcome = await post('openai', true, { content: 'FAIL_ERROR' });
+		const events = sseEvents(outcome.text);
+
+		expect(outcome.status).toBe(200);
+		expect(outcome.ended).toBe('end');
+		expect(openaiText(events)).toEqual(['one two']);
+		expect(events.at(-1)?.data).toEqual({
+			error: {
+				message: 'llmock chaos: simulated 429 error',
+				type: 'rate_limit_error',
+				param: null,
+				code: 'rate_limit_exceeded',
+			},
+		});
+		expect(events.map((e) => e.data)).not.toContain('[DONE]');
+	});
+
+	test('stream-error answers a call that did not ask for a stream with the HTTP error', async () => {
+		const outcome = await post('claude', false, { content: 'FAIL_ERROR' });
+
+		expect(outcome.status).toBe(429);
+		expect(JSON.parse(outcome.text)).toEqual(rateLimited);
+	});
+
+	test('stream-drop with no fixture cuts a stream of generated text', async () => {
+		const outcome = await post('claude', true, { content: 'FAIL_DROP' });
+		const events = sseEvents(outcome.text);
+
+		expect(outcome.status).toBe(200);
+		expect(outcome.ended).toBe('dropped');
+		expect(events.at(-1)?.event).toBe('content_block_delta');
+		expect(claudeText(events).length).toBeGreaterThan(0);
+		expect(claudeText(events).length).toBeLessThanOrEqual(2);
+		expect(claudeText(events).join('')).not.toContain('one two');
+	});
+
+	test('stream-drop cuts a call that did not ask for a stream', async () => {
+		const outcome = await post('claude', false, { content: 'FAIL_DROP' });
+
+		expect(outcome.status).toBeUndefined();
+		expect(outcome.ended).toBe('dropped');
+	});
+
+	test('stream-stall holds the stream open until the client goes', async () => {
+		const outcome = await post('claude', true, { content: 'FAIL_STALL' });
+		const events = sseEvents(outcome.text);
+
+		expect(outcome.ended).toBe('open');
+		expect(events.map((e) => e.event)).toEqual([
+			'message_start',
+			'content_block_start',
+		]);
+		expect(getStalledCount()).toBe(1);
+
+		outcome.disconnect();
+		await waitForStalled(0);
+	});
+
+	test('does not move which of the other calls chaos fails', async () => {
+		process.env.CHAOS_ENABLED = 'true';
+		process.env.CHAOS_FREQUENCY = '2';
+
+		const first = await post('claude', false);
+		const byRule = await post('claude', false, { content: 'FAIL_HTTP' });
+		const second = await post('claude', false);
+
+		expect(first.status).toBe(200);
+		// The rule's own status, not the chaos one
+		expect(byRule.status).toBe(429);
+		expect(second.status).toBe(529);
+		expect(getChaosStats()).toEqual({ calls: 2, injected: 2 });
+	});
+
+	test('does not apply to the embeddings route', async () => {
+		const outcome = await post('claude', false, {
+			path: '/v1/embeddings',
+			content: 'FAIL_HTTP',
+		});
+
+		expect(outcome.status).toBe(200);
 	});
 });
 
