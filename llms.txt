@@ -97,8 +97,9 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `server.port` | number | 8001 | Listen port. |
 | `server.host` | string | `0.0.0.0` | Bind address. Use `127.0.0.1` to keep the mock off the network; keep `0.0.0.0` in Docker. |
 | `server.admin` | boolean | true | `false` leaves the `/admin/*` routes out (see Admin API). |
+| `server.uiTheme` | `"dark"` \| `"light"` | `dark` | Dashboard colours only; no effect on the API. Also set by the `UI_THEME` environment variable (wins over the config; `--uiTheme` wins over both). Any other value means `dark`. Reported as `uiTheme` by `GET /ui-meta`. |
 
-CLI flags override the selected preset for one run: `--model --port --host --admin --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --chaosKind --chaosAfterChunks --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. Booleans must be the literal `true`/`false`; every flag except `--foreground` needs a value.
+CLI flags override the selected preset for one run: `--model --port --host --admin --uiTheme --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --chaosKind --chaosAfterChunks --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. Booleans must be the literal `true`/`false`; every flag except `--foreground` needs a value.
 
 ## Fixture replies (`responseRules`)
 

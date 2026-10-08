@@ -157,6 +157,7 @@ Each option overrides the matching setting of the selected preset for that run:
 | `--model` | `defaultModel` | Name of a preset in `.llmockrc.json` |
 | `--port` / `--host` | `server.port` / `server.host` | Port number / address |
 | `--admin` | `server.admin` | `true` or `false` |
+| `--uiTheme` | `server.uiTheme` | `dark` or `light` |
 | `--endpoint` | `endpoint` | Path without a leading slash |
 | `--responseType` | `responseType` | `lorem` or `stored` |
 | `--maxLoremParas` | `maxLoremParas` | Number |
@@ -276,6 +277,7 @@ The config file is read once at startup, so restart the server after changing it
 | `embeddings.dimensions` | Embedding vector size |
 | `server.port` / `server.host` | Port and address the server listens on (`8001`, `0.0.0.0`) |
 | `server.admin` | `false` turns the [admin API](#admin-api-changing-rules-and-settings-while-running) off (default `true`) |
+| `server.uiTheme` | Colours of the [dashboard](#dashboard): `"dark"` (the default) or `"light"` |
 
 Only `name` and `endpoint` are required in a preset. Anything left out uses: `responseType` `lorem`, `maxLoremParas` 8, `maxLoggedRequests` 10, no delay, and validation, logging, debug, streaming, embeddings and chaos off.
 
@@ -659,6 +661,15 @@ Once running, open `http://localhost:8001` for the live dashboard:
 | `http://localhost:8001/ping` | Health check |
 
 The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged requests. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Admin API**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
+
+The dashboard is dark by default. For a light one, set the `UI_THEME` environment variable, or `"uiTheme": "light"` in the `server` block of `.llmockrc.json`, or start with `--uiTheme=light`:
+
+```bash
+UI_THEME=light npx llmock start       # macOS, Linux, Git Bash
+$env:UI_THEME = 'light'; npx llmock start   # PowerShell
+```
+
+The flag wins over the environment variable, which wins over the config file. In Docker, add `UI_THEME=light` to `environment` in `docker-compose.yml`. Any value other than `light` gives the dark theme.
 
 With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. A rule that holds its reply as `text` shows **its own text** in place of a file; click it to read the text. A rule added through the [admin API](#admin-api-changing-rules-and-settings-while-running) is listed first and marked **runtime**. With no rules set, the box shows a blank rule with a note pointing to the setting.
 

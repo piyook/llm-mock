@@ -29,6 +29,7 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
   - `storedResponsesCount` / `storedResponsesFile` (when the response type is `stored`)
   - `responseRules` (each rule's `match`, the `text` or `files` it replies with, its `stopReason` and its `fail` settings, `null` if it replies; `source` is `runtime` for a rule added through the admin API, which also has an `id`)
   - `adminApi` (`ENABLED` or `DISABLED`)
+  - `uiTheme` (`dark` or `light`, from `UI_THEME`, `--uiTheme` or `server.uiTheme`). The server also writes it to the page as `<html data-theme="…">`, which is what `ui/src/styles.css` goes by; colours are CSS variables on `:root`, with the light theme's under `:root[data-theme='light']`
 
 - The viewer dialog reads file contents from `/ui-stored-responses` and `/ui-rule-file?rule=<i>&file=<j>`, and the most recent logged requests (10 unless `maxLoggedRequests` is set) from `/ui-request-log`, shown one at a time. **Clear logs** sends `DELETE /ui-request-log`. A rule's own `text` is shown straight from `/ui-meta`. **Reset** in the Admin API box sends `POST /admin/reset`.
 
