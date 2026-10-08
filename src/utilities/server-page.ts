@@ -55,6 +55,20 @@ function countStoredResponses(): number {
 	}
 }
 
+export type UiTheme = 'dark' | 'light';
+
+// The dashboard's colours: dark unless UI_THEME is "light"
+export const getUiTheme = (): UiTheme =>
+	process.env?.UI_THEME?.toLowerCase() === 'light' ? 'light' : 'dark';
+
+/**
+ * Names the theme on the page's <html> element, which is what the dashboard's
+ * stylesheet goes by. Done as the page is served so it is drawn in the right
+ * colours from the start, rather than switching once the settings have loaded.
+ */
+export const withUiTheme = (html: string, theme: UiTheme): string =>
+	html.replace(/<html\b/i, `<html data-theme="${theme}"`);
+
 function contentTypeForPath(filePath: string): string {
 	const ext = path.extname(filePath).toLowerCase();
 	switch (ext) {
@@ -247,6 +261,7 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			embeddingsEnabled: embeddingsEnabled ? 'ENABLED' : 'DISABLED',
 			embeddingDimension,
 			adminApi: adminApiEnabled() ? 'ENABLED' : 'DISABLED',
+			uiTheme: getUiTheme(),
 			apiLinks,
 		});
 	});
@@ -321,7 +336,7 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		if (uiIndex) {
 			return reply
 				.type(contentTypeForPath(uiIndex.absPath))
-				.send(uiIndex.data);
+				.send(withUiTheme(uiIndex.data.toString('utf8'), getUiTheme()));
 		}
 		return reply.type('text/html').send(fallbackHtmlString);
 	});

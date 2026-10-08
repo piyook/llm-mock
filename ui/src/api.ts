@@ -41,6 +41,7 @@ export type UiMeta = {
 	embeddingsEnabled: 'ENABLED' | 'DISABLED';
 	embeddingDimension: number;
 	adminApi: 'ENABLED' | 'DISABLED';
+	uiTheme: 'dark' | 'light';
 	apiLinks: Array<{ href: string; label: string }>;
 };
 

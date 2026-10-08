@@ -210,6 +210,9 @@
 			const [m, p] = await Promise.all([fetchUiMeta(), fetchPing()]);
 			meta = m;
 			online = p;
+			// The server sets this on the page it serves; this covers the
+			// dashboard run on its own with `npm run ui-dev`
+			document.documentElement.dataset.theme = m.uiTheme;
 			// Cleared only on success, so the message doesn't blink on every
 			// retry while the server is down
 			error = null;

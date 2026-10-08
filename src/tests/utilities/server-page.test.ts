@@ -18,7 +18,11 @@ const logDir = await vi.hoisted(async () => {
 
 vi.mock('env-paths', () => ({ default: () => ({ log: logDir }) }));
 
-const { default: serverPage } = await import('../../utilities/server-page.js');
+const {
+	default: serverPage,
+	getUiTheme,
+	withUiTheme,
+} = await import('../../utilities/server-page.js');
 const { logPath } = await import('../../utilities/logger.js');
 const { resetChaos, shouldInjectError } =
 	await import('../../utilities/chaos.js');
@@ -146,6 +150,41 @@ describe('dashboard routes for stored responses and response rules', () => {
 		const { body } = await get('/ui-meta');
 
 		expect(body.version).toBe(require('../../../package.json').version);
+	});
+
+	test('the dashboard theme is dark unless UI_THEME is light', async () => {
+		const before = process.env.UI_THEME;
+		try {
+			delete process.env.UI_THEME;
+			expect(getUiTheme()).toBe('dark');
+			expect((await get('/ui-meta')).body.uiTheme).toBe('dark');
+
+			for (const value of ['', 'dark', 'blue']) {
+				process.env.UI_THEME = value;
+				expect(getUiTheme()).toBe('dark');
+			}
+
+			for (const value of ['light', 'LIGHT']) {
+				process.env.UI_THEME = value;
+				expect(getUiTheme()).toBe('light');
+			}
+			expect((await get('/ui-meta')).body.uiTheme).toBe('light');
+		} finally {
+			if (before === undefined) delete process.env.UI_THEME;
+			else process.env.UI_THEME = before;
+		}
+	});
+
+	test('withUiTheme names the theme on the html element only', () => {
+		const page =
+			'<!doctype html>\n<html lang="en">\n\t<body><p>html</p></body>\n</html>';
+
+		expect(withUiTheme(page, 'light')).toBe(
+			'<!doctype html>\n<html data-theme="light" lang="en">\n\t<body><p>html</p></body>\n</html>',
+		);
+		expect(withUiTheme(page, 'dark')).toContain(
+			'<html data-theme="dark" lang="en">',
+		);
 	});
 
 	test('ui-meta reports whether the admin API is on', async () => {
