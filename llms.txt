@@ -139,7 +139,9 @@ The way to set up a reply or a failure from inside a test, with no fixture file,
 | `PATCH /admin/chaos` | any of `{"enabled", "frequency", "mode", "status", "kind", "afterChunks"}` | `200` in the `GET /admin/chaos` shape; `400 {"error"}` if not valid (nothing is changed) |
 | `GET /admin/delay` | none | `200 {"delay": {"min", "max"}}` (ms) |
 | `PATCH /admin/delay` | `{"min"?, "max"?}` (ms) | `200 {"delay": {"min", "max"}}`; `400 {"error"}` if not valid (nothing is changed) |
-| `POST /admin/reset` | none | `200 {"rules", "chaos", "stats", "delay"}`: runtime rules removed, chaos and delay settings back to their startup values (config file plus CLI flags), chaos counts back to 0 |
+| `GET /admin/settings` | none | `200 {"settings": {"responseType", "maxLoremParas", "stream", "validateRequests", "logRequests", "maxLoggedRequests"}}` |
+| `PATCH /admin/settings` | any of those six keys | `200` in the `GET /admin/settings` shape; `400 {"error"}` if not valid (nothing is changed) |
+| `POST /admin/reset` | none | `200 {"rules", "chaos", "stats", "delay", "settings"}`: runtime rules removed, chaos, delay and reply settings back to their startup values (config file plus CLI flags), chaos counts back to 0 |
 
 - `match`, `stopReason` and `fail` mean exactly what they mean in `responseRules` (see Fixture replies). A rule needs `text` or `fail`; with both, `text` is what a `stream-*` failure sends before it fails.
 - `file` and `files` are refused with `400`: the reply must be `text`. Any other key is refused too.
@@ -148,6 +150,7 @@ The way to set up a reply or a failure from inside a test, with no fixture file,
 - `PATCH /admin/chaos` changes only the keys sent. Values are held to the config file's limits (see Chaos): `enabled` a JSON boolean, `frequency` an integer ≥ 1, `mode` `every`/`random`, `status` an integer 400–599, `kind` one of the four kinds, `afterChunks` an integer ≥ 0. Strings such as `"true"` or `"429"` are refused. Unknown keys are refused.
 - `PATCH /admin/chaos` does not touch the call count. For a known failing call with `mode: "every"`: `POST /admin/reset`, then `PATCH /admin/chaos`; the count then starts at 0 (with `frequency: 2` the 1st call succeeds and the 2nd fails). `stats.calls` only counts calls made while chaos is enabled.
 - `PATCH /admin/delay`: `min` and `max` are integers from 0 to 2147483647 and the resulting `min` must not exceed `max` (a key not sent keeps its value), so send both when raising the delay from `0`/`0`.
+- `PATCH /admin/settings` changes only the keys sent, with the preset's names and JSON types: `responseType` `"lorem"`/`"stored"`, `maxLoremParas` an integer 1–1000, `stream`/`validateRequests`/`logRequests` JSON booleans (not `"ON"`/`"true"`), `maxLoggedRequests` an integer 1–100. Unknown keys are refused. `"stored"` uses the preset's `storedResponsesFile`, or the bundled texts if it has none; an unreadable file → `400`. `stream` is ignored by the `claude` template (the request's own `stream` decides). Not changeable while running: preset, template (`name`), `model`, `endpoint`, `embeddings`, `debug`, `storedResponsesFile`, port and host.
 - A change applies from the next request. `GET /ui-meta` reports the settings in use.
 - Send `POST /admin/rules` and the `PATCH` routes with `Content-Type: application/json`. Send the routes that take no body without a body.
 - An `id` is never reused, also after a reset. Config rules have `id: null` and can not be removed.
@@ -285,7 +288,7 @@ To change a response envelope or the required request keys, or to mock a provide
 | `GET /ui-rule-file?rule=<i>&file=<j>` | Contents of one response rule file, as JSON |
 | `GET /ui-request-log` | `{"file", "log"}`: `log` is an array of the most recent validated requests (the last `maxLoggedRequests`, 10 by default), newest first, each with why it passed/failed (older ones are dropped; `log` is `null` if none logged) |
 | `DELETE /ui-request-log` | Empties the request log; returns `{"file", "log": null}` |
-| `/admin/rules`, `/admin/chaos`, `/admin/delay`, `/admin/reset` | Change response rules, chaos and delay while running (see Admin API) |
+| `/admin/rules`, `/admin/chaos`, `/admin/delay`, `/admin/settings`, `/admin/reset` | Change response rules, chaos, delay and reply settings while running (see Admin API) |
 | `GET /` | HTML dashboard |
 | `GET /<endpoint>` | A generated reply with no validation and no rules (quick smoke test) |
 
