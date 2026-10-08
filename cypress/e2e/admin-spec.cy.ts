@@ -152,6 +152,30 @@ describe('Mock LLM Spec for the admin API', () => {
         });
     });
 
+    it('keeps a rule with times for the retry when chaos fails the call', () => {
+        const chaos = (change: object) =>
+            cy.request({ method: 'PATCH', url: '/admin/chaos', body: change });
+
+        addRule({ match: 'E2E_ADMIN_CHAOS', text: 'after the retry', times: 1 });
+        chaos({ enabled: true, frequency: 1, kind: 'http', status: 500 });
+
+        cy.request({
+            method: 'POST',
+            url,
+            body: body('E2E_ADMIN_CHAOS'),
+            failOnStatusCode: false,
+        })
+            .its('status')
+            .should('eq', 500);
+        cy.request('/admin/rules').its('body.rules.0.times').should('eq', 1);
+
+        chaos({ enabled: false });
+        ask('E2E_ADMIN_CHAOS')
+            .its('body.content.0.text')
+            .should('eq', 'after the retry');
+        cy.request('/admin/rules').its('body.rules').should('have.length', 6);
+    });
+
     it('refuses a rule that names a file', () => {
         cy.request({
             method: 'POST',
@@ -288,6 +312,12 @@ describe('Mock LLM Spec for the admin API', () => {
         // This suite's server is started with UI_THEME=light
         it('draws the dashboard in the light theme', () => {
             cy.request('/ui-meta').its('body.uiTheme').should('eq', 'light');
+            // The page names its theme however it is asked for
+            for (const page of ['/', '/index.html']) {
+                cy.request(page)
+                    .its('body')
+                    .should('contain', '<html data-theme="light"');
+            }
 
             cy.visit('/');
             cy.get('html').should('have.attr', 'data-theme', 'light');

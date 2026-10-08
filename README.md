@@ -599,7 +599,7 @@ await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
 - A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text` or `fail`.
 - The reply is given as `text`, never as `file` or `files`. The server has no login, so a path sent over HTTP would let anyone who can reach it read files from your machine.
 - Rules added this way are matched before the config file's rules, in the order they were added. To replace a config rule for one test, add a rule with the same `match`.
-- Give a rule `times` (a whole number, 1 or more) to have it answer that many matching requests and then remove itself. Without `times` a rule stays until you remove it or reset. `times` is for rules added this way only, not for the config file.
+- Give a rule `times` (a whole number, 1 or more) to have it answer that many matching requests and then remove itself. A call that [chaos](#chaos-mode-error-simulation) fails does not count, so the rule is still there for the retry. Without `times` a rule stays until you remove it or reset. `times` is for rules added this way only, not for the config file.
 - Nothing is saved. The config file is never written, and a restart starts again with the config file's rules only.
 - A rule that is not valid gets a `400` with `{ "error": "..." }` and is not added.
 - Each rule in a listing has `source` (`"runtime"` or `"config"`), `id` (`null` for a config rule, which can not be removed this way) and `times` (how many more requests it answers, or `null` if it stays).
@@ -637,7 +637,7 @@ await fetch('http://localhost:8001/admin/chaos', {
 - `PATCH` changes only the settings you send; the others stay as they are. The settings mean what they mean in the config file's [`chaos`](#chaos-mode-error-simulation) and [`responseDelay`](#response-delay-simulation).
 - A value that is not valid gets a `400` and nothing is changed. Nothing falls back to a default, unlike a CLI flag.
 - Changing chaos settings leaves the call count alone. With `mode: "every"`, call `POST /admin/reset` first and then `PATCH /admin/chaos`, so the count starts from 0 and you know which call fails.
-- `min` can not be more than `max`. Send both when you raise the delay from `0`.
+- `min` can not be more than `max`, and neither can be more than 2147483647 (about 24 days). Send both when you raise the delay from `0`.
 - The dashboard shows the settings in use, so a change appears there within 2 seconds. Its **Admin API** box has a **Reset** button that does the same as `POST /admin/reset`.
 - To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 

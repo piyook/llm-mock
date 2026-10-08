@@ -27,6 +27,10 @@ const delayVariables: Record<keyof DelaySettings, string> = {
 	max: 'RESPONSE_DELAY_MAX',
 };
 
+// The longest wait a timer can hold (about 24.8 days); a longer one would
+// fire at once
+const maxDelayMs = 2_147_483_647;
+
 const isInteger = (value: unknown, min: number, max = Infinity): boolean =>
 	Number.isInteger(value) && Number(value) >= min && Number(value) <= max;
 
@@ -131,9 +135,9 @@ export const changeDelay = (change: unknown): void => {
 	) as Array<[keyof DelaySettings, unknown]>;
 
 	for (const [key, value] of settings) {
-		if (!isInteger(value, 0)) {
+		if (!isInteger(value, 0, maxDelayMs)) {
 			throw new TypeError(
-				`delay.${key} must be an integer of 0 or more (milliseconds)`,
+				`delay.${key} must be an integer from 0 to ${maxDelayMs} (milliseconds)`,
 			);
 		}
 	}

@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import { readsAsOff } from '../config/config-loader.js';
 import { getChaosConfig, getChaosStats, resetChaos } from './chaos.js';
 import {
 	addRuntimeRule,
@@ -19,10 +20,10 @@ import {
  * up a reply or a failure without editing the config file and restarting.
  * Nothing here is saved: a restart goes back to the config file.
  *
- * Off when ADMIN_API is "false" (`server.admin` in the config, or --admin).
+ * Off when ADMIN_API reads as off (`server.admin` in the config, or --admin).
  */
 export const adminApiEnabled = (): boolean =>
-	process.env?.ADMIN_API?.toLowerCase() !== 'false';
+	!readsAsOff(process.env?.ADMIN_API);
 
 // The chaos settings in use, with the calls counted and failed so far
 const describeChaos = () => ({
