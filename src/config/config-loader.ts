@@ -54,6 +54,8 @@ export interface ModelConfig {
 export interface ServerConfig {
 	port: number;
 	host: string;
+	// Optional: false turns the admin API (/admin/*) off
+	admin?: boolean;
 }
 
 export interface LlmMockConfig {
@@ -240,6 +242,9 @@ export function setEnvironmentFromConfig(modelName?: string): void {
 	// Server settings - only set if not already set by CLI
 	process.env.SERVER_PORT =
 		process.env.SERVER_PORT || config.server.port.toString();
+	process.env.ADMIN_API =
+		process.env.ADMIN_API ||
+		(config.server.admin === false ? 'false' : 'true');
 	process.env.LLM_URL_ENDPOINT =
 		process.env.LLM_URL_ENDPOINT || modelConfig.endpoint;
 

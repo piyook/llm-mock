@@ -22,6 +22,8 @@ const { default: serverPage } = await import('../../utilities/server-page.js');
 const { logPath } = await import('../../utilities/logger.js');
 const { resetChaos, shouldInjectError } =
 	await import('../../utilities/chaos.js');
+const { addRuntimeRule, clearRuntimeRules } =
+	await import('../../utilities/runtime-rules.js');
 
 const require = createRequire(import.meta.url);
 const bundled: string[] = require('../../data/data.json').map(
@@ -231,31 +233,72 @@ describe('dashboard routes for stored responses and response rules', () => {
 		expect(body.storedResponsesCount).toBe(stored.length);
 		expect(body.responseRules).toEqual([
 			{
+				id: null,
+				source: 'config',
 				match: 'WANT_TEXT',
+				text: null,
 				files: ['fixtures/text.txt'],
 				stopReason: 'end',
 				fail: null,
 			},
 			{
+				id: null,
+				source: 'config',
 				match: 'WANT_POOL',
+				text: null,
 				files: ['fixtures/pool-a.txt', 'fixtures/pool-b.txt'],
 				stopReason: 'end',
 				fail: null,
 			},
 			{
+				id: null,
+				source: 'config',
 				match: 'WANT_MISSING',
+				text: null,
 				files: ['fixtures/missing.txt'],
 				stopReason: 'max_tokens',
 				fail: null,
 			},
 			// A rule that only fails: no files, and the defaults filled in
 			{
+				id: null,
+				source: 'config',
 				match: 'WANT_FAILURE',
+				text: null,
 				files: [],
 				stopReason: 'end',
 				fail: { kind: 'stream-drop', status: 500, afterChunks: 0 },
 			},
 		]);
+	});
+
+	test('ui-meta lists a rule added while running first, and files keep their place in that list', async () => {
+		const { id } = addRuntimeRule({ match: 'WANT_RUNTIME', text: 'now' });
+		try {
+			const { body } = await get('/ui-meta');
+
+			expect(body.responseRules).toHaveLength(5);
+			expect(body.responseRules[0]).toEqual({
+				id,
+				source: 'runtime',
+				match: 'WANT_RUNTIME',
+				text: 'now',
+				files: [],
+				stopReason: 'end',
+				fail: null,
+			});
+			expect(body.responseRules[1].match).toBe('WANT_TEXT');
+
+			// The runtime rule has no file to show
+			expect((await get('/ui-rule-file?rule=0&file=0')).status).toBe(404);
+			expect((await get('/ui-rule-file?rule=1&file=0')).body).toEqual({
+				match: 'WANT_TEXT',
+				file: 'fixtures/text.txt',
+				content: 'canned text\n',
+			});
+		} finally {
+			clearRuntimeRules();
+		}
 	});
 
 	test('ui-meta reports no file and no rules when none are configured', async () => {

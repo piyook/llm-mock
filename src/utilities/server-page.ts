@@ -3,13 +3,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../models/db.js';
-import {
-	getResponseRules,
-	getStoredResponsesFile,
-} from '../config/config-loader.js';
+import { getStoredResponsesFile } from '../config/config-loader.js';
 import { clearLog, logPath, maxLogEntries } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
-import { readRuleFile, ruleFailure, ruleFiles } from './response-rules.js';
+import { readRuleFile, ruleFiles } from './response-rules.js';
+import { describeActiveRules, getActiveRules } from './runtime-rules.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
@@ -175,15 +173,9 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			? (getStoredResponsesFile().file ?? null)
 			: null;
 
-		// Rules in config order (first match wins), each with every file it
-		// can reply with, how its reply ends, and how it fails (null if it
-		// replies)
-		const responseRules = getResponseRules().rules.map((rule) => ({
-			match: rule.match,
-			files: ruleFiles(rule),
-			stopReason: rule.stopReason ?? 'end',
-			fail: ruleFailure(rule) ?? null,
-		}));
+		// Rules in the order they are matched (first match wins): the ones
+		// added through the admin API, then the config file's
+		const responseRules = describeActiveRules();
 
 		const responseDelayMinMs =
 			Number(process.env?.RESPONSE_DELAY_MIN ?? 0) || 0;
@@ -269,11 +261,11 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	});
 
 	// Contents of one response rule fixture, for the dashboard viewer. Files
-	// are addressed by position in the config (?rule=0&file=0), never by path,
-	// so only configured fixtures can be read.
+	// are addressed by position in the ui-meta list (?rule=0&file=0), never by
+	// path, so only configured fixtures can be read.
 	app.get('/ui-rule-file', async (request, reply) => {
 		const query = request.query as { rule?: string; file?: string };
-		const { rules, baseDir } = getResponseRules();
+		const { rules, baseDir } = getActiveRules();
 		const rule = rules[Number(query.rule ?? 0)];
 		const file = rule && ruleFiles(rule)[Number(query.file ?? 0)];
 

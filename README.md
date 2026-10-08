@@ -28,6 +28,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
   - [Response delay simulation](#response-delay-simulation)
   - [Chaos mode (error simulation)](#chaos-mode-error-simulation)
     - [Stream failures](#stream-failures)
+  - [Admin API](#admin-api-changing-rules-while-running)
   - [Custom API paths](#custom-api-paths)
 - [Features](#features)
   - [Dashboard](#dashboard)
@@ -155,6 +156,7 @@ Each option overrides the matching setting of the selected preset for that run:
 |---|---|---|
 | `--model` | `defaultModel` | Name of a preset in `.llmockrc.json` |
 | `--port` / `--host` | `server.port` / `server.host` | Port number / address |
+| `--admin` | `server.admin` | `true` or `false` |
 | `--endpoint` | `endpoint` | Path without a leading slash |
 | `--responseType` | `responseType` | `lorem` or `stored` |
 | `--maxLoremParas` | `maxLoremParas` | Number |
@@ -174,7 +176,7 @@ Each option overrides the matching setting of the selected preset for that run:
 | `--embeddingDimensions` | `embeddings.dimensions` | Number |
 | `--foreground` | | No value; keeps the server attached (see below) |
 
-`llmock help` prints the same list. `responseRules` and `storedResponsesFile` can only be set in the config file.
+`llmock help` prints the same list. `responseRules` and `storedResponsesFile` can only be set in the config file; to add a rule to a running server, use the [admin API](#admin-api-changing-rules-while-running).
 
 ### Foreground Mode
 
@@ -273,6 +275,7 @@ The config file is read once at startup, so restart the server after changing it
 | `embeddings.enabled` | Enable the `/v1/embeddings` endpoint |
 | `embeddings.dimensions` | Embedding vector size |
 | `server.port` / `server.host` | Port and address the server listens on (`8001`, `0.0.0.0`) |
+| `server.admin` | `false` turns the [admin API](#admin-api-changing-rules-while-running) off (default `true`) |
 
 Only `name` and `endpoint` are required in a preset. Anything left out uses: `responseType` `lorem`, `maxLoremParas` 8, `maxLoggedRequests` 10, no delay, and validation, logging, debug, streaming, embeddings and chaos off.
 
@@ -361,6 +364,8 @@ With a request whose message contains `Classify this support ticket`, the server
 - Matching covers the whole request, including earlier turns of a conversation. A rule that matched an early message keeps matching on every later turn, so use distinctive markers and put more specific rules first.
 - `file` is resolved relative to the folder holding the config file, and is read exactly as written (including any trailing newline). It is read on every request, so you can edit it without restarting.
 - For varied replies to the same kind of request, give a rule `files` instead of `file`: `{ "match": "Summarise the thread", "files": ["fixtures/summary-a.txt", "fixtures/summary-b.txt"] }`. One of the files is picked at random on each matching request. A rule has either `file` or `files`, not both, and `files` must be a non-empty list of non-empty strings.
+- For a short reply, a rule can hold the reply itself as `text` in place of a file: `{ "match": "Classify this support ticket", "text": "{\"priority\":\"high\"}" }`. A rule has only one of `text`, `file` and `files`.
+- To add a rule while the server is running, use the [admin API](#admin-api-changing-rules-while-running).
 - A malformed rule stops the server at startup. An unreadable fixture (including any entry of `files`) logs a warning at startup, and a request that needs it returns an error rather than falling back to generated text.
 - Works with every preset and with both static and streamed replies.
 
@@ -560,6 +565,39 @@ try {
   // The text received before the failure is incomplete: discard it and retry
 }
 ```
+
+### Admin API (changing rules while running)
+
+The config file is read once, when the server starts. The admin API lets a test (or a coding agent) add a response rule to a running server, with no file to write and no restart:
+
+```js
+// Before the test: reply to this prompt with this text
+await fetch('http://localhost:8001/admin/rules', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ match: 'Classify this ticket', text: '{"priority":"high"}' }),
+});
+
+// After the test: back to the config file's rules
+await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
+```
+
+| Route | What it does |
+|---|---|
+| `GET /admin/rules` | Lists every rule in the order requests are matched against them |
+| `POST /admin/rules` | Adds a rule: `{ "match", "text", "stopReason"?, "fail"? }`. Answers `201` with the rule and its `id` |
+| `DELETE /admin/rules/<id>` | Removes one rule added this way |
+| `DELETE /admin/rules` | Removes every rule added this way |
+| `POST /admin/reset` | Removes every rule added this way and sets the [chaos](#chaos-mode-error-simulation) call count back to 0 |
+
+- A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text` or `fail`.
+- The reply is given as `text`, never as `file` or `files`. The server has no login, so a path sent over HTTP would let anyone who can reach it read files from your machine.
+- Rules added this way are matched before the config file's rules, in the order they were added. To replace a config rule for one test, add a rule with the same `match`.
+- Nothing is saved. The config file is never written, and a restart starts again with the config file's rules only.
+- A rule that is not valid gets a `400` with `{ "error": "..." }` and is not added.
+- Each rule in a listing has `source` (`"runtime"` or `"config"`) and `id` (`null` for a config rule, which can not be removed this way).
+- Chaos settings, delays and everything else still come from the config file and need a restart to change.
+- To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 
 ### Custom API paths
 

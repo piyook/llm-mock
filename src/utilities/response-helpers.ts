@@ -6,16 +6,14 @@ import {
 	setStreamingHeaders,
 	streamWithDelay,
 } from './build-streaming-response.js';
-import {
-	getResponseRules,
-	getStoredResponsesFile,
-} from '../config/config-loader.js';
+import { getStoredResponsesFile } from '../config/config-loader.js';
 import {
 	findMatchingRule,
 	loadRuleContent,
 	ruleFailure,
-	ruleFiles,
+	ruleHasReply,
 } from './response-rules.js';
+import { getActiveRules } from './runtime-rules.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { applyStopReason } from './stop-reason.js';
 import {
@@ -32,14 +30,14 @@ const DEFAULT_EMBEDDING_DIMENSIONS =
 	Number(process.env?.EMBEDDING_DIMENSION) || 128;
 
 /**
- * Fixture reply for this request if a configured response rule matches it,
- * otherwise undefined (a normal response is generated instead).
+ * Fixture reply for this request if a response rule matches it, otherwise
+ * undefined (a normal response is generated instead).
  */
 const getRuleReply = (requestBody: unknown): MockReply | undefined => {
-	const { rules, baseDir } = getResponseRules();
+	const { rules, baseDir } = getActiveRules();
 	const rule = findMatchingRule(rules, requestBody);
-	// A rule that only fails has no fixture: the reply is generated as usual
-	if (!rule || ruleFiles(rule).length === 0) return undefined;
+	// A rule that only fails has no reply: one is generated as usual
+	if (!rule || !ruleHasReply(rule)) return undefined;
 
 	return {
 		text: loadRuleContent(rule, baseDir),
@@ -54,7 +52,7 @@ const getRuleReply = (requestBody: unknown): MockReply | undefined => {
 export const getRuleFailure = (
 	requestBody: unknown,
 ): CallFailure | undefined => {
-	const rule = findMatchingRule(getResponseRules().rules, requestBody);
+	const rule = findMatchingRule(getActiveRules().rules, requestBody);
 
 	return rule && ruleFailure(rule);
 };
