@@ -329,7 +329,7 @@ describe('dashboard routes for stored responses and response rules', () => {
 		]);
 	});
 
-	test('ui-meta lists a rule added while running first, and files keep their place in that list', async () => {
+	test('ui-meta lists a rule added while running first, and files keep their place among the config rules', async () => {
 		const { id } = addRuntimeRule({ match: 'WANT_RUNTIME', text: 'now' });
 		try {
 			const { body } = await get('/ui-meta');
@@ -347,9 +347,9 @@ describe('dashboard routes for stored responses and response rules', () => {
 			});
 			expect(body.responseRules[1].match).toBe('WANT_TEXT');
 
-			// The runtime rule has no file to show
-			expect((await get('/ui-rule-file?rule=0&file=0')).status).toBe(404);
-			expect((await get('/ui-rule-file?rule=1&file=0')).body).toEqual({
+			// A file is found by its rule's place among the config rules, so
+			// adding or removing a runtime rule does not move it
+			expect((await get('/ui-rule-file?rule=0&file=0')).body).toEqual({
 				match: 'WANT_TEXT',
 				file: 'fixtures/text.txt',
 				content: 'canned text\n',

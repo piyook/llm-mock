@@ -12,7 +12,11 @@ import {
 	generateResponseContent,
 	getRuleFailure,
 } from '../../utilities/response-helpers.js';
-import { clearRuntimeRules } from '../../utilities/runtime-rules.js';
+import {
+	clearRuntimeRules,
+	countRuleUse,
+	findRequestRule,
+} from '../../utilities/runtime-rules.js';
 
 // The admin routes, and what the rules and settings they change do
 describe('admin API', () => {
@@ -113,8 +117,18 @@ describe('admin API', () => {
 		messages: [{ role: 'user', content: text }],
 	});
 
-	const replyTo = async (text: string) =>
-		(await generateResponseContent(request(text))).text;
+	// What the server does with a request that chaos leaves alone: finds its
+	// rule once, counts it against the rule's `times`, then replies
+	const answer = async (text: string) => {
+		const body = request(text);
+		const matched = findRequestRule(body);
+		const failure = getRuleFailure(body, matched);
+		countRuleUse(matched?.rule);
+
+		return { failure, reply: await generateResponseContent(body, matched) };
+	};
+
+	const replyTo = async (text: string) => (await answer(text)).reply.text;
 
 	const configRules = [
 		{
@@ -307,18 +321,38 @@ describe('admin API', () => {
 			times: 1,
 		});
 
-		// What the server does with one request: how it fails, then its reply
-		const first = request('WANT_FAIL_ONCE');
-		expect(getRuleFailure(first)?.kind).toBe('stream-drop');
-		expect((await generateResponseContent(first)).text).toBe(
-			'the start of it',
-		);
+		// The one request both fails as the rule says and starts with its text
+		const first = await answer('WANT_FAIL_ONCE');
+		expect(first.failure?.kind).toBe('stream-drop');
+		expect(first.reply.text).toBe('the start of it');
 
-		const second = request('WANT_FAIL_ONCE');
-		expect(getRuleFailure(second)).toBeUndefined();
-		expect((await generateResponseContent(second)).text).not.toBe(
-			'the start of it',
-		);
+		const second = await answer('WANT_FAIL_ONCE');
+		expect(second.failure).toBeUndefined();
+		expect(second.reply.text).not.toBe('the start of it');
+	});
+
+	test('a request with a plain text body counts once too', async () => {
+		await addRule({ match: 'WANT_PLAIN', text: 'plain', times: 2 });
+
+		const matched = findRequestRule('please WANT_PLAIN');
+		expect(getRuleFailure('please WANT_PLAIN', matched)).toBeUndefined();
+		countRuleUse(matched?.rule);
+		expect(
+			(await generateResponseContent('please WANT_PLAIN', matched)).text,
+		).toBe('plain');
+
+		expect((await send('GET', '/admin/rules')).body.rules[0].times).toBe(1);
+	});
+
+	test('looking a rule up does not count against its times', async () => {
+		await addRule({ match: 'WANT_LOOK', text: 'still here', times: 1 });
+
+		// As when chaos fails the call: the rule is found but never counted
+		findRequestRule(request('WANT_LOOK'));
+		findRequestRule(request('WANT_LOOK'));
+
+		expect((await send('GET', '/admin/rules')).body.rules[0].times).toBe(1);
+		expect(await replyTo('WANT_LOOK')).toBe('still here');
 	});
 
 	test('rules with times give a different reply to each call in turn', async () => {
@@ -488,6 +522,11 @@ describe('admin API', () => {
 		['a negative delay', { min: -1, max: 5 }, /delay\.min must be/],
 		['a delay as text', { max: '500' }, /delay\.max must be/],
 		['a fraction', { min: 0.5, max: 5 }, /delay\.min must be/],
+		[
+			'a delay longer than a timer can hold',
+			{ min: 0, max: 2_147_483_648 },
+			/delay\.max must be an integer from 0 to 2147483647/,
+		],
 		['a min above the max', { min: 500, max: 100 }, /can not be more than/],
 		['a min above the max in use', { min: 500 }, /can not be more than/],
 	])(
@@ -547,15 +586,21 @@ describe('admin API', () => {
 		expect(after.body.rule.id).not.toBe(before.body.rule.id);
 	});
 
-	test('the admin API is on unless ADMIN_API is false', () => {
+	test('the admin API is on unless ADMIN_API reads as off', () => {
 		const before = process.env.ADMIN_API;
 		try {
 			delete process.env.ADMIN_API;
 			expect(adminApiEnabled()).toBe(true);
-			process.env.ADMIN_API = 'true';
-			expect(adminApiEnabled()).toBe(true);
-			process.env.ADMIN_API = 'false';
-			expect(adminApiEnabled()).toBe(false);
+
+			for (const value of ['true', 'TRUE', '1', 'on', '']) {
+				process.env.ADMIN_API = value;
+				expect(adminApiEnabled()).toBe(true);
+			}
+
+			for (const value of ['false', 'False', 'FALSE', '0', 'off', 'no']) {
+				process.env.ADMIN_API = value;
+				expect(adminApiEnabled()).toBe(false);
+			}
 		} finally {
 			if (before === undefined) delete process.env.ADMIN_API;
 			else process.env.ADMIN_API = before;
