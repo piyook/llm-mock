@@ -7,7 +7,7 @@ Describes the llmock version this file ships with (read it from `node_modules/ll
 ## Mental model
 
 - One server process serves **one preset** (a named entry in `.llmockrc.json` → `models`). A preset fixes the chat route, the wire format, and the reply behaviour. To mock two providers at once, run two servers on two ports.
-- Config is read once at startup. Any change to `.llmockrc.json` needs `stop` + `start`. Fixture files and the stored responses file are re-read on every request, so editing them needs no restart.
+- Config is read once at startup. Any change to `.llmockrc.json` needs `stop` + `start`. Fixture files and the stored responses file are re-read on every request, so editing them needs no restart. Response rules can also be added to a running server over HTTP (see Admin API); nothing else can be changed without a restart.
 - No auth: API keys and headers are ignored (SDKs still need a non-empty dummy key).
 - Replies are text only. There are no tool calls and no token counting endpoint. Failures (an HTTP error, or a stream that fails part-way through) are simulated only with `chaos` on (see Chaos). A reply ends normally unless its response rule sets `stopReason` (see Fixture replies).
 
@@ -86,7 +86,7 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `responseDelay.min/max` | ms | 0 / 0 | Random wait before each reply. `0`/`0` disables. |
 | `embeddings.enabled` | boolean | false | Registers `/v1/embeddings`. When false the route 404s. |
 | `embeddings.dimensions` | number | 128 | Default vector length. |
-| `responseRules` | `{match, file, stopReason?}[]`, `{match, files, stopReason?}[]` or `{match, fail}[]` | none | See Fixture replies. A rule with `fail` fails the calls that match it. |
+| `responseRules` | `{match, file, stopReason?}[]`, `{match, files, stopReason?}[]`, `{match, text, stopReason?}[]` or `{match, fail}[]` | none | See Fixture replies. A rule with `fail` fails the calls that match it. |
 | `storedResponsesFile` | string | none | JSON file of texts for `responseType: "stored"`. See Stored replies. |
 | `chaos.enabled` | boolean | false | Fail some calls. See Chaos. |
 | `chaos.frequency` | integer ≥ 1 | 1 | Fail 1 in this many calls. `1` fails every call. |
@@ -96,8 +96,9 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `chaos.afterChunks` | integer ≥ 0 | 2 | Content deltas a failing stream sends before a `stream-*` kind fails it. |
 | `server.port` | number | 8001 | Listen port. |
 | `server.host` | string | `0.0.0.0` | Bind address. Use `127.0.0.1` to keep the mock off the network; keep `0.0.0.0` in Docker. |
+| `server.admin` | boolean | true | `false` leaves the `/admin/*` routes out (see Admin API). |
 
-CLI flags override the selected preset for one run: `--model --port --host --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --chaosKind --chaosAfterChunks --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. Booleans must be the literal `true`/`false`; every flag except `--foreground` needs a value.
+CLI flags override the selected preset for one run: `--model --port --host --admin --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --chaosKind --chaosAfterChunks --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. Booleans must be the literal `true`/`false`; every flag except `--foreground` needs a value.
 
 ## Fixture replies (`responseRules`)
 
@@ -109,6 +110,7 @@ The way to get deterministic output, e.g. JSON your code parses.
 - The reply text is the file's bytes, verbatim, including a trailing newline. It is inserted as the assistant message text in the preset's normal envelope (and streamed if streaming applies); it is not the raw HTTP body.
 - `file` resolves relative to the folder containing the config file.
 - Random variety for one kind of request: give the rule `files` instead of `file`, e.g. `{ "match": "Summarise", "files": ["fixtures/a.txt", "fixtures/b.txt"] }`. One file is picked at random on each matching request. A rule has `file` or `files`, not both.
+- Inline reply: give the rule `text` instead of a file, e.g. `{ "match": "Classify", "text": "{\"priority\":\"high\"}" }`. The reply text is that string, verbatim (`""` is an empty reply). A rule has only one of `text`, `file`, `files`.
 - No rule matched → normal `responseType` reply.
 - How the reply ends: add `stopReason` to a rule (with `file` or `files`) to stand for a truncated or refused reply, e.g. `{ "match": "Summarise this", "file": "fixtures/cut-off.txt", "stopReason": "max_tokens" }`. Values: `end` (the default: a normal end), `max_tokens`, `refusal`. The Responses section lists what each becomes on the wire. The reply text is still the file's bytes: llmock does not shorten it, so write a fixture that looks cut off (or, for a refusal, whatever text your app should see).
 - Failing one prompt: give a rule `fail` and every call that matches it fails, whether or not `chaos` is on, while every other call is left alone. E.g. `{ "match": "Summarise the Q3 report", "fail": { "kind": "stream-error", "status": 529, "afterChunks": 1 } }`.
@@ -117,10 +119,50 @@ The way to get deterministic output, e.g. JSON your code parses.
   - `file`/`files` are optional on a rule with `fail`. They only matter to a `stream-*` kind, as the text the stream sends before it fails; with neither, that text is the normal `responseType` reply. `stopReason` is never reached.
   - The rule fails every time it matches, so a client that retries the same prompt fails again. To have a retry succeed, use `chaos` with `frequency: 2` instead.
   - A call failed by a rule is added to `chaosInjected` but is not counted as a chaos call, so it does not shift which of the other calls `chaos` fails. The first matching rule still wins, so put a `fail` rule above a broader rule it overlaps with.
-- `match` or `file` empty/non-string, `files` not a non-empty array of non-empty strings, both `file` and `files` set, neither set on a rule without `fail`, a `stopReason` other than those three, or a `fail` that is not an object or has an unknown `kind`, a `status` outside 400–599 or an `afterChunks` that is not an integer ≥ 0 → server refuses to start. File missing → startup warning (every entry of `files` is checked), and a matching request that picks it gets `500` (no fallback to lorem).
+- `match` or `file` empty/non-string, `text` not a string, `files` not a non-empty array of non-empty strings, more than one of `text`, `file` and `files` set, none set on a rule without `fail`, a `stopReason` other than those three, or a `fail` that is not an object or has an unknown `kind`, a `status` outside 400–599 or an `afterChunks` that is not an integer ≥ 0 → server refuses to start. File missing → startup warning (every entry of `files` is checked), and a matching request that picks it gets `500` (no fallback to lorem).
 - GET requests have no body, so rules never apply to them.
-- `GET /ui-meta` → `responseRules` lists the active rules in order as `{"match", "files": [...], "stopReason", "fail"}` (a single `file` is reported as a one-entry `files`, no fixture as `[]`; a rule with no `stopReason` reports `"end"`; `fail` is `null`, or `{"kind", "status", "afterChunks"}` with the defaults filled in).
+- `GET /ui-meta` → `responseRules` lists the active rules in match order as `{"id", "source", "match", "text", "files": [...], "stopReason", "fail"}` (`source` is `"runtime"` for a rule added through the Admin API, which is listed first and has an `id`, else `"config"` with `id: null`; `text` is `null` unless the rule has one; a single `file` is reported as a one-entry `files`, no fixture as `[]`; a rule with no `stopReason` reports `"end"`; `fail` is `null`, or `{"kind", "status", "afterChunks"}` with the defaults filled in).
 - `GET /ui-rule-file?rule=<i>&file=<j>` → `{"match", "file", "content"}` for file `j` of rule `i` (both zero-based positions in that list). Unknown position → `404`; unreadable file → `500` with `{"error"}`.
+
+## Admin API (`/admin/*`)
+
+The way to set up a reply from inside a test, with no fixture file, no config edit and no restart. Rules added here live in memory only: the config file is never written and a restart drops them.
+
+| Route | Body | Returns |
+|---|---|---|
+| `GET /admin/rules` | none | `200 {"rules": [...]}`: every active rule in match order, in the `responseRules` shape of `GET /ui-meta` |
+| `POST /admin/rules` | `{"match", "text"?, "stopReason"?, "fail"?}` | `201 {"rule": {...}}` with its `id` (`"r1"`, `"r2"`…); `400 {"error"}` if not valid (nothing is added) |
+| `DELETE /admin/rules/<id>` | none | `200 {"rules": [...]}`; `404 {"error"}` for an unknown id |
+| `DELETE /admin/rules` | none | `200 {"rules": [...]}`: runtime rules removed, config rules kept |
+| `POST /admin/reset` | none | `200 {"rules": [...]}`: runtime rules removed and the chaos counts (calls counted, `chaosInjected`) back to 0 |
+
+- `match`, `stopReason` and `fail` mean exactly what they mean in `responseRules` (see Fixture replies). A rule needs `text` or `fail`; with both, `text` is what a `stream-*` failure sends before it fails.
+- `file` and `files` are refused with `400`: the reply must be `text`. Any other key is refused too.
+- Order: runtime rules first, in the order added, then the config rules. First match wins, so a runtime rule with the same `match` as a config rule replaces it until removed.
+- Send `POST /admin/rules` with `Content-Type: application/json`. Send the routes that take no body without a body.
+- An `id` is never reused, also after a reset. Config rules have `id: null` and can not be removed.
+- `POST /admin/reset` also drops connections a `stream-stall` is holding open. It does not change chaos settings, delays or the request log.
+- The state is per server process and shared by every client: tests that add rules to one server must not run in parallel against it unless their `match` strings differ.
+- Off with `"server": {"admin": false}` or `--admin=false` (the routes then 404). While it is on, a preset `endpoint` equal to `admin` or starting with `admin/` → startup error. No auth, like the rest of the server: use `server.host` `127.0.0.1` to keep it off the network.
+
+Per-test fixture (any runner):
+
+```js
+const mock = 'http://localhost:8001';
+const addRule = (rule) =>
+  fetch(`${mock}/admin/rules`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(rule),
+  });
+
+beforeEach(() => fetch(`${mock}/admin/reset`, { method: 'POST' }));
+
+test('high priority tickets are escalated', async () => {
+  await addRule({ match: 'Classify this ticket', text: '{"priority":"high"}' });
+  // ...call the code under test, which calls the mock...
+});
+```
 
 ## Stored replies (`storedResponsesFile`)
 
@@ -233,6 +275,7 @@ To change a response envelope or the required request keys, or to mock a provide
 | `GET /ui-rule-file?rule=<i>&file=<j>` | Contents of one response rule file, as JSON |
 | `GET /ui-request-log` | `{"file", "log"}`: `log` is an array of the most recent validated requests (the last `maxLoggedRequests`, 10 by default), newest first, each with why it passed/failed (older ones are dropped; `log` is `null` if none logged) |
 | `DELETE /ui-request-log` | Empties the request log; returns `{"file", "log": null}` |
+| `/admin/rules`, `/admin/reset` | Add and remove response rules while running (see Admin API) |
 | `GET /` | HTML dashboard |
 | `GET /<endpoint>` | A generated reply with no validation and no rules (quick smoke test) |
 
@@ -255,7 +298,7 @@ export function startMock() {
 export const stopMock = () => execSync('npx llmock stop --port=8001');
 ```
 
-Fast deterministic tests: `"responseDelay": {"min": 0, "max": 0}`, one `responseRules` entry per scenario keyed on a unique marker string in the prompt.
+Fast deterministic tests: `"responseDelay": {"min": 0, "max": 0}`, one `responseRules` entry per scenario keyed on a unique marker string in the prompt. Or keep each scenario's reply next to its test: `POST /admin/rules` in the test, `POST /admin/reset` in `beforeEach` (see Admin API).
 
 Retry tests: `"chaos": {"enabled": true, "frequency": 2, "status": 429}` makes every 2nd call fail, so a client that retries once always succeeds. Run it as its own preset (or with `--chaos=true`) so other tests are unaffected.
 
