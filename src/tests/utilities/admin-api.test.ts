@@ -66,6 +66,12 @@ describe('admin API', () => {
 			if (/^(CHAOS_|RESPONSE_DELAY_)/.test(key)) delete process.env[key];
 		}
 
+		// The reply settings a server would have read from this preset
+		process.env.STREAM = 'false';
+		process.env.VALIDATE_REQUESTS = 'OFF';
+		process.env.LOG_REQUESTS = 'OFF';
+		process.env.MAX_LOGGED_REQUESTS = '10';
+
 		loadConfig(configPath);
 		process.env.LLM_MODEL_NAME = 'claude';
 		process.env.MOCK_LLM_RESPONSE_TYPE = 'lorem';
@@ -129,6 +135,15 @@ describe('admin API', () => {
 	};
 
 	const replyTo = async (text: string) => (await answer(text)).reply.text;
+
+	const startSettings = {
+		responseType: 'lorem',
+		maxLoremParas: 3,
+		stream: false,
+		validateRequests: false,
+		logRequests: false,
+		maxLoggedRequests: 10,
+	};
 
 	const configRules = [
 		{
@@ -558,9 +573,108 @@ describe('admin API', () => {
 			chaos: chaosOff,
 			stats: { calls: 0, injected: 0 },
 			delay: { min: 0, max: 0 },
+			settings: startSettings,
 		});
 		expect(shouldInjectError()).toBe(false);
 	});
+
+	test('GET admin/settings reports the reply settings', async () => {
+		const { status, body } = await send('GET', '/admin/settings');
+
+		expect(status).toBe(200);
+		expect(body).toEqual({ settings: startSettings });
+	});
+
+	test('PATCH admin/settings changes the settings it is given and keeps the rest', async () => {
+		try {
+			const first = await patch('/admin/settings', {
+				responseType: 'stored',
+				stream: true,
+			});
+
+			expect(first.status).toBe(200);
+			expect(first.body.settings).toEqual({
+				...startSettings,
+				responseType: 'stored',
+				stream: true,
+			});
+			expect(process.env.MOCK_LLM_RESPONSE_TYPE).toBe('stored');
+			expect(process.env.STREAM).toBe('true');
+
+			const second = await patch('/admin/settings', {
+				maxLoremParas: 1,
+				validateRequests: true,
+				logRequests: true,
+				maxLoggedRequests: 25,
+			});
+
+			expect(second.body.settings).toEqual({
+				responseType: 'stored',
+				maxLoremParas: 1,
+				stream: true,
+				validateRequests: true,
+				logRequests: true,
+				maxLoggedRequests: 25,
+			});
+			// Written the way the rest of the server reads them
+			expect(process.env.VALIDATE_REQUESTS).toBe('ON');
+			expect(process.env.LOG_REQUESTS).toBe('ON');
+			expect(process.env.MAX_LOGGED_REQUESTS).toBe('25');
+		} finally {
+			await send('POST', '/admin/reset');
+		}
+
+		expect((await send('GET', '/admin/settings')).body.settings).toEqual(
+			startSettings,
+		);
+	});
+
+	test('a change of lorem length is what the next reply uses', async () => {
+		try {
+			await patch('/admin/settings', { maxLoremParas: 1 });
+			const lorem = await replyTo('anything');
+			// One sentence: a single full stop, at the end
+			expect(lorem.indexOf('.')).toBe(lorem.length - 1);
+		} finally {
+			await send('POST', '/admin/reset');
+		}
+	});
+
+	test.each([
+		['an array', [], /settings must be a JSON object/],
+		['an unknown setting', { model: 'x' }, /unknown settings: model/],
+		[
+			'an unknown response type',
+			{ responseType: 'markov' },
+			/settings\.responseType must be "lorem" or "stored"/,
+		],
+		['a count of 0', { maxLoremParas: 0 }, /settings\.maxLoremParas/],
+		['a count too high', { maxLoremParas: 1001 }, /from 1 to 1000/],
+		['stream as text', { stream: 'true' }, /settings\.stream must be true/],
+		['validation as ON', { validateRequests: 'ON' }, /validateRequests/],
+		['logging as 1', { logRequests: 1 }, /settings\.logRequests/],
+		[
+			'too many logged requests',
+			{ maxLoggedRequests: 101 },
+			/settings\.maxLoggedRequests must be an integer from 1 to 100/,
+		],
+		[
+			'one good setting and one bad',
+			{ stream: true, maxLoggedRequests: 0 },
+			/settings\.maxLoggedRequests/,
+		],
+	])(
+		'PATCH admin/settings answers 400 for %s',
+		async (_name, payload, error) => {
+			const { status, body } = await patch('/admin/settings', payload);
+
+			expect(status).toBe(400);
+			expect(body.error).toMatch(error);
+			expect(
+				(await send('GET', '/admin/settings')).body.settings,
+			).toEqual(startSettings);
+		},
+	);
 
 	test('a reset then a change has the chaos count start from 0', async () => {
 		try {

@@ -176,6 +176,60 @@ describe('Mock LLM Spec for the admin API', () => {
         cy.request('/admin/rules').its('body.rules').should('have.length', 6);
     });
 
+    it('replies from the stored responses once the response type is changed', () => {
+        cy.request({
+            method: 'PATCH',
+            url: '/admin/settings',
+            body: { responseType: 'stored' },
+        })
+            .its('body.settings.responseType')
+            .should('eq', 'stored');
+
+        cy.request('/ui-stored-responses').then(({ body: stored }) => {
+            ask('anything at all')
+                .its('body.content.0.text')
+                .should('be.oneOf', stored.responses);
+        });
+
+        reset().its('body.settings.responseType').should('eq', 'lorem');
+        cy.request('/ui-meta').its('body.mockResponseType').should('eq', 'lorem');
+    });
+
+    it('stops checking requests once validation is switched off', () => {
+        const notARequest = { hello: 'there' };
+        const send = () =>
+            cy.request({
+                method: 'POST',
+                url,
+                body: notARequest,
+                failOnStatusCode: false,
+            });
+
+        send().its('status').should('eq', 400);
+
+        cy.request({
+            method: 'PATCH',
+            url: '/admin/settings',
+            body: { validateRequests: false },
+        });
+        send().its('status').should('eq', 200);
+
+        reset();
+        send().its('status').should('eq', 400);
+    });
+
+    it('refuses a setting that is not valid', () => {
+        cy.request({
+            method: 'PATCH',
+            url: '/admin/settings',
+            body: { responseType: 'markov' },
+            failOnStatusCode: false,
+        }).then((response) => {
+            expect(response.status).to.eq(400);
+            expect(response.body.error).to.contain('settings.responseType');
+        });
+    });
+
     it('refuses a rule that names a file', () => {
         cy.request({
             method: 'POST',
