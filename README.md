@@ -617,7 +617,7 @@ await fetch('http://localhost:8001/admin/chaos', {
 - A value that is not valid gets a `400` and nothing is changed. Nothing falls back to a default, unlike a CLI flag.
 - Changing chaos settings leaves the call count alone. With `mode: "every"`, call `POST /admin/reset` first and then `PATCH /admin/chaos`, so the count starts from 0 and you know which call fails.
 - `min` can not be more than `max`. Send both when you raise the delay from `0`.
-- The dashboard shows the settings in use, so a change appears there within 2 seconds.
+- The dashboard shows the settings in use, so a change appears there within 2 seconds. Its **Admin API** box has a **Reset** button that does the same as `POST /admin/reset`.
 - To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 
 ### Custom API paths
@@ -658,9 +658,11 @@ Once running, open `http://localhost:8001` for the live dashboard:
 | `http://localhost:8001` | Main dashboard |
 | `http://localhost:8001/ping` | Health check |
 
-The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged requests. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
+The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged requests. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Admin API**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
 
-With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. With no rules set, the box shows a blank rule with a note pointing to the setting.
+With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. A rule that holds its reply as `text` shows **its own text** in place of a file; click it to read the text. A rule added through the [admin API](#admin-api-changing-rules-and-settings-while-running) is listed first and marked **runtime**. With no rules set, the box shows a blank rule with a note pointing to the setting.
+
+The **Admin API** box says whether the admin API is on and how many rules were added while running. **Reset** does what `POST /admin/reset` does, after asking you to confirm: it removes those rules, puts chaos and delay back to how the server started and sets the chaos count to 0.
 
 ### Available endpoints
 
