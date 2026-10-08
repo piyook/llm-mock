@@ -176,6 +176,21 @@ h1 {
 	background: var(--bg-row);
 }
 
+/* A value with the switch that changes it */
+.kvValue {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	align-items: center;
+	gap: 8px;
+}
+
+.switch {
+	padding: 3px 8px;
+	font-size: 0.9rem;
+	white-space: nowrap;
+}
+
 .badge {
 	background: var(--accent2);
 	padding: 4px 10px;

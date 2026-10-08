@@ -390,6 +390,51 @@ describe('Mock LLM Spec for the admin API', () => {
             cy.get('[cy-data="rule_runtime"]').should('not.exist');
         });
 
+        it('switches the response type from the dashboard, and back with Reset', () => {
+            cy.visit('/');
+            cy.get('[cy-data="response_type"]').should('have.text', 'lorem');
+
+            cy.get('[cy-data="switch_response_type"]')
+                .should('contain', 'Use stored')
+                .click();
+            cy.get('[cy-data="response_type"]').should('have.text', 'stored');
+            cy.get('[cy-data="switch_response_type"]').should('contain', 'Use lorem');
+            cy.get('[cy-data="stored_responses_link"]').should('be.visible');
+            cy.request('/admin/settings')
+                .its('body.settings.responseType')
+                .should('eq', 'stored');
+
+            cy.get('[cy-data="admin_reset"]').click();
+            cy.get('[cy-data="admin_reset_confirm"]').click();
+            cy.get('[cy-data="response_type"]').should('have.text', 'lorem');
+        });
+
+        it('switches chaos, validation and the request log from the dashboard', () => {
+            cy.visit('/');
+
+            cy.get('[cy-data="chaos_status"]').should('have.text', 'DISABLED');
+            cy.get('[cy-data="switch_chaos"]').should('contain', 'Turn on').click();
+            cy.get('[cy-data="chaos_status"]').should('have.text', 'ENABLED');
+            cy.get('[cy-data="switch_chaos"]').should('contain', 'Turn off').click();
+            cy.get('[cy-data="chaos_status"]').should('have.text', 'DISABLED');
+
+            cy.get('[cy-data="validate_requests"]').should('have.text', 'ON');
+            cy.get('[cy-data="switch_validate_requests"]').click();
+            cy.get('[cy-data="validate_requests"]').should('have.text', 'OFF');
+
+            cy.get('[cy-data="log_requests"]').then(($badge) => {
+                const before = $badge.text();
+                cy.get('[cy-data="switch_log_requests"]').click();
+                cy.get('[cy-data="log_requests"]').should(
+                    'have.text',
+                    before === 'ON' ? 'OFF' : 'ON',
+                );
+            });
+
+            // This template streams when a request asks, so there is no switch
+            cy.get('[cy-data="switch_streaming"]').should('not.exist');
+        });
+
         it('shows how many requests a rule with times has left', () => {
             addRule({ match: 'E2E_ADMIN_LEFT', text: 'twice', times: 2 });
             addRule({ match: 'E2E_ADMIN_STAYS', text: 'always' });

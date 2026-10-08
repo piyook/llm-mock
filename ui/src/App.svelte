@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import {
+		changeRuntimeSettings,
 		clearRequestLog,
 		fetchPing,
 		fetchRequestLog,
@@ -39,6 +40,12 @@
 	// The admin card's reset: whether it is asking to confirm, and why it failed
 	let confirmingReset = false;
 	let resetError: string | null = null;
+
+	// The switches on the cards work through the admin API, so they are only
+	// there while it is on
+	$: canChange = meta?.adminApi === 'ENABLED';
+	// The card whose switch failed, and why
+	let changeError: { card: string; message: string } | null = null;
 
 	// A list longer than this scrolls inside a fixed height window
 	const SCROLL_AFTER = 4;
@@ -107,12 +114,25 @@
 		}));
 	}
 
+	// Changes a setting on the running server, then shows the settings as they
+	// now are
+	async function change(card: string, route: 'settings' | 'chaos', setting: object) {
+		try {
+			await changeRuntimeSettings(route, setting);
+			changeError = null;
+			await refresh();
+		} catch (e) {
+			changeError = { card, message: e instanceof Error ? e.message : String(e) };
+		}
+	}
+
 	// Undoes what the admin API changed, then shows the settings as they now are
 	async function resetRuntime() {
 		confirmingReset = false;
 		try {
 			await resetRuntimeChanges();
 			resetError = null;
+			changeError = null;
 			await refresh();
 		} catch (e) {
 			resetError = e instanceof Error ? e.message : String(e);
@@ -134,7 +154,7 @@
 					source: file,
 					paged: true,
 					texts: [
-						'No request has been logged yet. Turn on validateRequests and logRequests, restart the server, then send a POST request.',
+						'No request has been logged yet. Turn on Request Validation and Request Log, then send a POST request.',
 					],
 				};
 			}
@@ -287,9 +307,28 @@
 			</div>
 			<div class="kv">
 				<span class="muted">Streaming</span>
-				<span class="badge">{meta?.streamingStatus ?? 'DISABLED'}</span>
+				<span class="kvValue">
+					<span class="badge" cy-data="streaming_status">
+						{meta?.streamingStatus ?? 'DISABLED'}
+					</span>
+					<!-- The claude template streams when a request asks it to -->
+					{#if canChange && meta?.llmName !== 'claude'}
+						<button
+							class="fileLink switch"
+							cy-data="switch_streaming"
+							title="Changes this on the running server. Reset or a restart puts it back"
+							on:click={() =>
+								change('model', 'settings', { stream: meta?.streamingStatus !== 'ENABLED' })}
+						>
+							{meta?.streamingStatus === 'ENABLED' ? 'Turn off' : 'Turn on'}
+						</button>
+					{/if}
+				</span>
 			</div>
 		</div>
+		{#if changeError?.card === 'model'}
+			<p class="viewerError cardNote" cy-data="change_error">{changeError.message}</p>
+		{/if}
 	</section>
 
 	<section class="card" cy-data="responses">
@@ -297,7 +336,21 @@
 		<div class="grid">
 			<div class="kv">
 				<span class="muted">Response Type</span>
-				<span class="badge">{meta?.mockResponseType || 'None'}</span>
+				<span class="kvValue">
+					<span class="badge" cy-data="response_type">{meta?.mockResponseType || 'None'}</span>
+					{#if canChange}
+						<button
+							class="fileLink switch"
+							cy-data="switch_response_type"
+							title="Changes this on the running server. Reset or a restart puts it back"
+							on:click={() => change('responses', 'settings', {
+									responseType: meta?.mockResponseType === 'stored' ? 'lorem' : 'stored',
+								})}
+						>
+							Use {meta?.mockResponseType === 'stored' ? 'lorem' : 'stored'}
+						</button>
+					{/if}
+				</span>
 			</div>
 			<div class="kv">
 				<span class="muted">Response Delay</span>
@@ -326,6 +379,9 @@
 				</div>
 			{/if}
 		</div>
+		{#if changeError?.card === 'responses'}
+			<p class="viewerError cardNote" cy-data="change_error">{changeError.message}</p>
+		{/if}
 	</section>
 
 	<section class="card" cy-data="chaos">
@@ -333,7 +389,19 @@
 		<div class="grid">
 			<div class="kv">
 				<span class="muted">Chaos</span>
-				<span class="badge" cy-data="chaos_status">{meta?.chaosStatus ?? 'DISABLED'}</span>
+				<span class="kvValue">
+					<span class="badge" cy-data="chaos_status">{meta?.chaosStatus ?? 'DISABLED'}</span>
+					{#if canChange}
+						<button
+							class="fileLink switch"
+							cy-data="switch_chaos"
+							title="Changes this on the running server. Reset or a restart puts it back"
+							on:click={() => change('chaos', 'chaos', { enabled: meta?.chaosStatus !== 'ENABLED' })}
+						>
+							{meta?.chaosStatus === 'ENABLED' ? 'Turn off' : 'Turn on'}
+						</button>
+					{/if}
+				</span>
 			</div>
 			{#if meta?.chaosStatus === 'ENABLED'}
 				<div class="kv">
@@ -360,6 +428,9 @@
 				</div>
 			{/if}
 		</div>
+		{#if changeError?.card === 'chaos'}
+			<p class="viewerError cardNote" cy-data="change_error">{changeError.message}</p>
+		{/if}
 		<p class="muted cardNote" cy-data="chaos_note">
 			Chaos answers some calls with an HTTP error in place of a reply, or fails a
 			stream part-way through. Set <code>chaos</code> (<code>enabled</code>,
@@ -511,8 +582,9 @@
 			{#if meta?.adminApi === 'ENABLED'}
 				A test can add response rules and change the chaos, delay and reply settings while
 				the server runs, through the routes under <code>/admin</code>. Nothing is saved to
-				<code>.llmockrc.json</code>. Reset removes those rules, puts the settings back to
-				how the server started and sets the chaos count to 0.
+				<code>.llmockrc.json</code>. The switches on this page do the same for the settings
+				they sit beside. Reset removes those rules, puts the settings back to how the server
+				started and sets the chaos count to 0.
 			{:else}
 				The routes under <code>/admin</code> are off. To use them, remove
 				<code>"admin": false</code> from the <code>server</code> block of
@@ -542,7 +614,19 @@
 		<div class="grid">
 			<div class="kv">
 				<span class="muted">Request Validation</span>
-				<span class="badge">{meta?.validateRequests || 'OFF'}</span>
+				<span class="kvValue">
+					<span class="badge" cy-data="validate_requests">{meta?.validateRequests || 'OFF'}</span>
+					{#if canChange}
+						<button
+							class="fileLink switch"
+							cy-data="switch_validate_requests"
+							title="Changes this on the running server. Reset or a restart puts it back"
+							on:click={() => change('diagnostics', 'settings', { validateRequests: meta?.validateRequests !== 'ON' })}
+						>
+							{meta?.validateRequests === 'ON' ? 'Turn off' : 'Turn on'}
+						</button>
+					{/if}
+				</span>
 			</div>
 			<div class="kv">
 				<span class="muted">Debug Mode</span>
@@ -550,7 +634,19 @@
 			</div>
 			<div class="kv">
 				<span class="muted">Request Log</span>
-				<span class="badge">{meta?.logRequests || 'OFF'}</span>
+				<span class="kvValue">
+					<span class="badge" cy-data="log_requests">{meta?.logRequests || 'OFF'}</span>
+					{#if canChange}
+						<button
+							class="fileLink switch"
+							cy-data="switch_log_requests"
+							title="Changes this on the running server. Reset or a restart puts it back"
+							on:click={() => change('diagnostics', 'settings', { logRequests: meta?.logRequests?.toUpperCase() !== 'ON' })}
+						>
+							{meta?.logRequests?.toUpperCase() === 'ON' ? 'Turn off' : 'Turn on'}
+						</button>
+					{/if}
+				</span>
 			</div>
 			<div class="kv">
 				<span class="muted">Max Logged Requests</span>
@@ -570,6 +666,9 @@
 				</button>
 			</div>
 		</div>
+		{#if changeError?.card === 'diagnostics'}
+			<p class="viewerError cardNote" cy-data="change_error">{changeError.message}</p>
+		{/if}
 		<p class="muted cardNote" cy-data="max_logged_requests_note">
 			The log keeps the last {meta?.maxLoggedRequests ?? 10} requests. To change this,
 			set <code>maxLoggedRequests</code> (1 to 100) in the model preset in

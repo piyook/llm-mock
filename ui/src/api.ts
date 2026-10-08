@@ -91,9 +91,27 @@ export function clearRequestLog(): Promise<RequestLog> {
 }
 
 // Back to how the server started: no rules added while running, and the
-// chaos and delay settings of the config file
+// chaos, delay and reply settings of the config file
 export function resetRuntimeChanges(): Promise<unknown> {
 	return fetchViewerJson('/admin/reset', 'POST');
+}
+
+// Changes settings on the running server through the admin API; a change
+// that can't be made is answered with `{ error }` saying why
+export async function changeRuntimeSettings(
+	route: 'settings' | 'chaos',
+	change: object,
+): Promise<unknown> {
+	const res = await fetch(`/admin/${route}`, {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(change),
+	});
+	const body = await res.json().catch(() => null);
+	if (!res.ok) {
+		throw new Error(body?.error ?? `/admin/${route} failed: ${res.status}`);
+	}
+	return body;
 }
 
 export async function fetchPing(): Promise<boolean> {
