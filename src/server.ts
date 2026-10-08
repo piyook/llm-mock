@@ -2,6 +2,7 @@ import fastify from 'fastify';
 import * as seeders from './seeders/index.js';
 import getApiRoutes from './utilities/file-scan.js';
 import serverPage from './utilities/server-page.js';
+import adminApi, { adminApiEnabled } from './utilities/admin-api.js';
 import { dbLoadFromDisk } from './models/db.js';
 import {
 	setEnvironmentFromConfig,
@@ -48,6 +49,8 @@ releaseStalledOnClose(app);
 const { apiRoutes } = await getApiRoutes(app);
 
 serverPage(app, apiRoutes);
+
+if (adminApiEnabled()) adminApi(app);
 
 // Load database from disk if persistence is enabled
 const loaded = dbLoadFromDisk();
