@@ -707,6 +707,8 @@ The flag wins over the environment variable, which wins over the config file. In
 
 With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. A rule that holds its reply as `text` shows **its own text** in place of a file; click it to read the text. A rule added through the [admin API](#admin-api-changing-rules-and-settings-while-running) is listed first and marked **runtime**; one with `times` also shows how many requests it has left. With no rules set, the box shows a blank rule with a note pointing to the setting.
 
+While the admin API is on, the settings with two values have a button beside them that changes the running server: **Response Type** (lorem or stored), **Streaming**, **Chaos**, **Request Validation** and **Request Log**. A change made this way is not saved; **Reset** or a restart puts it back. (Streaming has no button on the `claude` template, where each request says whether it wants a stream.)
+
 The **Admin API** box says whether the admin API is on and how many rules were added while running. **Reset** does what `POST /admin/reset` does, after asking you to confirm: it removes those rules, puts chaos and delay back to how the server started and sets the chaos count to 0.
 
 ### Available endpoints
