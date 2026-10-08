@@ -191,6 +191,41 @@ h1 {
 	white-space: nowrap;
 }
 
+/* A row being changed takes the full width, so its boxes and buttons fit on
+   one line */
+.kv:has(form.kvValue) {
+	grid-column: 1 / -1;
+}
+
+/* A box to fill in, with the words that say what it holds */
+.editField {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 0.9rem;
+	white-space: nowrap;
+}
+
+.editBox {
+	width: 5.5em;
+	border: 1.5px solid var(--accent);
+	border-radius: 8px;
+	padding: 3px 6px;
+	background: var(--bg-card);
+	color: var(--text-main);
+	font: inherit;
+	font-weight: 650;
+}
+
+select.editBox {
+	width: auto;
+}
+
+.editBox:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
 .badge {
 	background: var(--accent2);
 	padding: 4px 10px;

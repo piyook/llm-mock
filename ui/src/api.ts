@@ -99,7 +99,7 @@ export function resetRuntimeChanges(): Promise<unknown> {
 // Changes settings on the running server through the admin API; a change
 // that can't be made is answered with `{ error }` saying why
 export async function changeRuntimeSettings(
-	route: 'settings' | 'chaos',
+	route: 'settings' | 'chaos' | 'delay',
 	change: object,
 ): Promise<unknown> {
 	const res = await fetch(`/admin/${route}`, {

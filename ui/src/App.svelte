@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
+	import SettingEditor from './SettingEditor.svelte';
 	import {
 		changeRuntimeSettings,
 		clearRequestLog,
@@ -115,14 +116,20 @@
 	}
 
 	// Changes a setting on the running server, then shows the settings as they
-	// now are
-	async function change(card: string, route: 'settings' | 'chaos', setting: object) {
+	// now are. Resolves to whether the change was made.
+	async function change(
+		card: string,
+		route: 'settings' | 'chaos' | 'delay',
+		setting: object,
+	): Promise<boolean> {
 		try {
 			await changeRuntimeSettings(route, setting);
 			changeError = null;
 			await refresh();
+			return true;
 		} catch (e) {
 			changeError = { card, message: e instanceof Error ? e.message : String(e) };
+			return false;
 		}
 	}
 
@@ -354,12 +361,29 @@
 			</div>
 			<div class="kv">
 				<span class="muted">Response Delay</span>
-				<span class="badge" cy-data="response_delay">{delayLabel(meta)}</span>
+				<SettingEditor
+					name="delay"
+					{canChange}
+					fields={[
+						{ key: 'min', label: 'min ms', value: meta?.responseDelayMinMs ?? 0, min: 0 },
+						{ key: 'max', label: 'max ms', value: meta?.responseDelayMaxMs ?? 0, min: 0 },
+					]}
+					save={(values) => change('responses', 'delay', values)}
+				>
+					<span class="badge" cy-data="response_delay">{delayLabel(meta)}</span>
+				</SettingEditor>
 			</div>
 			{#if meta?.mockResponseType === 'lorem'}
 				<div class="kv">
 					<span class="muted">Maximum sentences</span>
-					<span class="badge">{meta?.maxLoremParas ?? 'None'}</span>
+					<SettingEditor
+						name="max_lorem"
+						{canChange}
+						fields={[{ key: 'maxLoremParas', value: meta?.maxLoremParas ?? 5, min: 1, max: 1000 }]}
+						save={(values) => change('responses', 'settings', values)}
+					>
+						<span class="badge" cy-data="max_lorem">{meta?.maxLoremParas ?? 'None'}</span>
+					</SettingEditor>
 				</div>
 			{:else if meta?.mockResponseType === 'stored'}
 				<div class="kv">
@@ -406,20 +430,57 @@
 			{#if meta?.chaosStatus === 'ENABLED'}
 				<div class="kv">
 					<span class="muted">Error Frequency</span>
-					<span class="badge" cy-data="chaos_frequency">{chaosFrequencyLabel(meta)}</span>
+					<SettingEditor
+						name="chaos_frequency"
+						{canChange}
+						fields={[
+							{ key: 'frequency', label: '1 in', value: meta.chaosFrequency, min: 1 },
+							{ key: 'mode', value: meta.chaosMode, options: ['every', 'random'] },
+						]}
+						save={(values) => change('chaos', 'chaos', values)}
+					>
+						<span class="badge" cy-data="chaos_frequency">{chaosFrequencyLabel(meta)}</span>
+					</SettingEditor>
 				</div>
 				<div class="kv">
 					<span class="muted">Error Status</span>
-					<span class="badge" cy-data="chaos_error_status">{meta.chaosErrorStatus}</span>
+					<SettingEditor
+						name="chaos_status"
+						{canChange}
+						fields={[{ key: 'status', value: meta.chaosErrorStatus, min: 400, max: 599 }]}
+						save={(values) => change('chaos', 'chaos', values)}
+					>
+						<span class="badge" cy-data="chaos_error_status">{meta.chaosErrorStatus}</span>
+					</SettingEditor>
 				</div>
 				<div class="kv">
 					<span class="muted">Failure Kind</span>
-					<span class="badge" cy-data="chaos_kind">{meta.chaosKind}</span>
+					<SettingEditor
+						name="chaos_kind"
+						{canChange}
+						fields={[
+							{
+								key: 'kind',
+								value: meta.chaosKind,
+								options: ['http', 'stream-error', 'stream-drop', 'stream-stall'],
+							},
+						]}
+						save={(values) => change('chaos', 'chaos', values)}
+					>
+						<span class="badge" cy-data="chaos_kind">{meta.chaosKind}</span>
+					</SettingEditor>
 				</div>
 				{#if meta.chaosKind !== 'http'}
 					<div class="kv">
 						<span class="muted">Streams Fail</span>
-						<span class="badge" cy-data="chaos_after_chunks">{chaosAfterChunksLabel(meta)}</span>
+						<SettingEditor
+							name="chaos_after_chunks"
+							{canChange}
+							fields={[{ key: 'afterChunks', label: 'after deltas', value: meta.chaosAfterChunks, min: 0 }]}
+							save={(values) => change('chaos', 'chaos', values)}
+						>
+							<span class="badge" cy-data="chaos_after_chunks">{chaosAfterChunksLabel(meta)}</span>
+						</SettingEditor>
 					</div>
 				{/if}
 				<div class="kv">
@@ -582,7 +643,7 @@
 			{#if meta?.adminApi === 'ENABLED'}
 				A test can add response rules and change the chaos, delay and reply settings while
 				the server runs, through the routes under <code>/admin</code>. Nothing is saved to
-				<code>.llmockrc.json</code>. The switches on this page do the same for the settings
+				<code>.llmockrc.json</code>. The buttons on this page do the same for the settings
 				they sit beside. Reset removes those rules, puts the settings back to how the server
 				started and sets the chaos count to 0.
 			{:else}
@@ -650,9 +711,14 @@
 			</div>
 			<div class="kv">
 				<span class="muted">Max Logged Requests</span>
-				<span class="badge" cy-data="max_logged_requests">
-					{meta?.maxLoggedRequests ?? 10}
-				</span>
+				<SettingEditor
+					name="max_logged_requests"
+					{canChange}
+					fields={[{ key: 'maxLoggedRequests', value: meta?.maxLoggedRequests ?? 10, min: 1, max: 100 }]}
+					save={(values) => change('diagnostics', 'settings', values)}
+				>
+					<span class="badge" cy-data="max_logged_requests">{meta?.maxLoggedRequests ?? 10}</span>
+				</SettingEditor>
 			</div>
 			<div class="kv kvWide">
 				<span class="muted">Last Logged Requests</span>
