@@ -143,4 +143,52 @@ describe('Mock LLM Spec for chatGPT', () => {
             );
         });
     });
+
+    // This template goes by the server's streaming setting, so the dashboard
+    // has a switch for it (the claude template has none)
+    describe('the streaming switch on the dashboard', () => {
+        const reset = () => cy.request({ method: 'POST', url: '/admin/reset' });
+        const ask = () =>
+            cy.request('POST', '/chatgpt/chat/completions', requestData);
+
+        beforeEach(reset);
+        after(reset);
+
+        it('turns streaming on for the next request, and off again', () => {
+            cy.visit('/');
+            cy.get('[cy-data="streaming_status"]').should('contain', 'DISABLED');
+            ask().its('body').should('be.jsonSchema', chatGPTSchema);
+
+            cy.get('[cy-data="switch_streaming"]')
+                .should('contain', 'Turn on')
+                .click();
+            cy.get('[cy-data="streaming_status"]').should('contain', 'ENABLED');
+            cy.request('/admin/settings')
+                .its('body.settings.stream')
+                .should('eq', true);
+
+            // Asked from the page: cy.request does not keep a streamed body
+            cy.window()
+                .then((win) =>
+                    win
+                        .fetch('/chatgpt/chat/completions', {
+                            method: 'POST',
+                            headers: { 'content-type': 'application/json' },
+                            body: JSON.stringify(requestData),
+                        })
+                        .then((response) => response.text()),
+                )
+                .then((stream) => {
+                    expect(stream).to.contain('data: ');
+                    expect(stream).to.contain('chat.completion.chunk');
+                    expect(stream).to.contain('[DONE]');
+                });
+
+            cy.get('[cy-data="switch_streaming"]')
+                .should('contain', 'Turn off')
+                .click();
+            cy.get('[cy-data="streaming_status"]').should('contain', 'DISABLED');
+            ask().its('body').should('be.jsonSchema', chatGPTSchema);
+        });
+    });
 });
