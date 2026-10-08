@@ -7,13 +7,14 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { loadConfig } from '../../config/config-loader.js';
 import adminApi, { adminApiEnabled } from '../../utilities/admin-api.js';
 import { getChaosStats, shouldInjectError } from '../../utilities/chaos.js';
+import { getDelayConfig } from '../../utilities/delay.js';
 import {
 	generateResponseContent,
 	getRuleFailure,
 } from '../../utilities/response-helpers.js';
 import { clearRuntimeRules } from '../../utilities/runtime-rules.js';
 
-// The admin routes, and what the rules they add do to the replies
+// The admin routes, and what the rules and settings they change do
 describe('admin API', () => {
 	let dir: string;
 	let app: FastifyInstance;
@@ -56,6 +57,11 @@ describe('admin API', () => {
 			}),
 		);
 
+		// Chaos and delay as this preset has them: both off
+		for (const key of Object.keys(process.env)) {
+			if (/^(CHAOS_|RESPONSE_DELAY_)/.test(key)) delete process.env[key];
+		}
+
 		loadConfig(configPath);
 		process.env.LLM_MODEL_NAME = 'claude';
 		process.env.MOCK_LLM_RESPONSE_TYPE = 'lorem';
@@ -82,6 +88,15 @@ describe('admin API', () => {
 
 	const send = async (method: 'GET' | 'POST' | 'DELETE', url: string) => {
 		const response = await app.inject({ method, url });
+		return { status: response.statusCode, body: response.json() };
+	};
+
+	const patch = async (url: string, payload: unknown) => {
+		const response = await app.inject({
+			method: 'PATCH',
+			url,
+			payload: payload as object,
+		});
 		return { status: response.statusCode, body: response.json() };
 	};
 
@@ -276,26 +291,179 @@ describe('admin API', () => {
 		expect(await replyTo('WANT_FILE')).toBe('from the file');
 	});
 
-	test('POST admin/reset removes the runtime rules and zeroes the chaos count', async () => {
-		const settings = { CHAOS_ENABLED: 'true', CHAOS_FREQUENCY: '2' };
-		Object.assign(process.env, settings);
+	const chaosOff = {
+		enabled: false,
+		frequency: 1,
+		mode: 'every',
+		status: 500,
+		kind: 'http',
+		afterChunks: 2,
+	};
+
+	test('GET admin/chaos reports the settings and the calls counted', async () => {
+		const { status, body } = await send('GET', '/admin/chaos');
+
+		expect(status).toBe(200);
+		expect(body).toEqual({
+			chaos: chaosOff,
+			stats: { calls: 0, injected: 0 },
+		});
+	});
+
+	test('PATCH admin/chaos changes the settings it is given and keeps the rest', async () => {
 		try {
-			await addRule({ match: 'ONE', text: 'one' });
-			shouldInjectError();
-			shouldInjectError();
-			expect(getChaosStats()).toEqual({ calls: 2, injected: 1 });
+			const first = await patch('/admin/chaos', {
+				enabled: true,
+				frequency: 2,
+				status: 529,
+			});
 
-			const { status, body } = await send('POST', '/admin/reset');
+			expect(first.status).toBe(200);
+			expect(first.body.chaos).toEqual({
+				...chaosOff,
+				enabled: true,
+				frequency: 2,
+				status: 529,
+			});
+			// Every 2nd call fails from here on
+			expect(shouldInjectError()).toBe(false);
+			expect(shouldInjectError()).toBe(true);
 
-			expect(status).toBe(200);
-			expect(body.rules).toEqual(configRules);
-			expect(getChaosStats()).toEqual({ calls: 0, injected: 0 });
-			// The count starts again, so the 2nd call is the one that fails
+			const second = await patch('/admin/chaos', {
+				mode: 'random',
+				kind: 'stream-drop',
+				afterChunks: 0,
+			});
+
+			expect(second.body).toEqual({
+				chaos: {
+					enabled: true,
+					frequency: 2,
+					mode: 'random',
+					status: 529,
+					kind: 'stream-drop',
+					afterChunks: 0,
+				},
+				stats: { calls: 2, injected: 1 },
+			});
+			expect((await send('GET', '/admin/chaos')).body).toEqual(
+				second.body,
+			);
+		} finally {
+			await send('POST', '/admin/reset');
+		}
+	});
+
+	test.each([
+		['an array', [{ enabled: true }], /chaos must be a JSON object/],
+		['an unknown setting', { rate: 2 }, /unknown settings: rate/],
+		['enabled as text', { enabled: 'true' }, /chaos\.enabled must be true/],
+		['a frequency of 0', { frequency: 0 }, /chaos\.frequency must be/],
+		['a frequency with a fraction', { frequency: 1.5 }, /chaos\.frequency/],
+		['an unknown mode', { mode: 'sometimes' }, /chaos\.mode must be/],
+		['a status below 400', { status: 200 }, /chaos\.status must be/],
+		['an unknown kind', { kind: 'slow' }, /chaos\.kind must be one of/],
+		['a negative afterChunks', { afterChunks: -1 }, /chaos\.afterChunks/],
+		[
+			'one setting that is valid beside one that is not',
+			{ enabled: true, status: 200 },
+			/chaos\.status must be/,
+		],
+	])(
+		'PATCH admin/chaos answers 400 for %s, and changes nothing',
+		async (_name, payload, error) => {
+			const { status, body } = await patch('/admin/chaos', payload);
+
+			expect(status).toBe(400);
+			expect(body.error).toMatch(error);
+			expect((await send('GET', '/admin/chaos')).body.chaos).toEqual(
+				chaosOff,
+			);
+		},
+	);
+
+	test('GET admin/delay reports the response delay', async () => {
+		const { status, body } = await send('GET', '/admin/delay');
+
+		expect(status).toBe(200);
+		expect(body).toEqual({ delay: { min: 0, max: 0 } });
+	});
+
+	test('PATCH admin/delay changes the response delay', async () => {
+		try {
+			const both = await patch('/admin/delay', { min: 100, max: 250 });
+
+			expect(both.status).toBe(200);
+			expect(both.body).toEqual({ delay: { min: 100, max: 250 } });
+			expect(getDelayConfig()).toEqual({
+				min: 100,
+				max: 250,
+				enabled: true,
+			});
+
+			// One of the two, when the other still fits
+			const one = await patch('/admin/delay', { max: 400 });
+
+			expect(one.body).toEqual({ delay: { min: 100, max: 400 } });
+		} finally {
+			await send('POST', '/admin/reset');
+		}
+	});
+
+	test.each([
+		['an array', [{ min: 1 }], /delay must be a JSON object/],
+		['an unknown setting', { minimum: 5 }, /unknown settings: minimum/],
+		['a negative delay', { min: -1, max: 5 }, /delay\.min must be/],
+		['a delay as text', { max: '500' }, /delay\.max must be/],
+		['a fraction', { min: 0.5, max: 5 }, /delay\.min must be/],
+		['a min above the max', { min: 500, max: 100 }, /can not be more than/],
+		['a min above the max in use', { min: 500 }, /can not be more than/],
+	])(
+		'PATCH admin/delay answers 400 for %s, and changes nothing',
+		async (_name, payload, error) => {
+			const { status, body } = await patch('/admin/delay', payload);
+
+			expect(status).toBe(400);
+			expect(body.error).toMatch(error);
+			expect((await send('GET', '/admin/delay')).body).toEqual({
+				delay: { min: 0, max: 0 },
+			});
+		},
+	);
+
+	test('POST admin/reset goes back to how the server started', async () => {
+		await addRule({ match: 'ONE', text: 'one' });
+		await patch('/admin/chaos', { enabled: true, frequency: 2 });
+		await patch('/admin/delay', { min: 50, max: 50 });
+		shouldInjectError();
+		shouldInjectError();
+		expect(getChaosStats()).toEqual({ calls: 2, injected: 1 });
+
+		const { status, body } = await send('POST', '/admin/reset');
+
+		expect(status).toBe(200);
+		expect(body).toEqual({
+			rules: configRules,
+			chaos: chaosOff,
+			stats: { calls: 0, injected: 0 },
+			delay: { min: 0, max: 0 },
+		});
+		expect(shouldInjectError()).toBe(false);
+	});
+
+	test('a reset then a change has the chaos count start from 0', async () => {
+		try {
+			await patch('/admin/chaos', { enabled: true, frequency: 3 });
+			shouldInjectError();
+
+			await send('POST', '/admin/reset');
+			await patch('/admin/chaos', { enabled: true, frequency: 2 });
+
+			// The 2nd call is the one that fails, whatever was counted before
 			expect(shouldInjectError()).toBe(false);
 			expect(shouldInjectError()).toBe(true);
 		} finally {
 			await send('POST', '/admin/reset');
-			for (const key of Object.keys(settings)) delete process.env[key];
 		}
 	});
 
