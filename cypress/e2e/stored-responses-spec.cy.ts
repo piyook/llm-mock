@@ -39,6 +39,19 @@ describe('Mock LLM Spec for configured stored responses', () => {
         });
     });
 
+    it('draws the dashboard in the dark theme unless told otherwise', () => {
+        cy.request('/ui-meta').its('body.uiTheme').should('eq', 'dark');
+
+        cy.visit('/');
+        cy.get('html').should('have.attr', 'data-theme', 'dark');
+        cy.get('[cy-data="responses"]').should(
+            'have.css',
+            'background-color',
+            'rgb(45, 51, 59)',
+        );
+        cy.get('h1').should('have.css', 'color', 'rgb(249, 249, 249)');
+    });
+
     it('shows how many requests the log keeps and how to change it', () => {
         cy.request('/ui-meta')
             .its('body.maxLoggedRequests')

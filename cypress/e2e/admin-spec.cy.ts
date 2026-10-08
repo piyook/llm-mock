@@ -249,6 +249,20 @@ describe('Mock LLM Spec for the admin API', () => {
     });
 
     describe('on the dashboard', () => {
+        // This suite's server is started with UI_THEME=light
+        it('draws the dashboard in the light theme', () => {
+            cy.request('/ui-meta').its('body.uiTheme').should('eq', 'light');
+
+            cy.visit('/');
+            cy.get('html').should('have.attr', 'data-theme', 'light');
+            cy.get('[cy-data="admin"]').should(
+                'have.css',
+                'background-color',
+                'rgb(255, 255, 255)',
+            );
+            cy.get('h1').should('have.css', 'color', 'rgb(28, 33, 40)');
+        });
+
         it('shows the admin API as on, with nothing added yet', () => {
             cy.visit('/');
             cy.get('[cy-data="admin_status"]').should('contain', 'ENABLED');
