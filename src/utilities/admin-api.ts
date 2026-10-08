@@ -10,7 +10,9 @@ import {
 import {
 	changeChaos,
 	changeDelay,
+	changeReplySettings,
 	getDelay,
+	getReplySettings,
 	rememberStartupSettings,
 	restoreStartupSettings,
 } from './runtime-settings.js';
@@ -113,9 +115,23 @@ function adminApi(app: FastifyInstance) {
 		);
 	});
 
-	// Back to how the server started: no runtime rules, the chaos and delay
-	// settings of the config file, and the chaos count at 0, so a test can
-	// rely on which call fails next
+	app.get('/admin/settings', async (_request, reply) => {
+		return reply.send({ settings: getReplySettings() });
+	});
+
+	// Changes what a reply is (generated or stored, streamed or not) and
+	// what is checked and logged
+	app.patch('/admin/settings', async (request, reply) => {
+		return answerChange(
+			reply,
+			() => changeReplySettings(request.body),
+			() => ({ settings: getReplySettings() }),
+		);
+	});
+
+	// Back to how the server started: no runtime rules, the chaos, delay and
+	// reply settings of the config file, and the chaos count at 0, so a test
+	// can rely on which call fails next
 	app.post('/admin/reset', async (_request, reply) => {
 		clearRuntimeRules();
 		restoreStartupSettings();
@@ -125,6 +141,7 @@ function adminApi(app: FastifyInstance) {
 			rules: describeActiveRules(),
 			...describeChaos(),
 			delay: getDelay(),
+			settings: getReplySettings(),
 		});
 	});
 }

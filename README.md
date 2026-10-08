@@ -594,7 +594,9 @@ await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
 | `PATCH /admin/chaos` | Changes the chaos settings it is given: `enabled`, `frequency`, `mode`, `status`, `kind`, `afterChunks` |
 | `GET /admin/delay` | Shows the [response delay](#response-delay-simulation) in use |
 | `PATCH /admin/delay` | Changes the response delay: `{ "min", "max" }` in milliseconds |
-| `POST /admin/reset` | Goes back to how the server started: no rules added this way, the config file's chaos and delay settings, and the chaos call count at 0 |
+| `GET /admin/settings` | Shows the reply settings in use |
+| `PATCH /admin/settings` | Changes the reply settings it is given: `responseType`, `maxLoremParas`, `stream`, `validateRequests`, `logRequests`, `maxLoggedRequests` |
+| `POST /admin/reset` | Goes back to how the server started: no rules added this way, the config file's chaos, delay and reply settings, and the chaos call count at 0 |
 
 - A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text` or `fail`.
 - The reply is given as `text`, never as `file` or `files`. The server has no login, so a path sent over HTTP would let anyone who can reach it read files from your machine.
@@ -603,7 +605,7 @@ await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
 - Nothing is saved. The config file is never written, and a restart starts again with the config file's rules only.
 - A rule that is not valid gets a `400` with `{ "error": "..." }` and is not added.
 - Each rule in a listing has `source` (`"runtime"` or `"config"`), `id` (`null` for a config rule, which can not be removed this way) and `times` (how many more requests it answers, or `null` if it stays).
-- Everything else (the port, the endpoint, the preset, streaming, embeddings) still comes from the config file and needs a restart to change.
+- Everything else (the port, the endpoint, the preset with its template and model name, embeddings, debug mode) still comes from the config file and needs a restart to change.
 
 With `times`, a test can have the first call fail and the retry succeed, or give each call in turn its own reply:
 
@@ -623,6 +625,16 @@ await addRule({ match: 'Write the email', text: 'draft', times: 1 });
 await addRule({ match: 'Write the email', text: 'final', times: 1 });
 ```
 
+To switch what the server replies with for one test:
+
+```js
+await fetch('http://localhost:8001/admin/settings', {
+  method: 'PATCH',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ responseType: 'stored', stream: true }),
+});
+```
+
 To make calls fail part-way through a test, switch chaos on and reset afterwards:
 
 ```js
@@ -638,6 +650,9 @@ await fetch('http://localhost:8001/admin/chaos', {
 - A value that is not valid gets a `400` and nothing is changed. Nothing falls back to a default, unlike a CLI flag.
 - Changing chaos settings leaves the call count alone. With `mode: "every"`, call `POST /admin/reset` first and then `PATCH /admin/chaos`, so the count starts from 0 and you know which call fails.
 - `min` can not be more than `max`, and neither can be more than 2147483647 (about 24 days). Send both when you raise the delay from `0`.
+- `PATCH /admin/settings` takes the same names and values as the model preset: `responseType` is `"lorem"` or `"stored"`, `stream`, `validateRequests` and `logRequests` are `true` or `false`, `maxLoremParas` is 1 to 1000 and `maxLoggedRequests` is 1 to 100.
+- `"responseType": "stored"` uses the preset's [`storedResponsesFile`](#response-types) if it has one, otherwise the texts that come with LLMock. If that file can not be read, the change is refused with a `400`.
+- `stream` has no effect on the `claude` template, where each request says whether it wants a stream.
 - The dashboard shows the settings in use, so a change appears there within 2 seconds. Its **Admin API** box has a **Reset** button that does the same as `POST /admin/reset`.
 - To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 
@@ -691,6 +706,8 @@ $env:UI_THEME = 'light'; npx llmock start   # PowerShell
 The flag wins over the environment variable, which wins over the config file. In Docker, add `UI_THEME=light` to `environment` in `docker-compose.yml`. Any value other than `light` gives the dark theme.
 
 With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. A rule that holds its reply as `text` shows **its own text** in place of a file; click it to read the text. A rule added through the [admin API](#admin-api-changing-rules-and-settings-while-running) is listed first and marked **runtime**; one with `times` also shows how many requests it has left. With no rules set, the box shows a blank rule with a note pointing to the setting.
+
+While the admin API is on, settings have a button beside them that changes the running server. The ones with two values switch at a click: **Response Type** (lorem or stored), **Streaming**, **Chaos**, **Request Validation** and **Request Log**. The others have **Change**, which opens boxes to fill in, with **Save** and **Cancel**: **Response Delay**, **Maximum sentences**, **Max Logged Requests** and, while chaos is on, **Error Frequency**, **Error Status**, **Failure Kind** and **Streams Fail**. A value the server refuses is explained in that box of the dashboard and the boxes stay open. A change made this way is not saved; **Reset** or a restart puts it back. (Streaming has no button on the `claude` template, where each request says whether it wants a stream.)
 
 The **Admin API** box says whether the admin API is on and how many rules were added while running. **Reset** does what `POST /admin/reset` does, after asking you to confirm: it removes those rules, puts chaos and delay back to how the server started and sets the chaos count to 0.
 

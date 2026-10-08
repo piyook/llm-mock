@@ -176,6 +176,60 @@ describe('Mock LLM Spec for the admin API', () => {
         cy.request('/admin/rules').its('body.rules').should('have.length', 6);
     });
 
+    it('replies from the stored responses once the response type is changed', () => {
+        cy.request({
+            method: 'PATCH',
+            url: '/admin/settings',
+            body: { responseType: 'stored' },
+        })
+            .its('body.settings.responseType')
+            .should('eq', 'stored');
+
+        cy.request('/ui-stored-responses').then(({ body: stored }) => {
+            ask('anything at all')
+                .its('body.content.0.text')
+                .should('be.oneOf', stored.responses);
+        });
+
+        reset().its('body.settings.responseType').should('eq', 'lorem');
+        cy.request('/ui-meta').its('body.mockResponseType').should('eq', 'lorem');
+    });
+
+    it('stops checking requests once validation is switched off', () => {
+        const notARequest = { hello: 'there' };
+        const send = () =>
+            cy.request({
+                method: 'POST',
+                url,
+                body: notARequest,
+                failOnStatusCode: false,
+            });
+
+        send().its('status').should('eq', 400);
+
+        cy.request({
+            method: 'PATCH',
+            url: '/admin/settings',
+            body: { validateRequests: false },
+        });
+        send().its('status').should('eq', 200);
+
+        reset();
+        send().its('status').should('eq', 400);
+    });
+
+    it('refuses a setting that is not valid', () => {
+        cy.request({
+            method: 'PATCH',
+            url: '/admin/settings',
+            body: { responseType: 'markov' },
+            failOnStatusCode: false,
+        }).then((response) => {
+            expect(response.status).to.eq(400);
+            expect(response.body.error).to.contain('settings.responseType');
+        });
+    });
+
     it('refuses a rule that names a file', () => {
         cy.request({
             method: 'POST',
@@ -334,6 +388,160 @@ describe('Mock LLM Spec for the admin API', () => {
             cy.get('[cy-data="admin_status"]').should('contain', 'ENABLED');
             cy.get('[cy-data="admin_runtime_rules"]').should('contain', '0');
             cy.get('[cy-data="rule_runtime"]').should('not.exist');
+        });
+
+        it('switches the response type from the dashboard, and back with Reset', () => {
+            cy.visit('/');
+            cy.get('[cy-data="response_type"]').should('have.text', 'lorem');
+
+            cy.get('[cy-data="switch_response_type"]')
+                .should('contain', 'Use stored')
+                .click();
+            cy.get('[cy-data="response_type"]').should('have.text', 'stored');
+            cy.get('[cy-data="switch_response_type"]').should('contain', 'Use lorem');
+            cy.get('[cy-data="stored_responses_link"]').should('be.visible');
+            cy.request('/admin/settings')
+                .its('body.settings.responseType')
+                .should('eq', 'stored');
+
+            cy.get('[cy-data="admin_reset"]').click();
+            cy.get('[cy-data="admin_reset_confirm"]').click();
+            cy.get('[cy-data="response_type"]').should('have.text', 'lorem');
+        });
+
+        it('switches chaos, validation and the request log from the dashboard', () => {
+            cy.visit('/');
+
+            cy.get('[cy-data="chaos_status"]').should('have.text', 'DISABLED');
+            cy.get('[cy-data="switch_chaos"]').should('contain', 'Turn on').click();
+            cy.get('[cy-data="chaos_status"]').should('have.text', 'ENABLED');
+            cy.get('[cy-data="switch_chaos"]').should('contain', 'Turn off').click();
+            cy.get('[cy-data="chaos_status"]').should('have.text', 'DISABLED');
+
+            cy.get('[cy-data="validate_requests"]').should('have.text', 'ON');
+            cy.get('[cy-data="switch_validate_requests"]').click();
+            cy.get('[cy-data="validate_requests"]').should('have.text', 'OFF');
+
+            cy.get('[cy-data="log_requests"]').then(($badge) => {
+                const before = $badge.text();
+                cy.get('[cy-data="switch_log_requests"]').click();
+                cy.get('[cy-data="log_requests"]').should(
+                    'have.text',
+                    before === 'ON' ? 'OFF' : 'ON',
+                );
+            });
+
+            // This template streams when a request asks, so there is no switch
+            cy.get('[cy-data="switch_streaming"]').should('not.exist');
+        });
+
+        const fill = (box: string, value: number) =>
+            cy.get(`[cy-data="${box}"]`).clear().type(String(value));
+
+        it('changes the response delay from the dashboard', () => {
+            cy.visit('/');
+            cy.get('[cy-data="response_delay"]').should('have.text', 'Off');
+
+            cy.get('[cy-data="change_delay"]').click();
+            cy.get('[cy-data="edit_delay_min"]').should('have.value', '0');
+            fill('edit_delay_min', 10);
+            fill('edit_delay_max', 20);
+            cy.get('[cy-data="save_delay"]').click();
+
+            cy.get('[cy-data="response_delay"]').should('have.text', '10–20ms');
+            cy.request('/admin/delay')
+                .its('body.delay')
+                .should('deep.eq', { min: 10, max: 20 });
+        });
+
+        it('keeps the boxes open and says why when a change is refused', () => {
+            cy.visit('/');
+            cy.get('[cy-data="change_delay"]').click();
+            fill('edit_delay_min', 50);
+            fill('edit_delay_max', 10);
+            cy.get('[cy-data="save_delay"]').click();
+
+            cy.get('[cy-data="change_error"]').should(
+                'contain',
+                'can not be more than',
+            );
+            cy.get('[cy-data="edit_delay_max"]').should('be.visible');
+
+            fill('edit_delay_max', 60);
+            cy.get('[cy-data="save_delay"]').click();
+            cy.get('[cy-data="change_error"]').should('not.exist');
+            cy.get('[cy-data="response_delay"]').should('have.text', '50–60ms');
+        });
+
+        it('changes the lorem length and the log size from the dashboard', () => {
+            cy.visit('/');
+
+            cy.get('[cy-data="change_max_lorem"]').click();
+            fill('edit_max_lorem_maxLoremParas', 2);
+            cy.get('[cy-data="save_max_lorem"]').click();
+            cy.get('[cy-data="max_lorem"]').should('have.text', '2');
+
+            cy.get('[cy-data="change_max_logged_requests"]').click();
+            fill('edit_max_logged_requests_maxLoggedRequests', 25);
+            cy.get('[cy-data="save_max_logged_requests"]').click();
+            cy.get('[cy-data="max_logged_requests"]').should('have.text', '25');
+
+            cy.request('/admin/settings')
+                .its('body.settings')
+                .should('include', { maxLoremParas: 2, maxLoggedRequests: 25 });
+        });
+
+        it('changes how chaos fails calls from the dashboard', () => {
+            cy.visit('/');
+            cy.get('[cy-data="switch_chaos"]').click();
+
+            cy.get('[cy-data="change_chaos_frequency"]').click();
+            fill('edit_chaos_frequency_frequency', 3);
+            cy.get('[cy-data="edit_chaos_frequency_mode"]').select('random');
+            cy.get('[cy-data="save_chaos_frequency"]').click();
+            cy.get('[cy-data="chaos_frequency"]').should(
+                'have.text',
+                'Random, 1 in 3',
+            );
+
+            cy.get('[cy-data="change_chaos_status"]').click();
+            fill('edit_chaos_status_status', 503);
+            cy.get('[cy-data="save_chaos_status"]').click();
+            cy.get('[cy-data="chaos_error_status"]').should('have.text', '503');
+
+            cy.get('[cy-data="change_chaos_kind"]').click();
+            cy.get('[cy-data="edit_chaos_kind_kind"]').select('stream-drop');
+            cy.get('[cy-data="save_chaos_kind"]').click();
+            cy.get('[cy-data="chaos_kind"]').should('have.text', 'stream-drop');
+
+            cy.get('[cy-data="change_chaos_after_chunks"]').click();
+            fill('edit_chaos_after_chunks_afterChunks', 0);
+            cy.get('[cy-data="save_chaos_after_chunks"]').click();
+            cy.get('[cy-data="chaos_after_chunks"]').should(
+                'have.text',
+                'Straight away',
+            );
+
+            cy.request('/admin/chaos').its('body.chaos').should('deep.eq', {
+                enabled: true,
+                frequency: 3,
+                mode: 'random',
+                status: 503,
+                kind: 'stream-drop',
+                afterChunks: 0,
+            });
+        });
+
+        it('leaves a setting alone when a change is cancelled', () => {
+            cy.visit('/');
+            cy.get('[cy-data="change_delay"]').click();
+            fill('edit_delay_max', 900);
+            cy.contains('[cy-data="responses"] button', 'Cancel').click();
+
+            cy.get('[cy-data="response_delay"]').should('have.text', 'Off');
+            cy.request('/admin/delay')
+                .its('body.delay')
+                .should('deep.eq', { min: 0, max: 0 });
         });
 
         it('shows how many requests a rule with times has left', () => {
