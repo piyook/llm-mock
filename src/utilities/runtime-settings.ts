@@ -1,10 +1,13 @@
 /* eslint-disable @typescript-eslint/naming-convention */
+import { getStoredResponsesFile } from '../config/config-loader.js';
 import { chaosKinds, type ChaosSettings } from './chaos.js';
 import { getDelayConfig } from './delay.js';
+import { logEntriesLimit, maxLogEntries } from './logger.js';
+import { loadStoredResponses } from './stored-responses.js';
 
 /**
- * The chaos and response delay settings, changed while the server runs
- * through the admin API (see admin-api.ts). The server reads both from the
+ * The chaos, response delay and reply settings, changed while the server runs
+ * through the admin API (see admin-api.ts). The server reads them from the
  * environment on every request, so a change is written there and takes effect
  * on the next request. The config file is never written.
  */
@@ -21,6 +24,20 @@ const chaosVariables: Record<keyof ChaosSettings, string> = {
 	kind: 'CHAOS_KIND',
 	afterChunks: 'CHAOS_AFTER_CHUNKS',
 };
+
+/**
+ * The settings of the active preset that say what a reply is and what is
+ * checked and logged. What a preset is otherwise (its template, model name
+ * and endpoint) is fixed when the server starts.
+ */
+export interface ReplySettings {
+	responseType: 'lorem' | 'stored';
+	maxLoremParas: number;
+	stream: boolean;
+	validateRequests: boolean;
+	logRequests: boolean;
+	maxLoggedRequests: number;
+}
 
 const delayVariables: Record<keyof DelaySettings, string> = {
 	min: 'RESPONSE_DELAY_MIN',
@@ -62,6 +79,57 @@ const chaosChecks: Record<
 	afterChunks: {
 		valid: (value) => isInteger(value, 0),
 		expected: 'an integer of 0 or more',
+	},
+};
+
+// The most sentences a lorem reply can be asked to run to
+const maxLoremSentences = 1000;
+
+const isBoolean = (value: unknown): boolean => typeof value === 'boolean';
+const onOrOff = (value: unknown): string => (value === true ? 'ON' : 'OFF');
+
+// Where each reply setting is kept, what it has to be, and how it is written
+// there when that is not simply as text
+const replyChecks: Record<
+	keyof ReplySettings,
+	{
+		variable: string;
+		valid: (value: unknown) => boolean;
+		expected: string;
+		write?: (value: unknown) => string;
+	}
+> = {
+	responseType: {
+		variable: 'MOCK_LLM_RESPONSE_TYPE',
+		valid: (value) => value === 'lorem' || value === 'stored',
+		expected: '"lorem" or "stored"',
+	},
+	maxLoremParas: {
+		variable: 'MAX_LOREM_PARAS',
+		valid: (value) => isInteger(value, 1, maxLoremSentences),
+		expected: `an integer from 1 to ${maxLoremSentences}`,
+	},
+	stream: {
+		variable: 'STREAM',
+		valid: isBoolean,
+		expected: 'true or false',
+	},
+	validateRequests: {
+		variable: 'VALIDATE_REQUESTS',
+		valid: isBoolean,
+		expected: 'true or false',
+		write: onOrOff,
+	},
+	logRequests: {
+		variable: 'LOG_REQUESTS',
+		valid: isBoolean,
+		expected: 'true or false',
+		write: onOrOff,
+	},
+	maxLoggedRequests: {
+		variable: 'MAX_LOGGED_REQUESTS',
+		valid: (value) => isInteger(value, 1, logEntriesLimit),
+		expected: `an integer from 1 to ${logEntriesLimit}`,
 	},
 };
 
@@ -154,6 +222,59 @@ export const changeDelay = (change: unknown): void => {
 	}
 };
 
+// The reply settings in use, read the way a request reads them
+export const getReplySettings = (): ReplySettings => ({
+	responseType:
+		process.env.MOCK_LLM_RESPONSE_TYPE === 'stored' ? 'stored' : 'lorem',
+	maxLoremParas: Number.parseInt(process.env.MAX_LOREM_PARAS ?? '', 10) || 5,
+	stream: process.env.STREAM?.toLowerCase() === 'true',
+	validateRequests: process.env.VALIDATE_REQUESTS === 'ON',
+	logRequests: process.env.LOG_REQUESTS?.toUpperCase() === 'ON',
+	maxLoggedRequests: maxLogEntries(),
+});
+
+/**
+ * Changes the reply settings named in `change` and leaves the others as they
+ * are. Throws a TypeError, and changes nothing, if a value can't be used.
+ */
+export const changeReplySettings = (change: unknown): void => {
+	const settings = changedSettings(
+		change,
+		'settings',
+		Object.keys(replyChecks),
+	) as Array<[keyof ReplySettings, unknown]>;
+
+	for (const [key, value] of settings) {
+		if (!replyChecks[key].valid(value)) {
+			throw new TypeError(
+				`settings.${key} must be ${replyChecks[key].expected}`,
+			);
+		}
+	}
+
+	// As when the server starts: a stored responses file that can't be used
+	// is refused here, rather than failing every reply from now on
+	if (
+		settings.some(
+			([key, value]) => key === 'responseType' && value === 'stored',
+		)
+	) {
+		try {
+			const { file, baseDir } = getStoredResponsesFile();
+			if (file) loadStoredResponses(file, baseDir);
+		} catch (error) {
+			throw new TypeError(
+				`settings.responseType can not be "stored": ${(error as Error).message}`,
+			);
+		}
+	}
+
+	for (const [key, value] of settings) {
+		const { variable, write = String } = replyChecks[key];
+		process.env[variable] = write(value);
+	}
+};
+
 // The settings as they were when the server started, to go back to
 let startup: Record<string, string | undefined> = {};
 
@@ -163,6 +284,7 @@ export const rememberStartupSettings = (): void => {
 		[
 			...Object.values(chaosVariables),
 			...Object.values(delayVariables),
+			...Object.values(replyChecks).map(({ variable }) => variable),
 		].map((variable) => [variable, process.env[variable]]),
 	);
 };

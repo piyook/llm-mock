@@ -495,7 +495,7 @@
 						<button
 							class="fileLink"
 							cy-data="admin_reset"
-							title="Remove the rules added while running and restore the chaos and delay settings"
+							title="Remove the rules added while running and restore the settings changed while running"
 							on:click={() => (confirmingReset = true)}
 						>
 							Reset
@@ -509,9 +509,9 @@
 		{/if}
 		<p class="muted cardNote" cy-data="admin_note">
 			{#if meta?.adminApi === 'ENABLED'}
-				A test can add response rules and change the chaos and delay settings while the
-				server runs, through the routes under <code>/admin</code>. Nothing is saved to
-				<code>.llmockrc.json</code>. Reset removes those rules, puts chaos and delay back to
+				A test can add response rules and change the chaos, delay and reply settings while
+				the server runs, through the routes under <code>/admin</code>. Nothing is saved to
+				<code>.llmockrc.json</code>. Reset removes those rules, puts the settings back to
 				how the server started and sets the chaos count to 0.
 			{:else}
 				The routes under <code>/admin</code> are off. To use them, remove
@@ -580,7 +580,7 @@
 
 	<div class="footerNote">
 		Change settings in <code>.llmockrc.json</code> and restart the server, or change
-		rules, chaos and delay while it runs through the admin API.<br />
+		rules, chaos, delay and reply settings while it runs through the admin API.<br />
 		<code>validateRequests</code> and <code>logRequests</code> must both be on to log POST
 		requests.
 	</div>
