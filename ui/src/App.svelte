@@ -7,6 +7,7 @@
 		fetchRuleFile,
 		fetchStoredResponses,
 		fetchUiMeta,
+		resetRuntimeChanges,
 		type UiMeta,
 	} from './api.js';
 
@@ -35,10 +36,16 @@
 	// Block shown by a paged view, and whether it is asking to confirm a clear
 	let page = 0;
 	let confirmingClear = false;
+	// The admin card's reset: whether it is asking to confirm, and why it failed
+	let confirmingReset = false;
+	let resetError: string | null = null;
 
 	// A list longer than this scrolls inside a fixed height window
 	const SCROLL_AFTER = 4;
 	$: ruleCount = meta?.responseRules?.length ?? 0;
+	// Rules added through the admin API while the server runs
+	$: runtimeRuleCount =
+		meta?.responseRules?.filter((rule) => rule.source === 'runtime').length ?? 0;
 
 	// Opens the dialog straight away and fills it once `load` settles; a
 	// result for a view that has since been replaced is dropped
@@ -89,6 +96,25 @@
 			const { content } = await fetchRuleFile(rule, index);
 			return { texts: [content] };
 		});
+	}
+
+	// A rule that holds its reply as text has no file to fetch
+	function viewRuleText(match: string, text: string) {
+		void openViewer(`Reply when request contains "${match}"`, 'Text held by the rule', async () => ({
+			texts: [text],
+		}));
+	}
+
+	// Undoes what the admin API changed, then shows the settings as they now are
+	async function resetRuntime() {
+		confirmingReset = false;
+		try {
+			await resetRuntimeChanges();
+			resetError = null;
+			await refresh();
+		} catch (e) {
+			resetError = e instanceof Error ? e.message : String(e);
+		}
 	}
 
 	function viewRequestLog() {
@@ -333,8 +359,9 @@
 			Chaos answers some calls with an HTTP error in place of a reply, or fails a
 			stream part-way through. Set <code>chaos</code> (<code>enabled</code>,
 			<code>frequency</code>, <code>mode</code>, <code>status</code>, <code>kind</code>,
-			<code>afterChunks</code>) in the model preset in <code>.llmockrc.json</code>, or
-			start with <code>--chaos=true --chaosFrequency=&lt;num&gt;</code>.
+			<code>afterChunks</code>) in the model preset in <code>.llmockrc.json</code>,
+			start with <code>--chaos=true --chaosFrequency=&lt;num&gt;</code>, or change it while
+			the server runs with <code>PATCH /admin/chaos</code>.
 		</p>
 	</section>
 
@@ -346,7 +373,7 @@
 			</span>
 		</div>
 		<p class="muted" style="margin: 0 0 12px 0;">
-			A request containing the text on the left gets the file's contents as its
+			A request containing the text on the left gets the rule's file or text as its
 			reply, instead of a {meta?.mockResponseType || 'generated'} response, or fails if
 			the rule says so. The first matching rule wins.
 		</p>
@@ -356,12 +383,32 @@
 					<div class="ruleMatch">
 						<span class="muted">Request contains</span>
 						<code>{rule.match}</code>
+						{#if rule.source === 'runtime'}
+							<span
+								class="countPill"
+								cy-data="rule_runtime"
+								title="Added through the admin API while the server runs; gone after a reset or a restart"
+							>
+								runtime
+							</span>
+						{/if}
 					</div>
 					<div class="ruleFiles">
 						{#if rule.files.length > 0}
 							<span class="muted">
 								{rule.files.length > 1 ? 'Replies with one of, at random' : 'Replies with'}
 							</span>
+						{/if}
+						{#if rule.text !== null}
+							<span class="muted">Replies with</span>
+							<button
+								class="fileLink"
+								cy-data="rule_text_link"
+								title="View this text"
+								on:click={() => viewRuleText(rule.match, rule.text ?? '')}
+							>
+								its own text
+							</button>
 						{/if}
 						{#each rule.files as file, fileIndex (fileIndex)}
 							<button
@@ -405,6 +452,56 @@
 				</p>
 			{/each}
 		</div>
+	</section>
+
+	<section class="card" cy-data="admin">
+		<h2>Admin API</h2>
+		<div class="grid">
+			<div class="kv">
+				<span class="muted">Admin API</span>
+				<span class="badge" cy-data="admin_status">{meta?.adminApi ?? 'DISABLED'}</span>
+			</div>
+			{#if meta?.adminApi === 'ENABLED'}
+				<div class="kv">
+					<span class="muted">Rules Added While Running</span>
+					<span class="badge" cy-data="admin_runtime_rules">{runtimeRuleCount}</span>
+				</div>
+				<div class="kv kvWide">
+					<span class="muted">Runtime Changes</span>
+					{#if confirmingReset}
+						<span>Undo every change made through the admin API?</span>
+						<button class="fileLink danger" cy-data="admin_reset_confirm" on:click={resetRuntime}>
+							Yes, reset
+						</button>
+						<button class="fileLink" on:click={() => (confirmingReset = false)}>Cancel</button>
+					{:else}
+						<button
+							class="fileLink"
+							cy-data="admin_reset"
+							title="Remove the rules added while running and restore the chaos and delay settings"
+							on:click={() => (confirmingReset = true)}
+						>
+							Reset
+						</button>
+					{/if}
+				</div>
+			{/if}
+		</div>
+		{#if resetError}
+			<p class="viewerError" cy-data="admin_reset_error">{resetError}</p>
+		{/if}
+		<p class="muted cardNote" cy-data="admin_note">
+			{#if meta?.adminApi === 'ENABLED'}
+				A test can add response rules and change the chaos and delay settings while the
+				server runs, through the routes under <code>/admin</code>. Nothing is saved to
+				<code>.llmockrc.json</code>. Reset removes those rules, puts chaos and delay back to
+				how the server started and sets the chaos count to 0.
+			{:else}
+				The routes under <code>/admin</code> are off. To use them, remove
+				<code>"admin": false</code> from the <code>server</code> block of
+				<code>.llmockrc.json</code>, or start without <code>--admin=false</code>.
+			{/if}
+		</p>
 	</section>
 
 	<section class="card" cy-data="embeddings">
@@ -465,7 +562,8 @@
 	</section>
 
 	<div class="footerNote">
-		Change settings in <code>.llmockrc.json</code> and restart the server.<br />
+		Change settings in <code>.llmockrc.json</code> and restart the server, or change
+		rules, chaos and delay while it runs through the admin API.<br />
 		<code>validateRequests</code> and <code>logRequests</code> must both be on to log POST
 		requests.
 	</div>

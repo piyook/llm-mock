@@ -9,6 +9,7 @@ import { loadStoredResponses } from './stored-responses.js';
 import { readRuleFile, ruleFiles } from './response-rules.js';
 import { describeActiveRules, getActiveRules } from './runtime-rules.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
+import { adminApiEnabled } from './admin-api.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 
@@ -245,6 +246,7 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			chaosInjected: getChaosStats().injected,
 			embeddingsEnabled: embeddingsEnabled ? 'ENABLED' : 'DISABLED',
 			embeddingDimension,
+			adminApi: adminApiEnabled() ? 'ENABLED' : 'DISABLED',
 			apiLinks,
 		});
 	});

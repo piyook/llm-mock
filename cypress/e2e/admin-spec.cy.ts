@@ -248,6 +248,78 @@ describe('Mock LLM Spec for the admin API', () => {
         ask('fast').its('duration').should('be.lt', 600);
     });
 
+    describe('on the dashboard', () => {
+        it('shows the admin API as on, with nothing added yet', () => {
+            cy.visit('/');
+            cy.get('[cy-data="admin_status"]').should('contain', 'ENABLED');
+            cy.get('[cy-data="admin_runtime_rules"]').should('contain', '0');
+            cy.get('[cy-data="rule_runtime"]').should('not.exist');
+        });
+
+        it('marks a rule added while running and shows its text', () => {
+            addRule({ match: 'E2E_ADMIN_SHOWN', text: 'the reply as text' });
+
+            cy.visit('/');
+            cy.get('[cy-data="response_rules_count"]').should(
+                'contain',
+                '7 rules',
+            );
+            cy.get('[cy-data="admin_runtime_rules"]').should('contain', '1');
+            cy.get('[cy-data="rule_runtime"]').should('have.length', 1);
+
+            // The runtime rule is listed first
+            cy.get('[cy-data="response_rules"] .rule')
+                .first()
+                .within(() => {
+                    cy.contains('E2E_ADMIN_SHOWN');
+                    cy.get('[cy-data="rule_runtime"]').should('be.visible');
+                    cy.get('[cy-data="rule_text_link"]').click();
+                });
+
+            cy.get('[cy-data="viewer"]').should('contain', 'E2E_ADMIN_SHOWN');
+            cy.get('[cy-data="viewer_text"]').should(
+                'have.text',
+                'the reply as text',
+            );
+        });
+
+        it('still opens the file of a config rule listed after a runtime rule', () => {
+            addRule({ match: 'E2E_ADMIN_FIRST', text: 'first' });
+
+            // The first config rule: E2E_FIXTURE_JSON, replying with json-reply.json
+            cy.visit('/');
+            cy.get('[cy-data="rule_file_link"]').first().click();
+            cy.get('[cy-data="viewer"]').should('contain', 'E2E_FIXTURE_JSON');
+            cy.get('[cy-data="viewer_text"]').should(
+                'contain',
+                '"status": "ok"',
+            );
+        });
+
+        it('undoes the runtime changes with Reset, after asking', () => {
+            addRule({ match: 'E2E_ADMIN_UNDO', text: 'undone' });
+            cy.request({
+                method: 'PATCH',
+                url: '/admin/chaos',
+                body: { enabled: true, frequency: 3 },
+            });
+
+            cy.visit('/');
+            cy.get('[cy-data="chaos_status"]').should('contain', 'ENABLED');
+            cy.get('[cy-data="rule_runtime"]').should('have.length', 1);
+
+            cy.get('[cy-data="admin_reset"]').click();
+            cy.get('[cy-data="admin_reset_confirm"]').click();
+
+            cy.get('[cy-data="rule_runtime"]').should('not.exist');
+            cy.get('[cy-data="admin_runtime_rules"]').should('contain', '0');
+            cy.get('[cy-data="chaos_status"]').should('contain', 'DISABLED');
+            cy.request('/admin/rules')
+                .its('body.rules')
+                .should('have.length', 6);
+        });
+    });
+
     it('reports a rule added while running to the dashboard', () => {
         addRule({ match: 'E2E_ADMIN_META', text: 'shown' });
 

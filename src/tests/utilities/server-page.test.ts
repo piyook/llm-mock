@@ -148,6 +148,20 @@ describe('dashboard routes for stored responses and response rules', () => {
 		expect(body.version).toBe(require('../../../package.json').version);
 	});
 
+	test('ui-meta reports whether the admin API is on', async () => {
+		const before = process.env.ADMIN_API;
+		try {
+			delete process.env.ADMIN_API;
+			expect((await get('/ui-meta')).body.adminApi).toBe('ENABLED');
+
+			process.env.ADMIN_API = 'false';
+			expect((await get('/ui-meta')).body.adminApi).toBe('DISABLED');
+		} finally {
+			if (before === undefined) delete process.env.ADMIN_API;
+			else process.env.ADMIN_API = before;
+		}
+	});
+
 	test('ui-meta reports chaos as off by default', async () => {
 		const { body } = await get('/ui-meta');
 

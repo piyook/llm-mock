@@ -9,7 +9,12 @@ export type UiMeta = {
 	storedResponsesCount: number | null;
 	storedResponsesFile: string | null;
 	responseRules: Array<{
+		// Set for a rule added through the admin API, which can be removed
+		id: string | null;
+		source: 'runtime' | 'config';
 		match: string;
+		// The reply itself, for a rule that holds it in place of a file
+		text: string | null;
 		files: string[];
 		stopReason: 'end' | 'max_tokens' | 'refusal';
 		fail: {
@@ -35,6 +40,7 @@ export type UiMeta = {
 	chaosInjected: number;
 	embeddingsEnabled: 'ENABLED' | 'DISABLED';
 	embeddingDimension: number;
+	adminApi: 'ENABLED' | 'DISABLED';
 	apiLinks: Array<{ href: string; label: string }>;
 };
 
@@ -79,6 +85,12 @@ export function fetchRequestLog(): Promise<RequestLog> {
 
 export function clearRequestLog(): Promise<RequestLog> {
 	return fetchViewerJson('/ui-request-log', 'DELETE');
+}
+
+// Back to how the server started: no rules added while running, and the
+// chaos and delay settings of the config file
+export function resetRuntimeChanges(): Promise<unknown> {
+	return fetchViewerJson('/admin/reset', 'POST');
 }
 
 export async function fetchPing(): Promise<boolean> {
