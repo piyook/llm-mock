@@ -116,6 +116,42 @@ describe('Mock LLM Spec for the admin API', () => {
         ask('something else').its('status').should('eq', 200);
     });
 
+    it('fails the first call only for a rule with fail and times 1', () => {
+        addRule({ match: 'E2E_ADMIN_RETRY', fail: { status: 529 }, times: 1 })
+            .its('body.rule.times')
+            .should('eq', 1);
+
+        cy.request({
+            method: 'POST',
+            url,
+            body: body('E2E_ADMIN_RETRY'),
+            failOnStatusCode: false,
+        })
+            .its('status')
+            .should('eq', 529);
+
+        // The rule is used up, so the retry gets a reply
+        ask('E2E_ADMIN_RETRY').its('status').should('eq', 200);
+        cy.request('/admin/rules').its('body.rules').should('have.length', 6);
+    });
+
+    it('gives each call the next reply when the rules have times', () => {
+        addRule({ match: 'E2E_ADMIN_TURN', text: 'first', times: 1 });
+        addRule({ match: 'E2E_ADMIN_TURN', text: 'second', times: 2 });
+
+        ask('E2E_ADMIN_TURN').its('body.content.0.text').should('eq', 'first');
+        ask('E2E_ADMIN_TURN').its('body.content.0.text').should('eq', 'second');
+
+        cy.request('/admin/rules').then((response) => {
+            expect(response.body.rules).to.have.length(7);
+            expect(response.body.rules[0]).to.include({
+                match: 'E2E_ADMIN_TURN',
+                text: 'second',
+                times: 1,
+            });
+        });
+    });
+
     it('refuses a rule that names a file', () => {
         cy.request({
             method: 'POST',
@@ -246,6 +282,110 @@ describe('Mock LLM Spec for the admin API', () => {
         reset().its('body.delay').should('deep.eq', { min: 0, max: 0 });
 
         ask('fast').its('duration').should('be.lt', 600);
+    });
+
+    describe('on the dashboard', () => {
+        // This suite's server is started with UI_THEME=light
+        it('draws the dashboard in the light theme', () => {
+            cy.request('/ui-meta').its('body.uiTheme').should('eq', 'light');
+
+            cy.visit('/');
+            cy.get('html').should('have.attr', 'data-theme', 'light');
+            cy.get('[cy-data="admin"]').should(
+                'have.css',
+                'background-color',
+                'rgb(255, 255, 255)',
+            );
+            cy.get('h1').should('have.css', 'color', 'rgb(28, 33, 40)');
+        });
+
+        it('shows the admin API as on, with nothing added yet', () => {
+            cy.visit('/');
+            cy.get('[cy-data="admin_status"]').should('contain', 'ENABLED');
+            cy.get('[cy-data="admin_runtime_rules"]').should('contain', '0');
+            cy.get('[cy-data="rule_runtime"]').should('not.exist');
+        });
+
+        it('shows how many requests a rule with times has left', () => {
+            addRule({ match: 'E2E_ADMIN_LEFT', text: 'twice', times: 2 });
+            addRule({ match: 'E2E_ADMIN_STAYS', text: 'always' });
+
+            cy.visit('/');
+            cy.get('[cy-data="rule_times"]')
+                .should('have.length', 1)
+                .and('contain', '2 left');
+
+            // The dashboard asks again every 2 seconds
+            ask('E2E_ADMIN_LEFT');
+            cy.get('[cy-data="rule_times"]').should('contain', '1 left');
+
+            ask('E2E_ADMIN_LEFT');
+            cy.get('[cy-data="rule_times"]').should('not.exist');
+            cy.get('[cy-data="admin_runtime_rules"]').should('have.text', '1');
+        });
+
+        it('marks a rule added while running and shows its text', () => {
+            addRule({ match: 'E2E_ADMIN_SHOWN', text: 'the reply as text' });
+
+            cy.visit('/');
+            cy.get('[cy-data="response_rules_count"]').should(
+                'contain',
+                '7 rules',
+            );
+            cy.get('[cy-data="admin_runtime_rules"]').should('contain', '1');
+            cy.get('[cy-data="rule_runtime"]').should('have.length', 1);
+
+            // The runtime rule is listed first
+            cy.get('[cy-data="response_rules"] .rule')
+                .first()
+                .within(() => {
+                    cy.contains('E2E_ADMIN_SHOWN');
+                    cy.get('[cy-data="rule_runtime"]').should('be.visible');
+                    cy.get('[cy-data="rule_text_link"]').click();
+                });
+
+            cy.get('[cy-data="viewer"]').should('contain', 'E2E_ADMIN_SHOWN');
+            cy.get('[cy-data="viewer_text"]').should(
+                'have.text',
+                'the reply as text',
+            );
+        });
+
+        it('still opens the file of a config rule listed after a runtime rule', () => {
+            addRule({ match: 'E2E_ADMIN_FIRST', text: 'first' });
+
+            // The first config rule: E2E_FIXTURE_JSON, replying with json-reply.json
+            cy.visit('/');
+            cy.get('[cy-data="rule_file_link"]').first().click();
+            cy.get('[cy-data="viewer"]').should('contain', 'E2E_FIXTURE_JSON');
+            cy.get('[cy-data="viewer_text"]').should(
+                'contain',
+                '"status": "ok"',
+            );
+        });
+
+        it('undoes the runtime changes with Reset, after asking', () => {
+            addRule({ match: 'E2E_ADMIN_UNDO', text: 'undone' });
+            cy.request({
+                method: 'PATCH',
+                url: '/admin/chaos',
+                body: { enabled: true, frequency: 3 },
+            });
+
+            cy.visit('/');
+            cy.get('[cy-data="chaos_status"]').should('contain', 'ENABLED');
+            cy.get('[cy-data="rule_runtime"]').should('have.length', 1);
+
+            cy.get('[cy-data="admin_reset"]').click();
+            cy.get('[cy-data="admin_reset_confirm"]').click();
+
+            cy.get('[cy-data="rule_runtime"]').should('not.exist');
+            cy.get('[cy-data="admin_runtime_rules"]').should('contain', '0');
+            cy.get('[cy-data="chaos_status"]').should('contain', 'DISABLED');
+            cy.request('/admin/rules')
+                .its('body.rules')
+                .should('have.length', 6);
+        });
     });
 
     it('reports a rule added while running to the dashboard', () => {

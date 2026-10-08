@@ -56,6 +56,8 @@ export interface ServerConfig {
 	host: string;
 	// Optional: false turns the admin API (/admin/*) off
 	admin?: boolean;
+	// Optional: the dashboard's colours (default dark)
+	uiTheme?: 'dark' | 'light';
 }
 
 export interface LlmMockConfig {
@@ -245,6 +247,8 @@ export function setEnvironmentFromConfig(modelName?: string): void {
 	process.env.ADMIN_API =
 		process.env.ADMIN_API ||
 		(config.server.admin === false ? 'false' : 'true');
+	process.env.UI_THEME =
+		process.env.UI_THEME || config.server.uiTheme || 'dark';
 	process.env.LLM_URL_ENDPOINT =
 		process.env.LLM_URL_ENDPOINT || modelConfig.endpoint;
 

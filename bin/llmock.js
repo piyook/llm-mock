@@ -44,6 +44,7 @@ OPTIONS:
   --port=<number>         Server port (default: 8001)
   --host=<address>        Server host (default: 0.0.0.0)
   --admin=<bool>          Serve the admin API under /admin (default: true)
+  --uiTheme=<theme>       Dashboard colours: dark (default) or light
   --endpoint=<path>       LLM endpoint path
   --responseType=<type>   Response type (lorem, stored)
   --maxLoremParas=<num>    Maximum lorem ipsum sentences
@@ -92,6 +93,7 @@ SERVER:
   Host: ${serverConfig.host}
   Port: ${serverConfig.port}
   Admin API: ${serverConfig.admin !== false}
+  Dashboard Theme: ${serverConfig.uiTheme || 'dark'}
 
 MODEL: ${selectedModel}
   LLM Name: ${modelConfig.name}
@@ -304,6 +306,8 @@ function setEnvironmentVariables(config, modelName, configPath) {
   process.env.SERVER_HOST = customSettings.host || serverConfig.host;
   process.env.ADMIN_API = (customSettings.admin !== undefined ?
     customSettings.admin !== 'false' : serverConfig.admin !== false) ? 'true' : 'false';
+  // The flag wins, then a UI_THEME already in the environment, then the config
+  process.env.UI_THEME = customSettings.uiTheme || process.env.UI_THEME || serverConfig.uiTheme || 'dark';
   process.env.LLM_URL_ENDPOINT = customSettings.endpoint || modelConfig.endpoint;
   
   // LLM settings (with custom overrides)

@@ -7,7 +7,7 @@ const suites = [
   { start: "llmock:start:streaming", spec: "cypress/e2e/streaming-only-spec.cy.ts" },
   { start: "llmock:start:embeddings",spec: "cypress/e2e/embeddings-spec.cy.ts" },
   { start: "llmock:start:claude",    spec: "cypress/e2e/claude-mock-spec.cy.ts" },
-  { start: "llmock:start:claude",    spec: "cypress/e2e/admin-spec.cy.ts", name: "admin" },
+  { start: "llmock:start:claude",    spec: "cypress/e2e/admin-spec.cy.ts", name: "admin", env: { UI_THEME: "light" } },
   { start: "llmock:start:stored",    spec: "cypress/e2e/stored-responses-spec.cy.ts" },
   { start: "llmock:start:chaos",     spec: "cypress/e2e/chaos-spec.cy.ts" },
   { start: "llmock:start:chaos-stream", spec: "cypress/e2e/chaos-stream-spec.cy.ts" },
@@ -52,11 +52,13 @@ const cypressCount = (output, label) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const startServer = (npmScript) => {
+const startServer = (npmScript, env = {}) => {
   return new Promise((resolve, reject) => {
     const proc = spawn(`npm run ${npmScript}`, {
       stdio: childStdio,
-      env: { ...process.env, CONFIG_PATH: '.llmockrc.test.json', E2E_MODE: 'true' },
+      // UI_THEME is cleared so a value in the developer's shell can't change
+      // what a suite sees; a suite that wants one sets its own
+      env: { ...process.env, UI_THEME: '', ...env, CONFIG_PATH: '.llmockrc.test.json', E2E_MODE: 'true' },
       shell: true,
       // A new process group lets us kill the tree on Unix. On Windows
       // `detached` opens a console window, and taskkill /T covers the tree.
@@ -191,13 +193,13 @@ const cleanup = async () => {
 process.on('SIGINT', async () => { await cleanup(); process.exit(130); });
 process.on('SIGTERM', async () => { await cleanup(); process.exit(143); });
 
-for (const { start, spec, name = start.split(':').pop() } of suites) {
+for (const { start, spec, env, name = start.split(':').pop() } of suites) {
   let cypressOutput = '';
   let error = null;
 
   log(`\n=== Starting test suite: ${start} ===`);
   try {
-    currentProc = await startServer(start);
+    currentProc = await startServer(start, env);
     log(`✓ Server started for ${start}`);
     await healthCheck();
     log(`✓ Health check passed for ${start}`);

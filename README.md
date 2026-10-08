@@ -157,6 +157,7 @@ Each option overrides the matching setting of the selected preset for that run:
 | `--model` | `defaultModel` | Name of a preset in `.llmockrc.json` |
 | `--port` / `--host` | `server.port` / `server.host` | Port number / address |
 | `--admin` | `server.admin` | `true` or `false` |
+| `--uiTheme` | `server.uiTheme` | `dark` or `light` |
 | `--endpoint` | `endpoint` | Path without a leading slash |
 | `--responseType` | `responseType` | `lorem` or `stored` |
 | `--maxLoremParas` | `maxLoremParas` | Number |
@@ -276,6 +277,7 @@ The config file is read once at startup, so restart the server after changing it
 | `embeddings.dimensions` | Embedding vector size |
 | `server.port` / `server.host` | Port and address the server listens on (`8001`, `0.0.0.0`) |
 | `server.admin` | `false` turns the [admin API](#admin-api-changing-rules-and-settings-while-running) off (default `true`) |
+| `server.uiTheme` | Colours of the [dashboard](#dashboard): `"dark"` (the default) or `"light"` |
 
 Only `name` and `endpoint` are required in a preset. Anything left out uses: `responseType` `lorem`, `maxLoremParas` 8, `maxLoggedRequests` 10, no delay, and validation, logging, debug, streaming, embeddings and chaos off.
 
@@ -585,7 +587,7 @@ await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
 | Route | What it does |
 |---|---|
 | `GET /admin/rules` | Lists every rule in the order requests are matched against them |
-| `POST /admin/rules` | Adds a rule: `{ "match", "text", "stopReason"?, "fail"? }`. Answers `201` with the rule and its `id` |
+| `POST /admin/rules` | Adds a rule: `{ "match", "text", "stopReason"?, "fail"?, "times"? }`. Answers `201` with the rule and its `id` |
 | `DELETE /admin/rules/<id>` | Removes one rule added this way |
 | `DELETE /admin/rules` | Removes every rule added this way |
 | `GET /admin/chaos` | Shows the [chaos](#chaos-mode-error-simulation) settings in use, and how many calls were counted and failed |
@@ -597,10 +599,29 @@ await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
 - A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text` or `fail`.
 - The reply is given as `text`, never as `file` or `files`. The server has no login, so a path sent over HTTP would let anyone who can reach it read files from your machine.
 - Rules added this way are matched before the config file's rules, in the order they were added. To replace a config rule for one test, add a rule with the same `match`.
+- Give a rule `times` (a whole number, 1 or more) to have it answer that many matching requests and then remove itself. Without `times` a rule stays until you remove it or reset. `times` is for rules added this way only, not for the config file.
 - Nothing is saved. The config file is never written, and a restart starts again with the config file's rules only.
 - A rule that is not valid gets a `400` with `{ "error": "..." }` and is not added.
-- Each rule in a listing has `source` (`"runtime"` or `"config"`) and `id` (`null` for a config rule, which can not be removed this way).
+- Each rule in a listing has `source` (`"runtime"` or `"config"`), `id` (`null` for a config rule, which can not be removed this way) and `times` (how many more requests it answers, or `null` if it stays).
 - Everything else (the port, the endpoint, the preset, streaming, embeddings) still comes from the config file and needs a restart to change.
+
+With `times`, a test can have the first call fail and the retry succeed, or give each call in turn its own reply:
+
+```js
+const addRule = (rule) =>
+  fetch('http://localhost:8001/admin/rules', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(rule),
+  });
+
+// The first call with this prompt gets a 529; the next one gets a normal reply
+await addRule({ match: 'Summarise the report', fail: { status: 529 }, times: 1 });
+
+// The first call gets "draft", the second "final", later ones a normal reply
+await addRule({ match: 'Write the email', text: 'draft', times: 1 });
+await addRule({ match: 'Write the email', text: 'final', times: 1 });
+```
 
 To make calls fail part-way through a test, switch chaos on and reset afterwards:
 
@@ -617,7 +638,7 @@ await fetch('http://localhost:8001/admin/chaos', {
 - A value that is not valid gets a `400` and nothing is changed. Nothing falls back to a default, unlike a CLI flag.
 - Changing chaos settings leaves the call count alone. With `mode: "every"`, call `POST /admin/reset` first and then `PATCH /admin/chaos`, so the count starts from 0 and you know which call fails.
 - `min` can not be more than `max`. Send both when you raise the delay from `0`.
-- The dashboard shows the settings in use, so a change appears there within 2 seconds.
+- The dashboard shows the settings in use, so a change appears there within 2 seconds. Its **Admin API** box has a **Reset** button that does the same as `POST /admin/reset`.
 - To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 
 ### Custom API paths
@@ -658,9 +679,20 @@ Once running, open `http://localhost:8001` for the live dashboard:
 | `http://localhost:8001` | Main dashboard |
 | `http://localhost:8001/ping` | Health check |
 
-The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged requests. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
+The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged requests. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Admin API**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
 
-With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. With no rules set, the box shows a blank rule with a note pointing to the setting.
+The dashboard is dark by default. For a light one, set the `UI_THEME` environment variable, or `"uiTheme": "light"` in the `server` block of `.llmockrc.json`, or start with `--uiTheme=light`:
+
+```bash
+UI_THEME=light npx llmock start       # macOS, Linux, Git Bash
+$env:UI_THEME = 'light'; npx llmock start   # PowerShell
+```
+
+The flag wins over the environment variable, which wins over the config file. In Docker, add `UI_THEME=light` to `environment` in `docker-compose.yml`. Any value other than `light` gives the dark theme.
+
+With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. A rule that holds its reply as `text` shows **its own text** in place of a file; click it to read the text. A rule added through the [admin API](#admin-api-changing-rules-and-settings-while-running) is listed first and marked **runtime**; one with `times` also shows how many requests it has left. With no rules set, the box shows a blank rule with a note pointing to the setting.
+
+The **Admin API** box says whether the admin API is on and how many rules were added while running. **Reset** does what `POST /admin/reset` does, after asking you to confirm: it removes those rules, puts chaos and delay back to how the server started and sets the chaos count to 0.
 
 ### Available endpoints
 

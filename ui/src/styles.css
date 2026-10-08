@@ -1,12 +1,36 @@
+/* The dark theme, which is the default */
 :root {
-	--bg-main: #23272f;
+	--bg-page: linear-gradient(120deg, #20232a 0%, #23272f 70%, #0d1117 100%);
+	--bg-header: #20232a;
 	--bg-card: #2d333b;
+	/* A row inside a card, and a block of text inside the viewer */
+	--bg-row: rgba(255, 255, 255, 0.04);
+	--bg-text: rgba(0, 0, 0, 0.25);
 	--accent: #4f8a8b;
 	--accent2: rgb(1, 25, 75);
+	--danger: rgb(126, 80, 78);
 	--text-main: #f9f9f9;
 	--text-muted: #a7a9be;
+	/* Text on an accent, accent2 or danger background, in either theme */
+	--text-on-colour: #fff;
+	--line: rgba(255, 255, 255, 0.12);
 	--border-radius: 14px;
 	--shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* The light theme: UI_THEME=light (see the server's ui-meta) */
+:root[data-theme='light'] {
+	--bg-page: linear-gradient(120deg, #f4f6f8 0%, #eef1f4 70%, #e2e7ed 100%);
+	--bg-header: #f4f6f8;
+	--bg-card: #fff;
+	--bg-row: rgba(0, 0, 0, 0.04);
+	--bg-text: rgba(0, 0, 0, 0.06);
+	--accent: #3f7c7d;
+	--danger: rgb(160, 72, 68);
+	--text-main: #1c2128;
+	--text-muted: #57606a;
+	--line: rgba(0, 0, 0, 0.12);
+	--shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
 
 html,
@@ -16,7 +40,7 @@ body {
 	min-height: 100vh;
 	color: var(--text-main);
 	font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
-	background: linear-gradient(120deg, #20232a 0%, #23272f 70%, #0d1117 100%);
+	background: var(--bg-page);
 }
 
 main {
@@ -42,7 +66,7 @@ main {
 	z-index: 1;
 	padding: 16px 0 12px 0;
 	margin-bottom: -12px;
-	background: #20232a;
+	background: var(--bg-header);
 }
 
 .card {
@@ -86,6 +110,13 @@ h1 {
 	font-size: 0.95rem;
 }
 
+/* The marks under a runtime rule's match, side by side */
+.rulePills {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
 .groupLabel {
 	margin: 14px 0 8px 0;
 }
@@ -106,6 +137,7 @@ h1 {
 	gap: 8px;
 	border-radius: 10px;
 	padding: 8px 12px;
+	color: var(--text-on-colour);
 	font-weight: 700;
 	letter-spacing: 0.3px;
 }
@@ -115,7 +147,7 @@ h1 {
 }
 
 .statusOffline {
-	background: rgb(126, 80, 78);
+	background: var(--danger);
 }
 
 .grid {
@@ -141,14 +173,14 @@ h1 {
 	align-items: center;
 	padding: 10px 12px;
 	border-radius: 12px;
-	background: rgba(255, 255, 255, 0.04);
+	background: var(--bg-row);
 }
 
 .badge {
 	background: var(--accent2);
 	padding: 4px 10px;
 	border-radius: 8px;
-	color: #fff;
+	color: var(--text-on-colour);
 	font-weight: 800;
 	overflow-wrap: anywhere;
 }
@@ -202,6 +234,7 @@ h1 {
 .fileLink:hover,
 .fileLink:focus-visible {
 	background: var(--accent);
+	color: var(--text-on-colour);
 	outline: none;
 }
 
@@ -234,7 +267,7 @@ h1 {
 	gap: 12px;
 	padding: 10px 12px;
 	border-radius: 12px;
-	background: rgba(255, 255, 255, 0.04);
+	background: var(--bg-row);
 }
 
 /* With no rules set the row is still drawn, its two values as empty boxes */
@@ -264,6 +297,7 @@ h1 {
 
 .ruleMatch code {
 	background: var(--accent2);
+	color: var(--text-on-colour);
 	padding: 4px 10px;
 	border-radius: 8px;
 	overflow-wrap: anywhere;
@@ -339,7 +373,7 @@ h1 {
 	margin: 0;
 	padding: 10px 12px;
 	border-radius: 12px;
-	background: rgba(0, 0, 0, 0.25);
+	background: var(--bg-text);
 	font-family: Consolas, 'Courier New', monospace;
 	font-size: 0.9rem;
 	white-space: pre-wrap;
@@ -350,6 +384,7 @@ h1 {
 	opacity: 0.4;
 	cursor: default;
 	background: none;
+	color: var(--text-main);
 }
 
 .fileLink.danger {
@@ -358,7 +393,7 @@ h1 {
 
 .fileLink.danger:hover,
 .fileLink.danger:focus-visible {
-	background: rgb(126, 80, 78);
+	background: var(--danger);
 }
 
 /* Stays in view while a long request scrolls behind it */
@@ -372,7 +407,7 @@ h1 {
 	gap: 10px;
 	margin: 14px -18px -18px;
 	padding: 12px 18px;
-	border-top: 1px solid rgba(255, 255, 255, 0.12);
+	border-top: 1px solid var(--line);
 	background: var(--bg-card);
 }
 
@@ -387,7 +422,8 @@ h1 {
 	margin: 0;
 	padding: 10px 12px;
 	border-radius: 12px;
-	background: rgb(126, 80, 78);
+	background: var(--danger);
+	color: var(--text-on-colour);
 	overflow-wrap: anywhere;
 }
 

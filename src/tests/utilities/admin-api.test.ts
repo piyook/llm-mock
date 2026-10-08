@@ -125,6 +125,7 @@ describe('admin API', () => {
 			files: ['fixtures/text.txt'],
 			stopReason: 'end',
 			fail: null,
+			times: null,
 		},
 		{
 			id: null,
@@ -134,6 +135,7 @@ describe('admin API', () => {
 			files: [],
 			stopReason: 'end',
 			fail: null,
+			times: null,
 		},
 	];
 
@@ -163,6 +165,7 @@ describe('admin API', () => {
 			files: [],
 			stopReason: 'end',
 			fail: null,
+			times: null,
 		});
 		expect(await replyTo('please WANT_RUNTIME')).toBe(
 			'{"priority":"high"}',
@@ -235,8 +238,19 @@ describe('admin API', () => {
 		],
 		[
 			'an unknown setting',
-			{ match: 'A', text: 'b', times: 2 },
-			/unknown settings: times/,
+			{ match: 'A', text: 'b', repeat: 2 },
+			/unknown settings: repeat/,
+		],
+		['a times of 0', { match: 'A', text: 'b', times: 0 }, /rule\.times/],
+		[
+			'a times that is not whole',
+			{ match: 'A', text: 'b', times: 1.5 },
+			/rule\.times must be an integer of 1 or more/,
+		],
+		[
+			'a times that is not a number',
+			{ match: 'A', text: 'b', times: '2' },
+			/rule\.times/,
 		],
 		[
 			'an unknown stop reason',
@@ -256,6 +270,64 @@ describe('admin API', () => {
 		expect((await send('GET', '/admin/rules')).body.rules).toEqual(
 			configRules,
 		);
+	});
+
+	test('a rule with times answers that many requests, then is removed', async () => {
+		const { body } = await addRule({
+			match: 'WANT_TWICE',
+			text: 'twice only',
+			times: 2,
+		});
+		const timesLeft = async () =>
+			(await send('GET', '/admin/rules')).body.rules.find(
+				(rule: { id: string }) => rule.id === body.rule.id,
+			)?.times;
+
+		expect(body.rule.times).toBe(2);
+
+		// A request that does not match leaves the count alone
+		await replyTo('something else');
+		expect(await timesLeft()).toBe(2);
+
+		expect(await replyTo('WANT_TWICE')).toBe('twice only');
+		expect(await timesLeft()).toBe(1);
+
+		expect(await replyTo('WANT_TWICE')).toBe('twice only');
+		expect((await send('GET', '/admin/rules')).body.rules).toEqual(
+			configRules,
+		);
+		expect(await replyTo('WANT_TWICE')).not.toBe('twice only');
+	});
+
+	test('a request counts once, however often it is asked about', async () => {
+		await addRule({
+			match: 'WANT_FAIL_ONCE',
+			text: 'the start of it',
+			fail: { kind: 'stream-drop' },
+			times: 1,
+		});
+
+		// What the server does with one request: how it fails, then its reply
+		const first = request('WANT_FAIL_ONCE');
+		expect(getRuleFailure(first)?.kind).toBe('stream-drop');
+		expect((await generateResponseContent(first)).text).toBe(
+			'the start of it',
+		);
+
+		const second = request('WANT_FAIL_ONCE');
+		expect(getRuleFailure(second)).toBeUndefined();
+		expect((await generateResponseContent(second)).text).not.toBe(
+			'the start of it',
+		);
+	});
+
+	test('rules with times give a different reply to each call in turn', async () => {
+		await addRule({ match: 'WANT_FILE', text: 'first', times: 1 });
+		await addRule({ match: 'WANT_FILE', text: 'second', times: 1 });
+
+		expect(await replyTo('WANT_FILE')).toBe('first');
+		expect(await replyTo('WANT_FILE')).toBe('second');
+		expect(await replyTo('WANT_FILE')).toBe('from the file');
 	});
 
 	test('DELETE admin/rules/:id removes that rule only', async () => {
