@@ -293,6 +293,7 @@ describe('dashboard routes for stored responses and response rules', () => {
 				files: ['fixtures/text.txt'],
 				stopReason: 'end',
 				fail: null,
+				times: null,
 			},
 			{
 				id: null,
@@ -302,6 +303,7 @@ describe('dashboard routes for stored responses and response rules', () => {
 				files: ['fixtures/pool-a.txt', 'fixtures/pool-b.txt'],
 				stopReason: 'end',
 				fail: null,
+				times: null,
 			},
 			{
 				id: null,
@@ -311,6 +313,7 @@ describe('dashboard routes for stored responses and response rules', () => {
 				files: ['fixtures/missing.txt'],
 				stopReason: 'max_tokens',
 				fail: null,
+				times: null,
 			},
 			// A rule that only fails: no files, and the defaults filled in
 			{
@@ -321,6 +324,7 @@ describe('dashboard routes for stored responses and response rules', () => {
 				files: [],
 				stopReason: 'end',
 				fail: { kind: 'stream-drop', status: 500, afterChunks: 0 },
+				times: null,
 			},
 		]);
 	});
@@ -339,6 +343,7 @@ describe('dashboard routes for stored responses and response rules', () => {
 				files: [],
 				stopReason: 'end',
 				fail: null,
+				times: null,
 			});
 			expect(body.responseRules[1].match).toBe('WANT_TEXT');
 

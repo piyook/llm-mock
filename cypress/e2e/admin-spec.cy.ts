@@ -116,6 +116,42 @@ describe('Mock LLM Spec for the admin API', () => {
         ask('something else').its('status').should('eq', 200);
     });
 
+    it('fails the first call only for a rule with fail and times 1', () => {
+        addRule({ match: 'E2E_ADMIN_RETRY', fail: { status: 529 }, times: 1 })
+            .its('body.rule.times')
+            .should('eq', 1);
+
+        cy.request({
+            method: 'POST',
+            url,
+            body: body('E2E_ADMIN_RETRY'),
+            failOnStatusCode: false,
+        })
+            .its('status')
+            .should('eq', 529);
+
+        // The rule is used up, so the retry gets a reply
+        ask('E2E_ADMIN_RETRY').its('status').should('eq', 200);
+        cy.request('/admin/rules').its('body.rules').should('have.length', 6);
+    });
+
+    it('gives each call the next reply when the rules have times', () => {
+        addRule({ match: 'E2E_ADMIN_TURN', text: 'first', times: 1 });
+        addRule({ match: 'E2E_ADMIN_TURN', text: 'second', times: 2 });
+
+        ask('E2E_ADMIN_TURN').its('body.content.0.text').should('eq', 'first');
+        ask('E2E_ADMIN_TURN').its('body.content.0.text').should('eq', 'second');
+
+        cy.request('/admin/rules').then((response) => {
+            expect(response.body.rules).to.have.length(7);
+            expect(response.body.rules[0]).to.include({
+                match: 'E2E_ADMIN_TURN',
+                text: 'second',
+                times: 1,
+            });
+        });
+    });
+
     it('refuses a rule that names a file', () => {
         cy.request({
             method: 'POST',
@@ -268,6 +304,24 @@ describe('Mock LLM Spec for the admin API', () => {
             cy.get('[cy-data="admin_status"]').should('contain', 'ENABLED');
             cy.get('[cy-data="admin_runtime_rules"]').should('contain', '0');
             cy.get('[cy-data="rule_runtime"]').should('not.exist');
+        });
+
+        it('shows how many requests a rule with times has left', () => {
+            addRule({ match: 'E2E_ADMIN_LEFT', text: 'twice', times: 2 });
+            addRule({ match: 'E2E_ADMIN_STAYS', text: 'always' });
+
+            cy.visit('/');
+            cy.get('[cy-data="rule_times"]')
+                .should('have.length', 1)
+                .and('contain', '2 left');
+
+            // The dashboard asks again every 2 seconds
+            ask('E2E_ADMIN_LEFT');
+            cy.get('[cy-data="rule_times"]').should('contain', '1 left');
+
+            ask('E2E_ADMIN_LEFT');
+            cy.get('[cy-data="rule_times"]').should('not.exist');
+            cy.get('[cy-data="admin_runtime_rules"]').should('have.text', '1');
         });
 
         it('marks a rule added while running and shows its text', () => {

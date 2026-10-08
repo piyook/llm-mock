@@ -8,12 +8,11 @@ import {
 } from './build-streaming-response.js';
 import { getStoredResponsesFile } from '../config/config-loader.js';
 import {
-	findMatchingRule,
 	loadRuleContent,
 	ruleFailure,
 	ruleHasReply,
 } from './response-rules.js';
-import { getActiveRules } from './runtime-rules.js';
+import { takeMatchingRule } from './runtime-rules.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { applyStopReason } from './stop-reason.js';
 import {
@@ -29,15 +28,35 @@ import type { FastifyReply } from 'fastify';
 const DEFAULT_EMBEDDING_DIMENSIONS =
 	Number(process.env?.EMBEDDING_DIMENSION) || 128;
 
+type MatchedRule = ReturnType<typeof takeMatchingRule>;
+
+// The rule found for each request body. A request is asked twice, how it
+// fails and then what it replies, and must get the same rule both times and
+// count once against a rule's `times`
+const matchedRules = new WeakMap<object, MatchedRule>();
+
+const ruleForRequest = (requestBody: unknown): MatchedRule => {
+	// Only a parsed JSON object or array can be remembered
+	if (typeof requestBody !== 'object' || requestBody === null) {
+		return takeMatchingRule(requestBody);
+	}
+
+	if (!matchedRules.has(requestBody)) {
+		matchedRules.set(requestBody, takeMatchingRule(requestBody));
+	}
+
+	return matchedRules.get(requestBody);
+};
+
 /**
  * Fixture reply for this request if a response rule matches it, otherwise
  * undefined (a normal response is generated instead).
  */
 const getRuleReply = (requestBody: unknown): MockReply | undefined => {
-	const { rules, baseDir } = getActiveRules();
-	const rule = findMatchingRule(rules, requestBody);
+	const matched = ruleForRequest(requestBody);
 	// A rule that only fails has no reply: one is generated as usual
-	if (!rule || !ruleHasReply(rule)) return undefined;
+	if (!matched || !ruleHasReply(matched.rule)) return undefined;
+	const { rule, baseDir } = matched;
 
 	return {
 		text: loadRuleContent(rule, baseDir),
@@ -52,9 +71,9 @@ const getRuleReply = (requestBody: unknown): MockReply | undefined => {
 export const getRuleFailure = (
 	requestBody: unknown,
 ): CallFailure | undefined => {
-	const rule = findMatchingRule(getActiveRules().rules, requestBody);
+	const matched = ruleForRequest(requestBody);
 
-	return rule && ruleFailure(rule);
+	return matched && ruleFailure(matched.rule);
 };
 
 /**

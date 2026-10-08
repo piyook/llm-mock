@@ -395,6 +395,15 @@
 								runtime
 							</span>
 						{/if}
+						{#if rule.times !== null}
+							<span
+								class="countPill"
+								cy-data="rule_times"
+								title="How many more requests this rule answers before it is removed"
+							>
+								{rule.times} left
+							</span>
+						{/if}
 					</div>
 					<div class="ruleFiles">
 						{#if rule.files.length > 0}

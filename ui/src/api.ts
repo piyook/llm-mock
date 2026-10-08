@@ -22,6 +22,8 @@ export type UiMeta = {
 			status: number;
 			afterChunks: number;
 		} | null;
+		// How many more requests a runtime rule answers; null if it stays
+		times: number | null;
 	}>;
 	validateRequests: string;
 	logRequests: string;
