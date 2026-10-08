@@ -44,6 +44,8 @@
 	const SCROLL_AFTER = 4;
 	$: ruleCount = meta?.responseRules?.length ?? 0;
 	// Rules added through the admin API while the server runs
+	// Runtime rules are listed first, so a config rule's place among the config
+	// rules (what /ui-rule-file goes by) is its place in the list less this
 	$: runtimeRuleCount =
 		meta?.responseRules?.filter((rule) => rule.source === 'runtime').length ?? 0;
 
@@ -429,7 +431,8 @@
 								class="fileLink"
 								cy-data="rule_file_link"
 								title="View this file"
-								on:click={() => viewRuleFile(rule.match, file, ruleIndex, fileIndex)}
+								on:click={() =>
+									viewRuleFile(rule.match, file, ruleIndex - runtimeRuleCount, fileIndex)}
 							>
 								{file}
 							</button>

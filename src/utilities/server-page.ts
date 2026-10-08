@@ -3,11 +3,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../models/db.js';
-import { getStoredResponsesFile } from '../config/config-loader.js';
+import {
+	getResponseRules,
+	getStoredResponsesFile,
+} from '../config/config-loader.js';
 import { clearLog, logPath, maxLogEntries } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { readRuleFile, ruleFiles } from './response-rules.js';
-import { describeActiveRules, getActiveRules } from './runtime-rules.js';
+import { describeActiveRules } from './runtime-rules.js';
+import { getDelay } from './runtime-settings.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
 import { adminApiEnabled } from './admin-api.js';
 
@@ -176,6 +180,10 @@ const fallbackHtmlString = `
     </html>
     `;
 
+// The built dashboard page with the theme in use named on it
+const themedPage = (uiIndex: { data: Buffer }): string =>
+	withUiTheme(uiIndex.data.toString('utf8'), getUiTheme());
+
 function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	// UI meta endpoint for the compiled Svelte dashboard
 	app.get('/ui-meta', async (_request, reply) => {
@@ -192,10 +200,7 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		// added through the admin API, then the config file's
 		const responseRules = describeActiveRules();
 
-		const responseDelayMinMs =
-			Number(process.env?.RESPONSE_DELAY_MIN ?? 0) || 0;
-		const responseDelayMaxMs =
-			Number(process.env?.RESPONSE_DELAY_MAX ?? 0) || 0;
+		const { min: responseDelayMinMs, max: responseDelayMaxMs } = getDelay();
 		const delayStatus =
 			responseDelayMinMs > 0 || responseDelayMaxMs > 0
 				? 'ENABLED'
@@ -278,11 +283,13 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	});
 
 	// Contents of one response rule fixture, for the dashboard viewer. Files
-	// are addressed by position in the ui-meta list (?rule=0&file=0), never by
-	// path, so only configured fixtures can be read.
+	// are addressed by position (?rule=0&file=0), never by path, so only
+	// configured fixtures can be read. `rule` counts the config file's rules
+	// only: they are the ones with files, and their positions stay the same
+	// as rules are added and removed through the admin API.
 	app.get('/ui-rule-file', async (request, reply) => {
 		const query = request.query as { rule?: string; file?: string };
-		const { rules, baseDir } = getActiveRules();
+		const { rules, baseDir } = getResponseRules();
 		const rule = rules[Number(query.rule ?? 0)];
 		const file = rule && ruleFiles(rule)[Number(query.file ?? 0)];
 
@@ -333,11 +340,7 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	// Home page route
 	app.get('/', async (_request, reply) => {
 		const uiIndex = tryReadUiDistFile('index.html');
-		if (uiIndex) {
-			return reply
-				.type(contentTypeForPath(uiIndex.absPath))
-				.send(withUiTheme(uiIndex.data.toString('utf8'), getUiTheme()));
-		}
+		if (uiIndex) return reply.type('text/html').send(themedPage(uiIndex));
 		return reply.type('text/html').send(fallbackHtmlString);
 	});
 
@@ -361,6 +364,10 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		if (!fileName.includes('.')) return reply.code(404).send();
 		const file = tryReadUiDistFile(fileName);
 		if (!file) return reply.code(404).send();
+		// The dashboard page asked for by name gets its theme too
+		if (fileName === 'index.html') {
+			return reply.type('text/html').send(themedPage(file));
+		}
 		return reply.type(contentTypeForPath(file.absPath)).send(file.data);
 	});
 }
