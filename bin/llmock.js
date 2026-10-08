@@ -14,6 +14,10 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Whether a setting reads as "off" (see readsAsOff in src/config/config-loader.ts)
+const readsAsOff = (value) =>
+  ['false', '0', 'off', 'no'].includes(String(value).trim().toLowerCase());
+
 // Parse command line arguments
 const {
   command,
@@ -92,7 +96,7 @@ Current LLM Mock Server Configuration:
 SERVER:
   Host: ${serverConfig.host}
   Port: ${serverConfig.port}
-  Admin API: ${serverConfig.admin !== false}
+  Admin API: ${!readsAsOff(serverConfig.admin)}
   Dashboard Theme: ${serverConfig.uiTheme || 'dark'}
 
 MODEL: ${selectedModel}
@@ -304,8 +308,8 @@ function setEnvironmentVariables(config, modelName, configPath) {
   // Server settings (with custom overrides)
   process.env.SERVER_PORT = customSettings.port || serverConfig.port.toString();
   process.env.SERVER_HOST = customSettings.host || serverConfig.host;
-  process.env.ADMIN_API = (customSettings.admin !== undefined ?
-    customSettings.admin !== 'false' : serverConfig.admin !== false) ? 'true' : 'false';
+  process.env.ADMIN_API = readsAsOff(customSettings.admin !== undefined ?
+    customSettings.admin : serverConfig.admin) ? 'false' : 'true';
   // The flag wins, then a UI_THEME already in the environment, then the config
   process.env.UI_THEME = customSettings.uiTheme || process.env.UI_THEME || serverConfig.uiTheme || 'dark';
   process.env.LLM_URL_ENDPOINT = customSettings.endpoint || modelConfig.endpoint;
