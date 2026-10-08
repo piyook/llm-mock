@@ -27,7 +27,7 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
   - `chaosStatus`, `chaosFrequency`, `chaosMode`, `chaosErrorStatus`, `chaosKind`, `chaosAfterChunks` (the chaos settings) and `chaosInjected` (calls failed since the server started)
   - `apiLinks` (resolved API URLs based on `LLM_URL_ENDPOINT`)
   - `storedResponsesCount` / `storedResponsesFile` (when the response type is `stored`)
-  - `responseRules` (each rule's `match`, the `text` or `files` it replies with, its `stopReason` and its `fail` settings, `null` if it replies; `source` is `runtime` for a rule added through the admin API, which also has an `id`)
+  - `responseRules` (each rule's `match`, the `text` or `files` it replies with, its `stopReason` and its `fail` settings, `null` if it replies; `source` is `runtime` for a rule added through the admin API, which also has an `id`, and a `times` if it only answers that many more requests)
   - `adminApi` (`ENABLED` or `DISABLED`)
   - `uiTheme` (`dark` or `light`, from `UI_THEME`, `--uiTheme` or `server.uiTheme`). The server also writes it to the page as `<html data-theme="…">`, which is what `ui/src/styles.css` goes by; colours are CSS variables on `:root`, with the light theme's under `:root[data-theme='light']`
 

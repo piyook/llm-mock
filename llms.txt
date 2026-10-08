@@ -132,7 +132,7 @@ The way to set up a reply or a failure from inside a test, with no fixture file,
 | Route | Body | Returns |
 |---|---|---|
 | `GET /admin/rules` | none | `200 {"rules": [...]}`: every active rule in match order, in the `responseRules` shape of `GET /ui-meta` |
-| `POST /admin/rules` | `{"match", "text"?, "stopReason"?, "fail"?}` | `201 {"rule": {...}}` with its `id` (`"r1"`, `"r2"`…); `400 {"error"}` if not valid (nothing is added) |
+| `POST /admin/rules` | `{"match", "text"?, "stopReason"?, "fail"?, "times"?}` | `201 {"rule": {...}}` with its `id` (`"r1"`, `"r2"`…); `400 {"error"}` if not valid (nothing is added) |
 | `DELETE /admin/rules/<id>` | none | `200 {"rules": [...]}`; `404 {"error"}` for an unknown id |
 | `DELETE /admin/rules` | none | `200 {"rules": [...]}`: runtime rules removed, config rules kept |
 | `GET /admin/chaos` | none | `200 {"chaos": {"enabled", "frequency", "mode", "status", "kind", "afterChunks"}, "stats": {"calls", "injected"}}` |
@@ -143,6 +143,7 @@ The way to set up a reply or a failure from inside a test, with no fixture file,
 
 - `match`, `stopReason` and `fail` mean exactly what they mean in `responseRules` (see Fixture replies). A rule needs `text` or `fail`; with both, `text` is what a `stream-*` failure sends before it fails.
 - `file` and `files` are refused with `400`: the reply must be `text`. Any other key is refused too.
+- `times` (integer ≥ 1, runtime rules only; a `times` in the config file's `responseRules` is ignored): the rule answers that many matching requests, then removes itself. Omitted → the rule stays until removed or reset. Each matching request counts once, also when it is failed by the rule's `fail` or by chaos. A listing shows the requests left as `times` (`null` for a rule that stays and for config rules). Fail once then succeed: `{"match": "X", "fail": {"status": 529}, "times": 1}`. A reply per call in turn: add `{"match": "X", "text": "first", "times": 1}` then `{"match": "X", "text": "second", "times": 1}`.
 - Order: runtime rules first, in the order added, then the config rules. First match wins, so a runtime rule with the same `match` as a config rule replaces it until removed.
 - `PATCH /admin/chaos` changes only the keys sent. Values are held to the config file's limits (see Chaos): `enabled` a JSON boolean, `frequency` an integer ≥ 1, `mode` `every`/`random`, `status` an integer 400–599, `kind` one of the four kinds, `afterChunks` an integer ≥ 0. Strings such as `"true"` or `"429"` are refused. Unknown keys are refused.
 - `PATCH /admin/chaos` does not touch the call count. For a known failing call with `mode: "every"`: `POST /admin/reset`, then `PATCH /admin/chaos`; the count then starts at 0 (with `frequency: 2` the 1st call succeeds and the 2nd fails). `stats.calls` only counts calls made while chaos is enabled.
