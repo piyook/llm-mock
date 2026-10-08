@@ -31,7 +31,7 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
   - `adminApi` (`ENABLED` or `DISABLED`)
   - `uiTheme` (`dark` or `light`, from `UI_THEME`, `--uiTheme` or `server.uiTheme`). The server also writes it to the page as `<html data-theme="…">`, which is what `ui/src/styles.css` goes by; colours are CSS variables on `:root`, with the light theme's under `:root[data-theme='light']`
 
-- The viewer dialog reads file contents from `/ui-stored-responses` and `/ui-rule-file?rule=<i>&file=<j>`, and the most recent logged requests (10 unless `maxLoggedRequests` is set) from `/ui-request-log`, shown one at a time. **Clear logs** sends `DELETE /ui-request-log`. A rule's own `text` is shown straight from `/ui-meta`. **Reset** in the Admin API box sends `POST /admin/reset`.
+- The viewer dialog reads file contents from `/ui-stored-responses` and `/ui-rule-file?rule=<i>&file=<j>` (`i` is the rule's place among the config file's rules, not counting runtime rules), and the most recent logged requests (10 unless `maxLoggedRequests` is set) from `/ui-request-log`, shown one at a time. **Clear logs** sends `DELETE /ui-request-log`. A rule's own `text` is shown straight from `/ui-meta`. **Reset** in the Admin API box sends `POST /admin/reset`.
 
 ### Running everything locally
 
