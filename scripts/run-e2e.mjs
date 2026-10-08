@@ -11,6 +11,7 @@ const suites = [
   { start: "llmock:start:stored",    spec: "cypress/e2e/stored-responses-spec.cy.ts" },
   { start: "llmock:start:chaos",     spec: "cypress/e2e/chaos-spec.cy.ts" },
   { start: "llmock:start:chaos-stream", spec: "cypress/e2e/chaos-stream-spec.cy.ts" },
+  { start: "llmock:start:admin-off", spec: "cypress/e2e/admin-off-spec.cy.ts" },
 ];
 
 // By default only a one-line result per suite is printed, and the full server
