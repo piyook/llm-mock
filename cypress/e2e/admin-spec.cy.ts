@@ -170,6 +170,84 @@ describe('Mock LLM Spec for the admin API', () => {
             .should('not.eq', 'before the reset');
     });
 
+    it('fails calls once chaos is switched on, and stops after a reset', () => {
+        cy.request({
+            method: 'PATCH',
+            url: '/admin/chaos',
+            body: { enabled: true, frequency: 2, status: 529 },
+        }).then((response) => {
+            expect(response.status).to.eq(200);
+            expect(response.body.chaos).to.include({
+                enabled: true,
+                frequency: 2,
+                mode: 'every',
+                status: 529,
+            });
+            expect(response.body.stats).to.deep.eq({ calls: 0, injected: 0 });
+        });
+
+        // Every 2nd call fails
+        ask('first').its('status').should('eq', 200);
+        cy.request({
+            method: 'POST',
+            url,
+            body: body('second'),
+            failOnStatusCode: false,
+        }).then((response) => {
+            expect(response.status).to.eq(529);
+            expect(response.body.error.type).to.eq('overloaded_error');
+        });
+
+        cy.request('/ui-meta').its('body.chaosStatus').should('eq', 'ENABLED');
+
+        reset().then((response) => {
+            expect(response.body.chaos.enabled).to.eq(false);
+            expect(response.body.stats).to.deep.eq({ calls: 0, injected: 0 });
+        });
+
+        ask('third').its('status').should('eq', 200);
+        ask('fourth').its('status').should('eq', 200);
+    });
+
+    it('refuses a chaos setting that is not valid', () => {
+        cy.request({
+            method: 'PATCH',
+            url: '/admin/chaos',
+            body: { enabled: true, status: 200 },
+            failOnStatusCode: false,
+        }).then((response) => {
+            expect(response.status).to.eq(400);
+            expect(response.body.error).to.contain('chaos.status');
+        });
+
+        cy.request('/admin/chaos').its('body.chaos.enabled').should('eq', false);
+    });
+
+    it('waits before replying once a delay is set, and not after a reset', () => {
+        cy.request({
+            method: 'PATCH',
+            url: '/admin/delay',
+            body: { min: 600, max: 600 },
+        })
+            .its('body.delay')
+            .should('deep.eq', { min: 600, max: 600 });
+
+        ask('slow').its('duration').should('be.gte', 600);
+
+        cy.request({
+            method: 'PATCH',
+            url: '/admin/delay',
+            body: { min: 900 },
+            failOnStatusCode: false,
+        })
+            .its('status')
+            .should('eq', 400);
+
+        reset().its('body.delay').should('deep.eq', { min: 0, max: 0 });
+
+        ask('fast').its('duration').should('be.lt', 600);
+    });
+
     it('reports a rule added while running to the dashboard', () => {
         addRule({ match: 'E2E_ADMIN_META', text: 'shown' });
 

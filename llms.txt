@@ -7,7 +7,7 @@ Describes the llmock version this file ships with (read it from `node_modules/ll
 ## Mental model
 
 - One server process serves **one preset** (a named entry in `.llmockrc.json` → `models`). A preset fixes the chat route, the wire format, and the reply behaviour. To mock two providers at once, run two servers on two ports.
-- Config is read once at startup. Any change to `.llmockrc.json` needs `stop` + `start`. Fixture files and the stored responses file are re-read on every request, so editing them needs no restart. Response rules can also be added to a running server over HTTP (see Admin API); nothing else can be changed without a restart.
+- Config is read once at startup. Any change to `.llmockrc.json` needs `stop` + `start`. Fixture files and the stored responses file are re-read on every request, so editing them needs no restart. Response rules, chaos settings and the response delay can also be changed on a running server over HTTP (see Admin API); nothing else can be changed without a restart.
 - No auth: API keys and headers are ignored (SDKs still need a non-empty dummy key).
 - Replies are text only. There are no tool calls and no token counting endpoint. Failures (an HTTP error, or a stream that fails part-way through) are simulated only with `chaos` on (see Chaos). A reply ends normally unless its response rule sets `stopReason` (see Fixture replies).
 
@@ -126,7 +126,7 @@ The way to get deterministic output, e.g. JSON your code parses.
 
 ## Admin API (`/admin/*`)
 
-The way to set up a reply from inside a test, with no fixture file, no config edit and no restart. Rules added here live in memory only: the config file is never written and a restart drops them.
+The way to set up a reply or a failure from inside a test, with no fixture file, no config edit and no restart. Changes made here live in memory only: the config file is never written and a restart drops them.
 
 | Route | Body | Returns |
 |---|---|---|
@@ -134,14 +134,22 @@ The way to set up a reply from inside a test, with no fixture file, no config ed
 | `POST /admin/rules` | `{"match", "text"?, "stopReason"?, "fail"?}` | `201 {"rule": {...}}` with its `id` (`"r1"`, `"r2"`…); `400 {"error"}` if not valid (nothing is added) |
 | `DELETE /admin/rules/<id>` | none | `200 {"rules": [...]}`; `404 {"error"}` for an unknown id |
 | `DELETE /admin/rules` | none | `200 {"rules": [...]}`: runtime rules removed, config rules kept |
-| `POST /admin/reset` | none | `200 {"rules": [...]}`: runtime rules removed and the chaos counts (calls counted, `chaosInjected`) back to 0 |
+| `GET /admin/chaos` | none | `200 {"chaos": {"enabled", "frequency", "mode", "status", "kind", "afterChunks"}, "stats": {"calls", "injected"}}` |
+| `PATCH /admin/chaos` | any of `{"enabled", "frequency", "mode", "status", "kind", "afterChunks"}` | `200` in the `GET /admin/chaos` shape; `400 {"error"}` if not valid (nothing is changed) |
+| `GET /admin/delay` | none | `200 {"delay": {"min", "max"}}` (ms) |
+| `PATCH /admin/delay` | `{"min"?, "max"?}` (ms) | `200 {"delay": {"min", "max"}}`; `400 {"error"}` if not valid (nothing is changed) |
+| `POST /admin/reset` | none | `200 {"rules", "chaos", "stats", "delay"}`: runtime rules removed, chaos and delay settings back to their startup values (config file plus CLI flags), chaos counts back to 0 |
 
 - `match`, `stopReason` and `fail` mean exactly what they mean in `responseRules` (see Fixture replies). A rule needs `text` or `fail`; with both, `text` is what a `stream-*` failure sends before it fails.
 - `file` and `files` are refused with `400`: the reply must be `text`. Any other key is refused too.
 - Order: runtime rules first, in the order added, then the config rules. First match wins, so a runtime rule with the same `match` as a config rule replaces it until removed.
-- Send `POST /admin/rules` with `Content-Type: application/json`. Send the routes that take no body without a body.
+- `PATCH /admin/chaos` changes only the keys sent. Values are held to the config file's limits (see Chaos): `enabled` a JSON boolean, `frequency` an integer ≥ 1, `mode` `every`/`random`, `status` an integer 400–599, `kind` one of the four kinds, `afterChunks` an integer ≥ 0. Strings such as `"true"` or `"429"` are refused. Unknown keys are refused.
+- `PATCH /admin/chaos` does not touch the call count. For a known failing call with `mode: "every"`: `POST /admin/reset`, then `PATCH /admin/chaos`; the count then starts at 0 (with `frequency: 2` the 1st call succeeds and the 2nd fails). `stats.calls` only counts calls made while chaos is enabled.
+- `PATCH /admin/delay`: `min` and `max` are integers ≥ 0 and the resulting `min` must not exceed `max` (a key not sent keeps its value), so send both when raising the delay from `0`/`0`.
+- A change applies from the next request. `GET /ui-meta` reports the settings in use.
+- Send `POST /admin/rules` and the `PATCH` routes with `Content-Type: application/json`. Send the routes that take no body without a body.
 - An `id` is never reused, also after a reset. Config rules have `id: null` and can not be removed.
-- `POST /admin/reset` also drops connections a `stream-stall` is holding open. It does not change chaos settings, delays or the request log.
+- `POST /admin/reset` also drops connections a `stream-stall` is holding open. It does not touch the request log.
 - The state is per server process and shared by every client: tests that add rules to one server must not run in parallel against it unless their `match` strings differ.
 - Off with `"server": {"admin": false}` or `--admin=false` (the routes then 404). While it is on, a preset `endpoint` equal to `admin` or starting with `admin/` → startup error. No auth, like the rest of the server: use `server.host` `127.0.0.1` to keep it off the network.
 
@@ -275,7 +283,7 @@ To change a response envelope or the required request keys, or to mock a provide
 | `GET /ui-rule-file?rule=<i>&file=<j>` | Contents of one response rule file, as JSON |
 | `GET /ui-request-log` | `{"file", "log"}`: `log` is an array of the most recent validated requests (the last `maxLoggedRequests`, 10 by default), newest first, each with why it passed/failed (older ones are dropped; `log` is `null` if none logged) |
 | `DELETE /ui-request-log` | Empties the request log; returns `{"file", "log": null}` |
-| `/admin/rules`, `/admin/reset` | Add and remove response rules while running (see Admin API) |
+| `/admin/rules`, `/admin/chaos`, `/admin/delay`, `/admin/reset` | Change response rules, chaos and delay while running (see Admin API) |
 | `GET /` | HTML dashboard |
 | `GET /<endpoint>` | A generated reply with no validation and no rules (quick smoke test) |
 
@@ -300,7 +308,7 @@ export const stopMock = () => execSync('npx llmock stop --port=8001');
 
 Fast deterministic tests: `"responseDelay": {"min": 0, "max": 0}`, one `responseRules` entry per scenario keyed on a unique marker string in the prompt. Or keep each scenario's reply next to its test: `POST /admin/rules` in the test, `POST /admin/reset` in `beforeEach` (see Admin API).
 
-Retry tests: `"chaos": {"enabled": true, "frequency": 2, "status": 429}` makes every 2nd call fail, so a client that retries once always succeeds. Run it as its own preset (or with `--chaos=true`) so other tests are unaffected.
+Retry tests: `"chaos": {"enabled": true, "frequency": 2, "status": 429}` makes every 2nd call fail, so a client that retries once always succeeds. Run it as its own preset (or with `--chaos=true`) so other tests are unaffected, or switch it on for one test with `PATCH /admin/chaos` and `POST /admin/reset` afterwards (see Admin API).
 
 Mid-stream failure tests: `"chaos": {"enabled": true, "frequency": 1, "kind": "stream-error", "afterChunks": 1}` on a `claude` preset (or `--chaos=true --chaosKind=stream-error --chaosAfterChunks=1`) makes every streamed call start, send one delta, then fail. With the Anthropic SDK the stream throws:
 
