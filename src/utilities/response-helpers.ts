@@ -12,7 +12,7 @@ import {
 	ruleFailure,
 	ruleHasReply,
 } from './response-rules.js';
-import { takeMatchingRule } from './runtime-rules.js';
+import { findRequestRule } from './runtime-rules.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { applyStopReason } from './stop-reason.js';
 import {
@@ -28,32 +28,14 @@ import type { FastifyReply } from 'fastify';
 const DEFAULT_EMBEDDING_DIMENSIONS =
 	Number(process.env?.EMBEDDING_DIMENSION) || 128;
 
-type MatchedRule = ReturnType<typeof takeMatchingRule>;
-
-// The rule found for each request body. A request is asked twice, how it
-// fails and then what it replies, and must get the same rule both times and
-// count once against a rule's `times`
-const matchedRules = new WeakMap<object, MatchedRule>();
-
-const ruleForRequest = (requestBody: unknown): MatchedRule => {
-	// Only a parsed JSON object or array can be remembered
-	if (typeof requestBody !== 'object' || requestBody === null) {
-		return takeMatchingRule(requestBody);
-	}
-
-	if (!matchedRules.has(requestBody)) {
-		matchedRules.set(requestBody, takeMatchingRule(requestBody));
-	}
-
-	return matchedRules.get(requestBody);
-};
+// The rule a request matches, as findRequestRule returns it
+type RequestRule = ReturnType<typeof findRequestRule>;
 
 /**
- * Fixture reply for this request if a response rule matches it, otherwise
- * undefined (a normal response is generated instead).
+ * Fixture reply of the rule a request matches, or undefined if it has none
+ * (a normal response is generated instead).
  */
-const getRuleReply = (requestBody: unknown): MockReply | undefined => {
-	const matched = ruleForRequest(requestBody);
+const getRuleReply = (matched: RequestRule): MockReply | undefined => {
 	// A rule that only fails has no reply: one is generated as usual
 	if (!matched || !ruleHasReply(matched.rule)) return undefined;
 	const { rule, baseDir } = matched;
@@ -67,27 +49,28 @@ const getRuleReply = (requestBody: unknown): MockReply | undefined => {
 /**
  * How this request fails if the response rule it matches has `fail`,
  * otherwise undefined.
+ *
+ * @param matched - The rule the request matches, if already found
  */
 export const getRuleFailure = (
 	requestBody: unknown,
-): CallFailure | undefined => {
-	const matched = ruleForRequest(requestBody);
-
-	return matched && ruleFailure(matched.rule);
-};
+	matched: RequestRule = findRequestRule(requestBody),
+): CallFailure | undefined => matched && ruleFailure(matched.rule);
 
 /**
  * Generates the mock LLM reply based on configuration
  * Supports response rules (fixture files), lorem ipsum and stored response types
  *
  * @param requestBody - Parsed request body, used to match response rules
+ * @param matched - The rule the request matches, if already found
  * @returns Promise<MockReply> The reply, with the generated text in `text`
  */
 export const generateResponseContent = async (
 	requestBody?: unknown,
+	matched: RequestRule = findRequestRule(requestBody),
 ): Promise<MockReply> => {
 	// A matching responseRules entry wins over the configured response type
-	const ruleReply = getRuleReply(requestBody);
+	const ruleReply = getRuleReply(matched);
 	if (ruleReply !== undefined) return ruleReply;
 
 	let content = '';

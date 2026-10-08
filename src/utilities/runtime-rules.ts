@@ -17,8 +17,9 @@ import {
  * files from this machine through a reply.
  *
  * `times` is how many more requests the rule answers. It goes down by one
- * with each request the rule matches, and the rule is removed after the last.
- * A rule without it stays until it is removed.
+ * with each request the rule replies to or fails (not one that chaos fails),
+ * and the rule is removed after the last. A rule without it stays until it is
+ * removed.
  */
 export interface RuntimeRule extends ResponseRule {
 	id: string;
@@ -104,23 +105,28 @@ export const getActiveRules = (): {
 
 /**
  * The rule that answers this request, with the folder its files resolve
- * against, or undefined if none matches. This counts as one of the requests a
- * rule with `times` answers, so call it once per request.
+ * against, or undefined if none matches. Find it once per request and pass it
+ * on: a rule with `times` may be gone the next time.
  */
-export const takeMatchingRule = (
+export const findRequestRule = (
 	body: unknown,
 ): { rule: ResponseRule; baseDir: string } | undefined => {
 	const { rules, baseDir } = getActiveRules();
 	const rule = findMatchingRule(rules, body);
-	if (!rule) return undefined;
 
+	return rule && { rule, baseDir };
+};
+
+/**
+ * Counts one request against a rule with `times`, and removes the rule after
+ * its last. Does nothing for any other rule.
+ */
+export const countRuleUse = (rule: ResponseRule | undefined): void => {
 	const runtime = runtimeRules.find((entry) => entry === rule);
-	if (runtime?.times !== undefined) {
-		runtime.times -= 1;
-		if (runtime.times === 0) removeRuntimeRule(runtime.id);
-	}
+	if (runtime?.times === undefined) return;
 
-	return { rule, baseDir };
+	runtime.times -= 1;
+	if (runtime.times === 0) removeRuntimeRule(runtime.id);
 };
 
 /**

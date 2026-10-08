@@ -12,6 +12,10 @@ import { buildClaudeStaticResponse } from '../../utilities/build-claude-response
 import { handleClaudeStreamingResponse } from '../../utilities/build-claude-streaming-response.js';
 import { shouldStream } from '../../utilities/stream-mode.js';
 import { applyChaos, applyRuleFailure } from '../../utilities/chaos.js';
+import {
+	countRuleUse,
+	findRequestRule,
+} from '../../utilities/runtime-rules.js';
 
 // Static JSON vs SSE stream is decided per request by shouldStream():
 // - claude preset: the request body's `stream` field
@@ -39,15 +43,20 @@ const handleRequest = async (reply: any, body?: unknown) => {
 	// A response rule with `fail` fails every call that matches it. Otherwise
 	// chaos mode decides: this call may get an error in place of a reply, or
 	// a stream that fails part-way through
-	const ruleFailure = getRuleFailure(body);
+	// The rule is found once, so the failure and the reply are the same rule's
+	const matched = findRequestRule(body);
+	const ruleFailure = getRuleFailure(body, matched);
 	const chaos = ruleFailure
 		? applyRuleFailure(reply, ruleFailure, process.env?.LLM_NAME, streaming)
 		: applyChaos(reply, process.env?.LLM_NAME, streaming);
+	// A call that chaos fails is not one of the calls a rule with `times`
+	// answers: the rule is still there for the retry
+	if (ruleFailure || !chaos) countRuleUse(matched?.rule);
 	if (chaos === true) return reply;
 	const streamFailure = chaos || undefined;
 
 	// Generate the mock reply (rule fixture, lorem or stored based on configuration)
-	const mockReply = await generateResponseContent(body);
+	const mockReply = await generateResponseContent(body, matched);
 
 	// Route to appropriate response handler
 	if (!streaming) {
