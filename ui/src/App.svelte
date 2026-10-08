@@ -387,21 +387,23 @@
 						<span class="muted">Request contains</span>
 						<code>{rule.match}</code>
 						{#if rule.source === 'runtime'}
-							<span
-								class="countPill"
-								cy-data="rule_runtime"
-								title="Added through the admin API while the server runs; gone after a reset or a restart"
-							>
-								runtime
-							</span>
-						{/if}
-						{#if rule.times !== null}
-							<span
-								class="countPill"
-								cy-data="rule_times"
-								title="How many more requests this rule answers before it is removed"
-							>
-								{rule.times} left
+							<span class="rulePills">
+								<span
+									class="countPill"
+									cy-data="rule_runtime"
+									title="Added through the admin API while the server runs; gone after a reset or a restart"
+								>
+									runtime
+								</span>
+								{#if rule.times !== null}
+									<span
+										class="countPill"
+										cy-data="rule_times"
+										title="How many more requests this rule answers before it is removed"
+									>
+										{rule.times} left
+									</span>
+								{/if}
 							</span>
 						{/if}
 					</div>

@@ -110,6 +110,13 @@ h1 {
 	font-size: 0.95rem;
 }
 
+/* The marks under a runtime rule's match, side by side */
+.rulePills {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
 .groupLabel {
 	margin: 14px 0 8px 0;
 }
