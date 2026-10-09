@@ -704,6 +704,8 @@ The dashboard has three pages, listed in the sidebar on the left (across the top
 
 The figures across the top of the overview lead to the page that holds them. The dashboard refreshes automatically every 2 seconds.
 
+![LLM Mock Server settings page](images/server-page-settings.png)
+
 The dashboard is dark by default. For a light one, set the `UI_THEME` environment variable, or `"uiTheme": "light"` in the `server` block of `.llmockrc.json`, or start with `--uiTheme=light`:
 
 ```bash
