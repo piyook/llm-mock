@@ -9,6 +9,8 @@ import {
 	readRuleFile,
 	ruleFailure,
 	ruleFiles,
+	ruleHasReply,
+	validateResponseRule,
 	validateResponseRules,
 } from '../../utilities/response-rules.js';
 
@@ -322,5 +324,62 @@ describe('validateResponseRules', () => {
 		],
 	])('rejects %s', (_name, rules, message) => {
 		expect(() => validateResponseRules(rules)).toThrow(message);
+	});
+});
+
+describe('a rule that holds its reply as text', () => {
+	test('replies with the text exactly as written, without reading a file', () => {
+		const rule = { match: 'A', text: '{"a": 1}\n' };
+
+		expect(loadRuleContent(rule, '/no/such/folder')).toBe('{"a": 1}\n');
+		expect(ruleFiles(rule)).toEqual([]);
+	});
+
+	test('an empty text is a reply too', () => {
+		expect(loadRuleContent({ match: 'A', text: '' }, '.')).toBe('');
+		expect(ruleHasReply({ match: 'A', text: '' })).toBe(true);
+	});
+
+	test('ruleHasReply tells a rule that replies from one that only fails', () => {
+		expect(ruleHasReply({ match: 'A', text: 'b' })).toBe(true);
+		expect(ruleHasReply({ match: 'A', file: 'a.txt' })).toBe(true);
+		expect(ruleHasReply({ match: 'A', files: ['a.txt'] })).toBe(true);
+		expect(ruleHasReply({ match: 'A', fail: {} })).toBe(false);
+	});
+
+	test('is accepted alone, with a stop reason and with fail', () => {
+		const rules = [
+			{ match: 'A', text: 'b' },
+			{ match: 'B', text: 'b', stopReason: 'refusal' },
+			{ match: 'C', text: 'b', fail: { kind: 'stream-drop' } },
+		];
+
+		expect(validateResponseRules(rules)).toBe(rules);
+	});
+
+	test('must be a string', () => {
+		expect(() => validateResponseRules([{ match: 'A', text: 5 }])).toThrow(
+			/\[0\]\.text must be a string/,
+		);
+	});
+
+	test.each([
+		{ match: 'A', text: 'b', file: 'a.txt' },
+		{ match: 'A', text: 'b', files: ['a.txt'] },
+	])('can not be combined with a file: %o', (rule) => {
+		expect(() => validateResponseRules([rule])).toThrow(
+			/\[0\] must have only one of text, file or files/,
+		);
+	});
+});
+
+describe('validateResponseRule', () => {
+	test('names the rule by the label it is given', () => {
+		expect(() => validateResponseRule({ text: 'b' }, 'rule')).toThrow(
+			/^rule\.match must be a non-empty string$/,
+		);
+		expect(() =>
+			validateResponseRule({ match: 'A', fail: { kind: 'no' } }, 'rule'),
+		).toThrow(/^rule\.fail\.kind must be one of/);
 	});
 });

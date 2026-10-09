@@ -17,6 +17,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - [Quick Start](#quick-start)
 - [Installation Options](#installation-options)
   - [CLI options](#cli-options)
+  - [Foreground mode](#foreground-mode)
 - [Configuration](#configuration)
   - [Configuration file](#configuration-file-llmockrcjson)
   - [Adding custom models](#adding-custom-models)
@@ -28,17 +29,23 @@ A lightweight local server that simulates LLM APIs for development and testing. 
   - [Response delay simulation](#response-delay-simulation)
   - [Chaos mode (error simulation)](#chaos-mode-error-simulation)
     - [Stream failures](#stream-failures)
+  - [Admin API](#admin-api-changing-rules-and-settings-while-running)
+    - [Network exposure](#network-exposure)
   - [Custom API paths](#custom-api-paths)
+  - [Environment variables](#environment-variables)
 - [Features](#features)
   - [Dashboard](#dashboard)
+  - [Available endpoints](#available-endpoints)
   - [Request validation](#request-validation)
   - [Request logging](#request-logging)
+  - [Debug mode](#debug-mode)
 - [Integration Guide](#integration-guide)
   - [Chat completions](#chat-completions)
   - [Embeddings API](#embeddings-api)
   - [Using with LangChain](#using-with-langchain)
 - [Supporting Different LLM Providers](#supporting-different-llm-providers)
   - [Anthropic (Claude Messages API)](#anthropic-claude-messages-api)
+  - [Template locations](#template-locations)
   - [Creating a custom provider template](#creating-a-custom-provider-template)
 - [Docker Support](#docker-support)
   - [Standalone Docker setup](#standalone-docker-setup-no-scaffolding)
@@ -111,6 +118,8 @@ my-project/
 
 The template folders contain editable copies of the built-in OpenAI, Gemini and Claude templates. The server uses them for request validation and response shape. To add your own provider, see [Template locations](#template-locations).
 
+> **Note:** LLMock has no authentication and by default listens on every network interface. For a local mock server this is not usually a problem, but if you want to take extra precautions you can keep it to your own machine. See [Network exposure](#network-exposure).
+
 ---
 
 ## Installation Options
@@ -155,6 +164,8 @@ Each option overrides the matching setting of the selected preset for that run:
 |---|---|---|
 | `--model` | `defaultModel` | Name of a preset in `.llmockrc.json` |
 | `--port` / `--host` | `server.port` / `server.host` | Port number / address |
+| `--admin` | `server.admin` | `true` or `false` |
+| `--uiTheme` | `server.uiTheme` | `dark` or `light` |
 | `--endpoint` | `endpoint` | Path without a leading slash |
 | `--responseType` | `responseType` | `lorem` or `stored` |
 | `--maxLoremParas` | `maxLoremParas` | Number |
@@ -174,7 +185,7 @@ Each option overrides the matching setting of the selected preset for that run:
 | `--embeddingDimensions` | `embeddings.dimensions` | Number |
 | `--foreground` | | No value; keeps the server attached (see below) |
 
-`llmock help` prints the same list. `responseRules` and `storedResponsesFile` can only be set in the config file.
+`llmock help` prints the same list. `responseRules` and `storedResponsesFile` can only be set in the config file; to add a rule to a running server, use the [admin API](#admin-api-changing-rules-and-settings-while-running).
 
 ### Foreground Mode
 
@@ -273,6 +284,8 @@ The config file is read once at startup, so restart the server after changing it
 | `embeddings.enabled` | Enable the `/v1/embeddings` endpoint |
 | `embeddings.dimensions` | Embedding vector size |
 | `server.port` / `server.host` | Port and address the server listens on (`8001`, `0.0.0.0`) |
+| `server.admin` | `false` turns the [admin API](#admin-api-changing-rules-and-settings-while-running) off (default `true`) |
+| `server.uiTheme` | Colours of the [dashboard](#dashboard): `"dark"` (the default) or `"light"` |
 
 Only `name` and `endpoint` are required in a preset. Anything left out uses: `responseType` `lorem`, `maxLoremParas` 8, `maxLoggedRequests` 10, no delay, and validation, logging, debug, streaming, embeddings and chaos off.
 
@@ -361,6 +374,8 @@ With a request whose message contains `Classify this support ticket`, the server
 - Matching covers the whole request, including earlier turns of a conversation. A rule that matched an early message keeps matching on every later turn, so use distinctive markers and put more specific rules first.
 - `file` is resolved relative to the folder holding the config file, and is read exactly as written (including any trailing newline). It is read on every request, so you can edit it without restarting.
 - For varied replies to the same kind of request, give a rule `files` instead of `file`: `{ "match": "Summarise the thread", "files": ["fixtures/summary-a.txt", "fixtures/summary-b.txt"] }`. One of the files is picked at random on each matching request. A rule has either `file` or `files`, not both, and `files` must be a non-empty list of non-empty strings.
+- For a short reply, a rule can hold the reply itself as `text` in place of a file: `{ "match": "Classify this support ticket", "text": "{\"priority\":\"high\"}" }`. A rule has only one of `text`, `file` and `files`.
+- To add a rule while the server is running, use the [admin API](#admin-api-changing-rules-and-settings-while-running).
 - A malformed rule stops the server at startup. An unreadable fixture (including any entry of `files`) logs a warning at startup, and a request that needs it returns an error rather than falling back to generated text.
 - Works with every preset and with both static and streamed replies.
 
@@ -496,7 +511,7 @@ llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429
   `/v1/embeddings` always uses the `openai` shape.
 - A `429`, `503` or `529` carries `retry-after: 1`. Every chaos error carries `x-llmock-chaos: true`, so a test can tell it from a real failure.
 - A `frequency`, `mode`, `status`, `kind` or `afterChunks` in the config file that is not valid stops the server at startup.
-- The **Chaos** box on the dashboard shows the settings and how many calls have been failed since the server started.
+- The **Chaos** box on the dashboard's **Settings** page shows the settings and how many calls have been failed since the server started.
 
 #### Stream failures
 
@@ -561,6 +576,103 @@ try {
 }
 ```
 
+### Admin API (changing rules and settings while running)
+
+The config file is read once, when the server starts. The admin API lets a test (or a coding agent) add a response rule to a running server, or change its chaos and delay settings, with no file to write and no restart:
+
+```js
+// Before the test: reply to this prompt with this text
+await fetch('http://localhost:8001/admin/rules', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ match: 'Classify this ticket', text: '{"priority":"high"}' }),
+});
+
+// After the test: back to how the server started
+await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
+```
+
+| Route | What it does |
+|---|---|
+| `GET /admin/rules` | Lists every rule in the order requests are matched against them |
+| `POST /admin/rules` | Adds a rule: `{ "match", "text", "stopReason"?, "fail"?, "times"? }`. Answers `201` with the rule and its `id` |
+| `DELETE /admin/rules/<id>` | Removes one rule added this way |
+| `DELETE /admin/rules` | Removes every rule added this way |
+| `GET /admin/chaos` | Shows the [chaos](#chaos-mode-error-simulation) settings in use, and how many calls were counted and failed |
+| `PATCH /admin/chaos` | Changes the chaos settings it is given: `enabled`, `frequency`, `mode`, `status`, `kind`, `afterChunks` |
+| `GET /admin/delay` | Shows the [response delay](#response-delay-simulation) in use |
+| `PATCH /admin/delay` | Changes the response delay: `{ "min", "max" }` in milliseconds |
+| `GET /admin/settings` | Shows the reply settings in use |
+| `PATCH /admin/settings` | Changes the reply settings it is given: `responseType`, `maxLoremParas`, `stream`, `validateRequests`, `logRequests`, `maxLoggedRequests` |
+| `POST /admin/reset` | Goes back to how the server started: no rules added this way, the config file's chaos, delay and reply settings, and the chaos call count at 0 |
+
+- A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text` or `fail`.
+- The reply is given as `text`, never as `file` or `files`. The server has no login, so a path sent over HTTP would let anyone who can reach it read files from your machine.
+- Rules added this way are matched before the config file's rules, in the order they were added. To replace a config rule for one test, add a rule with the same `match`.
+- Give a rule `times` (a whole number, 1 or more) to have it answer that many matching requests and then remove itself. A call that [chaos](#chaos-mode-error-simulation) fails does not count, so the rule is still there for the retry. Without `times` a rule stays until you remove it or reset. `times` is for rules added this way only, not for the config file.
+- Nothing is saved. The config file is never written, and a restart starts again with the config file's rules only.
+- A rule that is not valid gets a `400` with `{ "error": "..." }` and is not added.
+- Each rule in a listing has `source` (`"runtime"` or `"config"`), `id` (`null` for a config rule, which can not be removed this way) and `times` (how many more requests it answers, or `null` if it stays).
+- Everything else (the port, the endpoint, the preset with its template and model name, embeddings, debug mode) still comes from the config file and needs a restart to change.
+
+With `times`, a test can have the first call fail and the retry succeed, or give each call in turn its own reply:
+
+```js
+const addRule = (rule) =>
+  fetch('http://localhost:8001/admin/rules', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(rule),
+  });
+
+// The first call with this prompt gets a 529; the next one gets a normal reply
+await addRule({ match: 'Summarise the report', fail: { status: 529 }, times: 1 });
+
+// The first call gets "draft", the second "final", later ones a normal reply
+await addRule({ match: 'Write the email', text: 'draft', times: 1 });
+await addRule({ match: 'Write the email', text: 'final', times: 1 });
+```
+
+To switch what the server replies with for one test:
+
+```js
+await fetch('http://localhost:8001/admin/settings', {
+  method: 'PATCH',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ responseType: 'stored', stream: true }),
+});
+```
+
+To make calls fail part-way through a test, switch chaos on and reset afterwards:
+
+```js
+await fetch('http://localhost:8001/admin/chaos', {
+  method: 'PATCH',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ enabled: true, frequency: 2, status: 429 }),
+});
+// The 2nd, 4th, 6th... call now fails with a 429
+```
+
+- `PATCH` changes only the settings you send; the others stay as they are. The settings mean what they mean in the config file's [`chaos`](#chaos-mode-error-simulation) and [`responseDelay`](#response-delay-simulation).
+- A value that is not valid gets a `400` and nothing is changed. Nothing falls back to a default, unlike a CLI flag.
+- Changing chaos settings leaves the call count alone. With `mode: "every"`, call `POST /admin/reset` first and then `PATCH /admin/chaos`, so the count starts from 0 and you know which call fails.
+- `min` can not be more than `max`, and neither can be more than 2147483647 (about 24 days). Send both when you raise the delay from `0`.
+- `PATCH /admin/settings` takes the same names and values as the model preset: `responseType` is `"lorem"` or `"stored"`, `stream`, `validateRequests` and `logRequests` are `true` or `false`, `maxLoremParas` is 1 to 1000 and `maxLoggedRequests` is 1 to 100.
+- `"responseType": "stored"` uses the preset's [`storedResponsesFile`](#response-types) if it has one, otherwise the texts that come with LLMock. If that file can not be read, the change is refused with a `400`.
+- `stream` has no effect on the `claude` template, where each request says whether it wants a stream.
+- The dashboard shows the settings in use, so a change appears there within 2 seconds. The **Admin API** box on its **Settings** page has a **Reset** button that does the same as `POST /admin/reset`.
+- To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
+
+#### Network exposure
+
+LLMock has no authentication, and by default it listens on every network interface (`"host": "0.0.0.0"`). Anyone who can reach the port can change the replies through the admin API, and can read or clear the [request log](#request-logging), which holds the prompts your app sent. Turning the admin API off does not cover the request log.
+
+For a mock server running locally with test data this is not usually a problem. If you want to take extra precautions, you can keep the mock to your own machine:
+
+- Run directly: set `"host": "127.0.0.1"` in the `server` block, or start with `--host=127.0.0.1`.
+- Run in Docker: leave `"host": "0.0.0.0"` in the config, which the container needs, and publish the port on the loopback address only, as `"127.0.0.1:8001:8001"`. The [Docker example](#standalone-docker-setup-no-scaffolding) does this. Other containers in the same compose file still reach the mock by its service name.
+
 ### Custom API paths
 
 Set the endpoint to match any provider's path structure:
@@ -590,18 +702,15 @@ With `TEST_MODE=false` your app talks to the real LLM service again.
 
 ### Dashboard
 
-Once running, open `http://localhost:8001` for the live dashboard:
+Once running, open `http://localhost:8001` for the live dashboard. A health check is at `http://localhost:8001/ping`.
 
 ![LLM Mock Server Page](images/server-page.png)
 
-| URL | Purpose |
-|---|---|
-| `http://localhost:8001` | Main dashboard |
-| `http://localhost:8001/ping` | Health check |
+![LLM Mock Server settings page](images/server-page-settings.png)
 
-The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged requests. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
-
-With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. With no rules set, the box shows a blank rule with a note pointing to the setting.
+- **Settings** shows the configuration in use. While the [admin API](#admin-api-changing-rules-and-settings-while-running) is on, you can change values here on the running server; changes are not saved, and **Reset** or a restart puts them back.
+- **Response rules** lists the preset's `responseRules`; click a file or text entry to read the reply. Rules added through the admin API are marked **runtime**.
+- **Light theme** / **Dark theme** in the sidebar switches the colours for your browser. To change the default, set `"uiTheme": "light"` in the `server` block, start with `--uiTheme=light`, or set the `UI_THEME=light` environment variable.
 
 ### Available endpoints
 
@@ -977,7 +1086,8 @@ services:
   llmock:
     build: .
     ports:
-      - "8001:8001"
+      # This machine only. Use "8001:8001" to let other machines reach the mock
+      - "127.0.0.1:8001:8001"
     restart: unless-stopped
     volumes:
       - ./.llmockrc.json:/app/.llmockrc.json:ro
@@ -1037,8 +1147,6 @@ docker compose down --volumes && docker compose up -d --force-recreate --build  
 
 Confirm the server is running and the port matches `.llmockrc.json`. Open `http://localhost:8001` — if it's unreachable, the server may not have started.
 
-![LLM Mock Server error page](images/server-page-err.png)
-
 **`llmock start` exits with an error**
 
 Run `llmock start --foreground` with the same options to see the server's output. If it reports a server already running on the port, run `llmock stop` (with `--port` if it isn't 8001) first.
@@ -1047,7 +1155,7 @@ The server refuses to start on a malformed `responseRules` entry, or on a `store
 
 **Calls fail with a 500 or another error you didn't expect**
 
-Check whether chaos is on: the **Chaos** box on the dashboard shows `ENABLED`, and a chaos error carries the header `x-llmock-chaos: true`. Set `"chaos": { "enabled": false }` in the preset (or drop `--chaos=true`) and restart.
+Check whether chaos is on: the **Chaos** box on the dashboard's **Settings** page shows `ENABLED`, and a chaos error carries the header `x-llmock-chaos: true`. Set `"chaos": { "enabled": false }` in the preset (or drop `--chaos=true`) and restart.
 
 **Port already in use**
 

@@ -14,6 +14,10 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Whether a setting reads as "off" (see readsAsOff in src/config/config-loader.ts)
+const readsAsOff = (value) =>
+  ['false', '0', 'off', 'no'].includes(String(value).trim().toLowerCase());
+
 // Parse command line arguments
 const {
   command,
@@ -43,6 +47,8 @@ OPTIONS:
   --model=<name>          Model preset to use (chatgpt, gemini, streaming, embeddings, claude)
   --port=<number>         Server port (default: 8001)
   --host=<address>        Server host (default: 0.0.0.0)
+  --admin=<bool>          Serve the admin API under /admin (default: true)
+  --uiTheme=<theme>       Dashboard colours: dark (default) or light
   --endpoint=<path>       LLM endpoint path
   --responseType=<type>   Response type (lorem, stored)
   --maxLoremParas=<num>    Maximum lorem ipsum sentences
@@ -90,6 +96,8 @@ Current LLM Mock Server Configuration:
 SERVER:
   Host: ${serverConfig.host}
   Port: ${serverConfig.port}
+  Admin API: ${!readsAsOff(serverConfig.admin)}
+  Dashboard Theme: ${serverConfig.uiTheme || 'dark'}
 
 MODEL: ${selectedModel}
   LLM Name: ${modelConfig.name}
@@ -300,6 +308,10 @@ function setEnvironmentVariables(config, modelName, configPath) {
   // Server settings (with custom overrides)
   process.env.SERVER_PORT = customSettings.port || serverConfig.port.toString();
   process.env.SERVER_HOST = customSettings.host || serverConfig.host;
+  process.env.ADMIN_API = readsAsOff(customSettings.admin !== undefined ?
+    customSettings.admin : serverConfig.admin) ? 'false' : 'true';
+  // The flag wins, then a UI_THEME already in the environment, then the config
+  process.env.UI_THEME = customSettings.uiTheme || process.env.UI_THEME || serverConfig.uiTheme || 'dark';
   process.env.LLM_URL_ENDPOINT = customSettings.endpoint || modelConfig.endpoint;
   
   // LLM settings (with custom overrides)
@@ -342,6 +354,13 @@ function setEnvironmentVariables(config, modelName, configPath) {
   if (endpoint === 'v1/embeddings' && process.env.ENABLE_EMBEDDINGS_MOCK === 'true') {
     throw new Error(
       `Model "${modelName}" uses the endpoint "v1/embeddings", which the embeddings mock already serves. Use a different endpoint or set embeddings.enabled to false.`
+    );
+  }
+
+  // The admin API owns everything under /admin
+  if (process.env.ADMIN_API === 'true' && (endpoint === 'admin' || endpoint.startsWith('admin/'))) {
+    throw new Error(
+      `Model "${modelName}" uses the endpoint "${endpoint}", but paths under "admin" belong to the admin API. Use a different endpoint or set server.admin to false.`
     );
   }
 }

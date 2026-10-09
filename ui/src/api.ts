@@ -9,7 +9,12 @@ export type UiMeta = {
 	storedResponsesCount: number | null;
 	storedResponsesFile: string | null;
 	responseRules: Array<{
+		// Set for a rule added through the admin API, which can be removed
+		id: string | null;
+		source: 'runtime' | 'config';
 		match: string;
+		// The reply itself, for a rule that holds it in place of a file
+		text: string | null;
 		files: string[];
 		stopReason: 'end' | 'max_tokens' | 'refusal';
 		fail: {
@@ -17,6 +22,8 @@ export type UiMeta = {
 			status: number;
 			afterChunks: number;
 		} | null;
+		// How many more requests a runtime rule answers; null if it stays
+		times: number | null;
 	}>;
 	validateRequests: string;
 	logRequests: string;
@@ -35,6 +42,8 @@ export type UiMeta = {
 	chaosInjected: number;
 	embeddingsEnabled: 'ENABLED' | 'DISABLED';
 	embeddingDimension: number;
+	adminApi: 'ENABLED' | 'DISABLED';
+	uiTheme: 'dark' | 'light';
 	apiLinks: Array<{ href: string; label: string }>;
 };
 
@@ -79,6 +88,30 @@ export function fetchRequestLog(): Promise<RequestLog> {
 
 export function clearRequestLog(): Promise<RequestLog> {
 	return fetchViewerJson('/ui-request-log', 'DELETE');
+}
+
+// Back to how the server started: no rules added while running, and the
+// chaos, delay and reply settings of the config file
+export function resetRuntimeChanges(): Promise<unknown> {
+	return fetchViewerJson('/admin/reset', 'POST');
+}
+
+// Changes settings on the running server through the admin API; a change
+// that can't be made is answered with `{ error }` saying why
+export async function changeRuntimeSettings(
+	route: 'settings' | 'chaos' | 'delay',
+	change: object,
+): Promise<unknown> {
+	const res = await fetch(`/admin/${route}`, {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(change),
+	});
+	const body = await res.json().catch(() => null);
+	if (!res.ok) {
+		throw new Error(body?.error ?? `/admin/${route} failed: ${res.status}`);
+	}
+	return body;
 }
 
 export async function fetchPing(): Promise<boolean> {

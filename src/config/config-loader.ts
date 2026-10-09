@@ -51,9 +51,21 @@ export interface ModelConfig {
 	chaos?: Partial<ChaosConfig>;
 }
 
+/**
+ * Whether a setting reads as "off": false, or "false", "0", "off" or "no" in
+ * any case. Used for the admin API, which has no login, so that no usual way
+ * of writing "off" leaves it on.
+ */
+export const readsAsOff = (value: unknown): boolean =>
+	['false', '0', 'off', 'no'].includes(String(value).trim().toLowerCase());
+
 export interface ServerConfig {
 	port: number;
 	host: string;
+	// Optional: false turns the admin API (/admin/*) off
+	admin?: boolean;
+	// Optional: the dashboard's colours (default dark)
+	uiTheme?: 'dark' | 'light';
 }
 
 export interface LlmMockConfig {
@@ -240,6 +252,11 @@ export function setEnvironmentFromConfig(modelName?: string): void {
 	// Server settings - only set if not already set by CLI
 	process.env.SERVER_PORT =
 		process.env.SERVER_PORT || config.server.port.toString();
+	process.env.ADMIN_API =
+		process.env.ADMIN_API ||
+		(readsAsOff(config.server.admin) ? 'false' : 'true');
+	process.env.UI_THEME =
+		process.env.UI_THEME || config.server.uiTheme || 'dark';
 	process.env.LLM_URL_ENDPOINT =
 		process.env.LLM_URL_ENDPOINT || modelConfig.endpoint;
 

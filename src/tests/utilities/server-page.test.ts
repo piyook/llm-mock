@@ -18,10 +18,16 @@ const logDir = await vi.hoisted(async () => {
 
 vi.mock('env-paths', () => ({ default: () => ({ log: logDir }) }));
 
-const { default: serverPage } = await import('../../utilities/server-page.js');
+const {
+	default: serverPage,
+	getUiTheme,
+	withUiTheme,
+} = await import('../../utilities/server-page.js');
 const { logPath } = await import('../../utilities/logger.js');
 const { resetChaos, shouldInjectError } =
 	await import('../../utilities/chaos.js');
+const { addRuntimeRule, clearRuntimeRules } =
+	await import('../../utilities/runtime-rules.js');
 
 const require = createRequire(import.meta.url);
 const bundled: string[] = require('../../data/data.json').map(
@@ -146,6 +152,55 @@ describe('dashboard routes for stored responses and response rules', () => {
 		expect(body.version).toBe(require('../../../package.json').version);
 	});
 
+	test('the dashboard theme is dark unless UI_THEME is light', async () => {
+		const before = process.env.UI_THEME;
+		try {
+			delete process.env.UI_THEME;
+			expect(getUiTheme()).toBe('dark');
+			expect((await get('/ui-meta')).body.uiTheme).toBe('dark');
+
+			for (const value of ['', 'dark', 'blue']) {
+				process.env.UI_THEME = value;
+				expect(getUiTheme()).toBe('dark');
+			}
+
+			for (const value of ['light', 'LIGHT']) {
+				process.env.UI_THEME = value;
+				expect(getUiTheme()).toBe('light');
+			}
+			expect((await get('/ui-meta')).body.uiTheme).toBe('light');
+		} finally {
+			if (before === undefined) delete process.env.UI_THEME;
+			else process.env.UI_THEME = before;
+		}
+	});
+
+	test('withUiTheme names the theme on the html element only', () => {
+		const page =
+			'<!doctype html>\n<html lang="en">\n\t<body><p>html</p></body>\n</html>';
+
+		expect(withUiTheme(page, 'light')).toBe(
+			'<!doctype html>\n<html data-theme="light" lang="en">\n\t<body><p>html</p></body>\n</html>',
+		);
+		expect(withUiTheme(page, 'dark')).toContain(
+			'<html data-theme="dark" lang="en">',
+		);
+	});
+
+	test('ui-meta reports whether the admin API is on', async () => {
+		const before = process.env.ADMIN_API;
+		try {
+			delete process.env.ADMIN_API;
+			expect((await get('/ui-meta')).body.adminApi).toBe('ENABLED');
+
+			process.env.ADMIN_API = 'false';
+			expect((await get('/ui-meta')).body.adminApi).toBe('DISABLED');
+		} finally {
+			if (before === undefined) delete process.env.ADMIN_API;
+			else process.env.ADMIN_API = before;
+		}
+	});
+
 	test('ui-meta reports chaos as off by default', async () => {
 		const { body } = await get('/ui-meta');
 
@@ -231,31 +286,77 @@ describe('dashboard routes for stored responses and response rules', () => {
 		expect(body.storedResponsesCount).toBe(stored.length);
 		expect(body.responseRules).toEqual([
 			{
+				id: null,
+				source: 'config',
 				match: 'WANT_TEXT',
+				text: null,
 				files: ['fixtures/text.txt'],
 				stopReason: 'end',
 				fail: null,
+				times: null,
 			},
 			{
+				id: null,
+				source: 'config',
 				match: 'WANT_POOL',
+				text: null,
 				files: ['fixtures/pool-a.txt', 'fixtures/pool-b.txt'],
 				stopReason: 'end',
 				fail: null,
+				times: null,
 			},
 			{
+				id: null,
+				source: 'config',
 				match: 'WANT_MISSING',
+				text: null,
 				files: ['fixtures/missing.txt'],
 				stopReason: 'max_tokens',
 				fail: null,
+				times: null,
 			},
 			// A rule that only fails: no files, and the defaults filled in
 			{
+				id: null,
+				source: 'config',
 				match: 'WANT_FAILURE',
+				text: null,
 				files: [],
 				stopReason: 'end',
 				fail: { kind: 'stream-drop', status: 500, afterChunks: 0 },
+				times: null,
 			},
 		]);
+	});
+
+	test('ui-meta lists a rule added while running first, and files keep their place among the config rules', async () => {
+		const { id } = addRuntimeRule({ match: 'WANT_RUNTIME', text: 'now' });
+		try {
+			const { body } = await get('/ui-meta');
+
+			expect(body.responseRules).toHaveLength(5);
+			expect(body.responseRules[0]).toEqual({
+				id,
+				source: 'runtime',
+				match: 'WANT_RUNTIME',
+				text: 'now',
+				files: [],
+				stopReason: 'end',
+				fail: null,
+				times: null,
+			});
+			expect(body.responseRules[1].match).toBe('WANT_TEXT');
+
+			// A file is found by its rule's place among the config rules, so
+			// adding or removing a runtime rule does not move it
+			expect((await get('/ui-rule-file?rule=0&file=0')).body).toEqual({
+				match: 'WANT_TEXT',
+				file: 'fixtures/text.txt',
+				content: 'canned text\n',
+			});
+		} finally {
+			clearRuntimeRules();
+		}
 	});
 
 	test('ui-meta reports no file and no rules when none are configured', async () => {

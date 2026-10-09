@@ -6,16 +6,13 @@ import {
 	setStreamingHeaders,
 	streamWithDelay,
 } from './build-streaming-response.js';
+import { getStoredResponsesFile } from '../config/config-loader.js';
 import {
-	getResponseRules,
-	getStoredResponsesFile,
-} from '../config/config-loader.js';
-import {
-	findMatchingRule,
 	loadRuleContent,
 	ruleFailure,
-	ruleFiles,
+	ruleHasReply,
 } from './response-rules.js';
+import { findRequestRule } from './runtime-rules.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { applyStopReason } from './stop-reason.js';
 import {
@@ -31,15 +28,17 @@ import type { FastifyReply } from 'fastify';
 const DEFAULT_EMBEDDING_DIMENSIONS =
 	Number(process.env?.EMBEDDING_DIMENSION) || 128;
 
+// The rule a request matches, as findRequestRule returns it
+type RequestRule = ReturnType<typeof findRequestRule>;
+
 /**
- * Fixture reply for this request if a configured response rule matches it,
- * otherwise undefined (a normal response is generated instead).
+ * Fixture reply of the rule a request matches, or undefined if it has none
+ * (a normal response is generated instead).
  */
-const getRuleReply = (requestBody: unknown): MockReply | undefined => {
-	const { rules, baseDir } = getResponseRules();
-	const rule = findMatchingRule(rules, requestBody);
-	// A rule that only fails has no fixture: the reply is generated as usual
-	if (!rule || ruleFiles(rule).length === 0) return undefined;
+const getRuleReply = (matched: RequestRule): MockReply | undefined => {
+	// A rule that only fails has no reply: one is generated as usual
+	if (!matched || !ruleHasReply(matched.rule)) return undefined;
+	const { rule, baseDir } = matched;
 
 	return {
 		text: loadRuleContent(rule, baseDir),
@@ -50,27 +49,28 @@ const getRuleReply = (requestBody: unknown): MockReply | undefined => {
 /**
  * How this request fails if the response rule it matches has `fail`,
  * otherwise undefined.
+ *
+ * @param matched - The rule the request matches, if already found
  */
 export const getRuleFailure = (
 	requestBody: unknown,
-): CallFailure | undefined => {
-	const rule = findMatchingRule(getResponseRules().rules, requestBody);
-
-	return rule && ruleFailure(rule);
-};
+	matched: RequestRule = findRequestRule(requestBody),
+): CallFailure | undefined => matched && ruleFailure(matched.rule);
 
 /**
  * Generates the mock LLM reply based on configuration
  * Supports response rules (fixture files), lorem ipsum and stored response types
  *
  * @param requestBody - Parsed request body, used to match response rules
+ * @param matched - The rule the request matches, if already found
  * @returns Promise<MockReply> The reply, with the generated text in `text`
  */
 export const generateResponseContent = async (
 	requestBody?: unknown,
+	matched: RequestRule = findRequestRule(requestBody),
 ): Promise<MockReply> => {
 	// A matching responseRules entry wins over the configured response type
-	const ruleReply = getRuleReply(requestBody);
+	const ruleReply = getRuleReply(matched);
 	if (ruleReply !== undefined) return ruleReply;
 
 	let content = '';

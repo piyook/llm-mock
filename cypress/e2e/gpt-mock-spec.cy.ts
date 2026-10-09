@@ -107,7 +107,7 @@ describe('Mock LLM Spec for chatGPT', () => {
     });
 
     it('shows an empty response rules box on the dashboard when no rules are set', () => {
-        cy.visit('/');
+        cy.visit('/#/rules');
         cy.get('[cy-data="response_rules_empty"]').should(
             'contain',
             'No response rules set',
@@ -141,6 +141,54 @@ describe('Mock LLM Spec for chatGPT', () => {
             expect(response.body).to.contain(
                 'Invalid or Missing Request For This LLM Model Template: OPENAI Model:gpt-4o. Please ensure your request adheres to the expected format - see localhost:8001/ui-request-log for details of missing parameters or formatting issues.',
             );
+        });
+    });
+
+    // This template goes by the server's streaming setting, so the dashboard
+    // has a switch for it (the claude template has none)
+    describe('the streaming switch on the dashboard', () => {
+        const reset = () => cy.request({ method: 'POST', url: '/admin/reset' });
+        const ask = () =>
+            cy.request('POST', '/chatgpt/chat/completions', requestData);
+
+        beforeEach(reset);
+        after(reset);
+
+        it('turns streaming on for the next request, and off again', () => {
+            cy.visit('/#/settings');
+            cy.get('[cy-data="streaming_status"]').should('contain', 'DISABLED');
+            ask().its('body').should('be.jsonSchema', chatGPTSchema);
+
+            cy.get('[cy-data="switch_streaming"]')
+                .should('contain', 'Turn on')
+                .click();
+            cy.get('[cy-data="streaming_status"]').should('contain', 'ENABLED');
+            cy.request('/admin/settings')
+                .its('body.settings.stream')
+                .should('eq', true);
+
+            // Asked from the page: cy.request does not keep a streamed body
+            cy.window()
+                .then((win) =>
+                    win
+                        .fetch('/chatgpt/chat/completions', {
+                            method: 'POST',
+                            headers: { 'content-type': 'application/json' },
+                            body: JSON.stringify(requestData),
+                        })
+                        .then((response) => response.text()),
+                )
+                .then((stream) => {
+                    expect(stream).to.contain('data: ');
+                    expect(stream).to.contain('chat.completion.chunk');
+                    expect(stream).to.contain('[DONE]');
+                });
+
+            cy.get('[cy-data="switch_streaming"]')
+                .should('contain', 'Turn off')
+                .click();
+            cy.get('[cy-data="streaming_status"]').should('contain', 'DISABLED');
+            ask().its('body').should('be.jsonSchema', chatGPTSchema);
         });
     });
 });

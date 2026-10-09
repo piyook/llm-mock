@@ -9,8 +9,11 @@ import {
 } from '../config/config-loader.js';
 import { clearLog, logPath, maxLogEntries } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
-import { readRuleFile, ruleFailure, ruleFiles } from './response-rules.js';
+import { readRuleFile, ruleFiles } from './response-rules.js';
+import { describeActiveRules } from './runtime-rules.js';
+import { getDelay } from './runtime-settings.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
+import { adminApiEnabled } from './admin-api.js';
 
 const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
 
@@ -55,6 +58,20 @@ function countStoredResponses(): number {
 		return 0;
 	}
 }
+
+export type UiTheme = 'dark' | 'light';
+
+// The dashboard's colours: dark unless UI_THEME is "light"
+export const getUiTheme = (): UiTheme =>
+	process.env?.UI_THEME?.toLowerCase() === 'light' ? 'light' : 'dark';
+
+/**
+ * Names the theme on the page's <html> element, which is what the dashboard's
+ * stylesheet goes by. Done as the page is served so it is drawn in the right
+ * colours from the start, rather than switching once the settings have loaded.
+ */
+export const withUiTheme = (html: string, theme: UiTheme): string =>
+	html.replace(/<html\b/i, `<html data-theme="${theme}"`);
 
 function contentTypeForPath(filePath: string): string {
 	const ext = path.extname(filePath).toLowerCase();
@@ -163,6 +180,10 @@ const fallbackHtmlString = `
     </html>
     `;
 
+// The built dashboard page with the theme in use named on it
+const themedPage = (uiIndex: { data: Buffer }): string =>
+	withUiTheme(uiIndex.data.toString('utf8'), getUiTheme());
+
 function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	// UI meta endpoint for the compiled Svelte dashboard
 	app.get('/ui-meta', async (_request, reply) => {
@@ -175,20 +196,11 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			? (getStoredResponsesFile().file ?? null)
 			: null;
 
-		// Rules in config order (first match wins), each with every file it
-		// can reply with, how its reply ends, and how it fails (null if it
-		// replies)
-		const responseRules = getResponseRules().rules.map((rule) => ({
-			match: rule.match,
-			files: ruleFiles(rule),
-			stopReason: rule.stopReason ?? 'end',
-			fail: ruleFailure(rule) ?? null,
-		}));
+		// Rules in the order they are matched (first match wins): the ones
+		// added through the admin API, then the config file's
+		const responseRules = describeActiveRules();
 
-		const responseDelayMinMs =
-			Number(process.env?.RESPONSE_DELAY_MIN ?? 0) || 0;
-		const responseDelayMaxMs =
-			Number(process.env?.RESPONSE_DELAY_MAX ?? 0) || 0;
+		const { min: responseDelayMinMs, max: responseDelayMaxMs } = getDelay();
 		const delayStatus =
 			responseDelayMinMs > 0 || responseDelayMaxMs > 0
 				? 'ENABLED'
@@ -253,6 +265,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			chaosInjected: getChaosStats().injected,
 			embeddingsEnabled: embeddingsEnabled ? 'ENABLED' : 'DISABLED',
 			embeddingDimension,
+			adminApi: adminApiEnabled() ? 'ENABLED' : 'DISABLED',
+			uiTheme: getUiTheme(),
 			apiLinks,
 		});
 	});
@@ -269,8 +283,10 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	});
 
 	// Contents of one response rule fixture, for the dashboard viewer. Files
-	// are addressed by position in the config (?rule=0&file=0), never by path,
-	// so only configured fixtures can be read.
+	// are addressed by position (?rule=0&file=0), never by path, so only
+	// configured fixtures can be read. `rule` counts the config file's rules
+	// only: they are the ones with files, and their positions stay the same
+	// as rules are added and removed through the admin API.
 	app.get('/ui-rule-file', async (request, reply) => {
 		const query = request.query as { rule?: string; file?: string };
 		const { rules, baseDir } = getResponseRules();
@@ -324,11 +340,7 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	// Home page route
 	app.get('/', async (_request, reply) => {
 		const uiIndex = tryReadUiDistFile('index.html');
-		if (uiIndex) {
-			return reply
-				.type(contentTypeForPath(uiIndex.absPath))
-				.send(uiIndex.data);
-		}
+		if (uiIndex) return reply.type('text/html').send(themedPage(uiIndex));
 		return reply.type('text/html').send(fallbackHtmlString);
 	});
 
@@ -352,6 +364,10 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		if (!fileName.includes('.')) return reply.code(404).send();
 		const file = tryReadUiDistFile(fileName);
 		if (!file) return reply.code(404).send();
+		// The dashboard page asked for by name gets its theme too
+		if (fileName === 'index.html') {
+			return reply.type('text/html').send(themedPage(file));
+		}
 		return reply.type(contentTypeForPath(file.absPath)).send(file.data);
 	});
 }

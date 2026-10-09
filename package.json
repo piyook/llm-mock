@@ -1,6 +1,6 @@
 {
 	"name": "llmock",
-	"version": "3.10.0",
+	"version": "3.11.0",
 	"description": "A configurable mock LLM API server for testing and development",
 	"main": "./src/server.ts",
 	"type": "module",
@@ -74,6 +74,7 @@
 		"llmock:start:stored": "node scripts/llmock.mjs start --model=stored",
 		"llmock:start:chaos": "node scripts/llmock.mjs start --model=chaos",
 		"llmock:start:chaos-stream": "node scripts/llmock.mjs start --model=chaos-stream",
+		"llmock:start:admin-off": "node scripts/llmock.mjs start --model=claude --admin=off",
 		"llmock:stop": "node bin/llmock.js stop"
 	},
 	"dependencies": {
