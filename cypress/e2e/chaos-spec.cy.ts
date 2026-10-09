@@ -116,7 +116,7 @@ describe('Mock LLM Spec for chaos mode', () => {
         cy.request('/ui-meta')
             .its('body.chaosInjected')
             .then((injected: number) => {
-                cy.visit('/');
+                cy.visit('/#/settings');
                 cy.get('[cy-data="chaos_status"]').should('contain', 'ENABLED');
                 cy.get('[cy-data="chaos_frequency"]').should(
                     'contain',

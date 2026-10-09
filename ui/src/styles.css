@@ -1,17 +1,22 @@
 /* The dark theme, which is the default */
 :root {
-	--bg-page: linear-gradient(120deg, #20232a 0%, #23272f 70%, #0d1117 100%);
-	--bg-header: #20232a;
+	--bg-page: #1f2328;
+	--bg-sidebar: #262b32;
 	--bg-card: #2d333b;
 	/* A row inside a card, and a block of text inside the viewer */
 	--bg-row: rgba(255, 255, 255, 0.04);
 	--bg-text: rgba(0, 0, 0, 0.25);
-	--accent: #4f8a8b;
-	--accent2: rgb(1, 25, 75);
+	/* A value on a card */
+	--bg-badge: rgba(255, 255, 255, 0.1);
+	--accent: #4fb477;
+	/* The accent as a wash, behind something that is on */
+	--accent-soft: rgba(79, 180, 119, 0.16);
 	--danger: rgb(126, 80, 78);
 	--text-main: #f9f9f9;
 	--text-muted: #a7a9be;
-	/* Text on an accent, accent2 or danger background, in either theme */
+	/* Text on an accent background */
+	--text-on-accent: #10231a;
+	/* Text on a danger background, in either theme */
 	--text-on-colour: #fff;
 	--line: rgba(255, 255, 255, 0.12);
 	--border-radius: 14px;
@@ -20,15 +25,18 @@
 
 /* The light theme: UI_THEME=light (see the server's ui-meta) */
 :root[data-theme='light'] {
-	--bg-page: linear-gradient(120deg, #f4f6f8 0%, #eef1f4 70%, #e2e7ed 100%);
-	--bg-header: #f4f6f8;
+	--bg-page: #eef1f4;
+	--bg-sidebar: #f8f9fb;
 	--bg-card: #fff;
 	--bg-row: rgba(0, 0, 0, 0.04);
 	--bg-text: rgba(0, 0, 0, 0.06);
-	--accent: #3f7c7d;
+	--bg-badge: rgba(0, 0, 0, 0.08);
+	--accent: #2f8a55;
+	--accent-soft: rgba(47, 138, 85, 0.14);
 	--danger: rgb(160, 72, 68);
 	--text-main: #1c2128;
 	--text-muted: #57606a;
+	--text-on-accent: #fff;
 	--line: rgba(0, 0, 0, 0.12);
 	--shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
@@ -43,19 +51,146 @@ body {
 	background: var(--bg-page);
 }
 
-main {
-	/* Sized from the page width with the padding included, so it never
-	   overflows sideways on a narrow window */
+/* The sidebar beside the page in view */
+.shell {
+	display: grid;
+	grid-template-columns: 240px minmax(0, 1fr);
+	min-height: 100vh;
+}
+
+/* Stays in view while the page scrolls */
+.sidebar {
+	position: sticky;
+	top: 0;
 	box-sizing: border-box;
-	padding: 0 16px 40px 16px;
+	height: 100vh;
+	padding: 20px 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	overflow-y: auto;
+	background: var(--bg-sidebar);
+	border-right: 1px solid var(--line);
+}
+
+.brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 4px 10px 18px 10px;
+	color: var(--text-main);
+	font-size: 1.25rem;
+	font-weight: 700;
+	letter-spacing: 0.5px;
+	text-decoration: none;
+}
+
+.nav {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.navLink {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 9px 10px;
+	border-radius: 10px;
+	color: var(--text-muted);
+	font-weight: 650;
+	text-decoration: none;
+}
+
+.navLink svg {
+	flex-shrink: 0;
+	width: 18px;
+	height: 18px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.navLink:hover,
+.navLink:focus-visible {
+	background: var(--bg-row);
+	color: var(--text-main);
+	outline: none;
+}
+
+/* The page in view */
+.navLink.active {
+	background: var(--accent);
+	color: var(--text-on-accent);
+}
+
+.navCount {
+	margin-left: auto;
+	font-size: 0.85rem;
+}
+
+.navGroup {
+	margin: 22px 10px 4px 10px;
+	color: var(--text-muted);
+	font-size: 0.8rem;
+	letter-spacing: 0.6px;
+	text-transform: uppercase;
+}
+
+.facts {
+	margin: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+.fact {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	padding: 7px 10px;
+}
+
+.fact dt {
+	color: var(--text-muted);
+}
+
+.fact dd {
+	margin: 0;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--accent);
+	font-weight: 650;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* The button that swaps the light and dark themes, at the foot of the sidebar */
+.themeSwitch {
+	margin-top: auto;
+	border: none;
+	background: none;
+	font: inherit;
+	font-weight: 650;
+	text-align: left;
+	cursor: pointer;
+}
+
+.sidebarFoot {
+	margin: 8px 10px 0 10px;
+	font-size: 0.85rem;
+}
+
+main {
+	box-sizing: border-box;
+	padding: 0 28px 40px 28px;
 	width: 100%;
-	max-width: 832px;
-	min-width: 320px;
-	margin: 0 auto 32px auto;
+	max-width: 1240px;
 	display: flex;
 	flex-direction: column;
 	align-items: stretch;
-	gap: 24px;
+	gap: 20px;
 }
 
 /* Stays at the top while the cards scroll beneath it; the solid background
@@ -64,12 +199,118 @@ main {
 	position: sticky;
 	top: 0;
 	z-index: 1;
-	padding: 16px 0 12px 0;
+	padding: 22px 0 0 0;
 	margin-bottom: -12px;
-	background: var(--bg-header);
+	background: var(--bg-page);
+}
+
+/* On a narrow window the sidebar is a bar across the top, with the pages side
+   by side and the server's details left to the overview */
+@media (max-width: 860px) {
+	.shell {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.sidebar {
+		position: static;
+		height: auto;
+		padding: 12px 16px;
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+		border-right: none;
+		border-bottom: 1px solid var(--line);
+	}
+
+	.brand {
+		padding: 4px 10px 4px 0;
+	}
+
+	.nav {
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	/* At the far end of the bar */
+	.themeSwitch {
+		margin: 0 0 0 auto;
+	}
+
+	.navLink svg,
+	.navGroup,
+	.facts,
+	.sidebarFoot {
+		display: none;
+	}
+
+	main {
+		padding: 0 16px 40px 16px;
+	}
+}
+
+/* The figures across the top of the overview; each leads to its page */
+.tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+	gap: 16px;
+}
+
+.tile {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+	padding: 16px 18px;
+	border: 1.5px solid transparent;
+	border-radius: var(--border-radius);
+	background: var(--bg-card);
+	box-shadow: var(--shadow);
+	color: var(--text-main);
+	text-decoration: none;
+}
+
+.tile:hover,
+.tile:focus-visible {
+	border-color: var(--accent);
+	outline: none;
+}
+
+.tileLabel,
+.tileNote {
+	color: var(--text-muted);
+	font-size: 0.9rem;
+}
+
+.tileValue {
+	font-size: 1.5rem;
+	font-weight: 700;
+	overflow-wrap: anywhere;
+}
+
+/* Cards in two columns, each column keeping its own cards as they grow */
+.columns {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	align-items: start;
+	gap: 20px;
+}
+
+.column {
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+	min-width: 0;
+}
+
+@media (max-width: 1100px) {
+	.columns {
+		grid-template-columns: minmax(0, 1fr);
+	}
 }
 
 .card {
+	/* Its rows go by the card's own width (see .grid) */
+	container-type: inline-size;
 	background: var(--bg-card);
 	border-radius: var(--border-radius);
 	box-shadow: var(--shadow);
@@ -78,26 +319,74 @@ main {
 
 .titleRow {
 	display: flex;
-	align-items: baseline;
+	align-items: center;
 	justify-content: space-between;
+	flex-wrap: wrap;
 	gap: 12px;
 }
 
 h1 {
 	margin: 0;
-	font-size: 2.2rem;
-	letter-spacing: 1px;
+	font-size: 1.8rem;
+	letter-spacing: 0.5px;
 }
 
 .card h2 {
 	margin: 0 0 12px 0;
+	font-size: 1.2rem;
 }
 
 .titleGroup {
 	display: flex;
-	align-items: baseline;
+	align-items: center;
 	flex-wrap: wrap;
 	gap: 12px;
+}
+
+/* A card's heading with something at the far end of its line */
+.cardHead {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 12px;
+}
+
+.cardHead h2 {
+	margin: 0;
+}
+
+.cardLead {
+	margin: 0 0 12px 0;
+}
+
+.cardActions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+}
+
+.featureList {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+/* Whether a feature is on */
+.state {
+	min-width: 2.2em;
+	padding: 3px 10px;
+	border-radius: 999px;
+	background: var(--bg-badge);
+	color: var(--text-muted);
+	font-size: 0.9rem;
+	font-weight: 700;
+	text-align: center;
+}
+
+.state.on {
+	background: var(--accent-soft);
+	color: var(--accent);
 }
 
 .versionPill,
@@ -136,18 +425,19 @@ h1 {
 	align-items: center;
 	gap: 8px;
 	border-radius: 10px;
-	padding: 8px 12px;
-	color: var(--text-on-colour);
+	padding: 6px 12px;
 	font-weight: 700;
 	letter-spacing: 0.3px;
 }
 
 .statusOnline {
 	background: var(--accent);
+	color: var(--text-on-accent);
 }
 
 .statusOffline {
 	background: var(--danger);
+	color: var(--text-on-colour);
 }
 
 .grid {
@@ -156,13 +446,16 @@ h1 {
 	gap: 12px;
 }
 
-@media (max-width: 700px) {
+/* One value to a line once the card is too narrow for two */
+@container (max-width: 560px) {
 	.grid {
 		grid-template-columns: 1fr;
 	}
+}
 
+@media (max-width: 700px) {
 	h1 {
-		font-size: 1.6rem;
+		font-size: 1.5rem;
 	}
 }
 
@@ -227,11 +520,11 @@ select.editBox {
 }
 
 .badge {
-	background: var(--accent2);
+	background: var(--bg-badge);
 	padding: 4px 10px;
 	border-radius: 8px;
-	color: var(--text-on-colour);
-	font-weight: 800;
+	color: var(--text-main);
+	font-weight: 700;
 	overflow-wrap: anywhere;
 }
 
@@ -243,19 +536,20 @@ select.editBox {
 
 .endpointLink {
 	display: block;
-	background: #5b8ca6;
-	color: #fff;
-	text-decoration: none;
-	padding: 12px 0;
+	padding: 10px 12px;
+	border: 1.5px solid var(--accent);
 	border-radius: 10px;
+	color: var(--text-main);
+	font-family: Consolas, 'Courier New', monospace;
 	font-weight: 650;
-	border: 1.5px solid #446a7c;
-	text-align: center;
+	text-decoration: none;
+	overflow-wrap: anywhere;
 }
 
 .endpointLink:hover,
-.endpointLink:focus {
-	background: #22496a;
+.endpointLink:focus-visible {
+	background: var(--accent);
+	color: var(--text-on-accent);
 	outline: none;
 }
 
@@ -278,13 +572,14 @@ select.editBox {
 	font-weight: 650;
 	cursor: pointer;
 	text-align: left;
+	text-decoration: none;
 	overflow-wrap: anywhere;
 }
 
 .fileLink:hover,
 .fileLink:focus-visible {
 	background: var(--accent);
-	color: var(--text-on-colour);
+	color: var(--text-on-accent);
 	outline: none;
 }
 
@@ -294,16 +589,12 @@ select.editBox {
 	gap: 10px;
 }
 
-/* A long list keeps to a window about four rows high and scrolls inside it,
-   so the sections below stay within reach */
+/* A long list of texts in the viewer keeps to a fixed height and scrolls
+   inside it */
 .scrollList {
 	overflow-y: auto;
 	padding-right: 6px;
 	scrollbar-color: var(--accent) transparent;
-}
-
-.rules.scrollList {
-	max-height: 340px;
 }
 
 /* Rows in a scrolling list keep their height rather than squeeze to fit */
@@ -346,8 +637,8 @@ select.editBox {
 }
 
 .ruleMatch code {
-	background: var(--accent2);
-	color: var(--text-on-colour);
+	background: var(--bg-badge);
+	color: var(--text-main);
 	padding: 4px 10px;
 	border-radius: 8px;
 	overflow-wrap: anywhere;
@@ -357,11 +648,6 @@ select.editBox {
 @media (max-width: 700px) {
 	.rule {
 		grid-template-columns: 1fr;
-	}
-
-	/* Each rule is two lines tall here */
-	.rules.scrollList {
-		max-height: min(600px, 70vh);
 	}
 }
 
@@ -444,6 +730,7 @@ select.editBox {
 .fileLink.danger:hover,
 .fileLink.danger:focus-visible {
 	background: var(--danger);
+	color: var(--text-on-colour);
 }
 
 /* Stays in view while a long request scrolls behind it */
@@ -483,4 +770,3 @@ select.editBox {
 	color: var(--text-muted);
 	line-height: 1.4;
 }
-
