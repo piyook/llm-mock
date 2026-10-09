@@ -656,6 +656,13 @@ await fetch('http://localhost:8001/admin/chaos', {
 - The dashboard shows the settings in use, so a change appears there within 2 seconds. Its **Admin API** box has a **Reset** button that does the same as `POST /admin/reset`.
 - To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 
+#### Network exposure
+
+LLMock has no authentication, and by default it listens on every network interface (`"host": "0.0.0.0"`). Anyone who can reach the port can change the replies through the admin API, and can read or clear the [request log](#request-logging), which holds the prompts your app sent. Turning the admin API off does not cover the request log. To keep the mock to your own machine:
+
+- Run directly: set `"host": "127.0.0.1"` in the `server` block, or start with `--host=127.0.0.1`.
+- Run in Docker: leave `"host": "0.0.0.0"` in the config, which the container needs, and publish the port on the loopback address only, as `"127.0.0.1:8001:8001"`. The [Docker example](#standalone-docker-setup-no-scaffolding) does this. Other containers in the same compose file still reach the mock by its service name.
+
 ### Custom API paths
 
 Set the endpoint to match any provider's path structure:
@@ -1085,7 +1092,8 @@ services:
   llmock:
     build: .
     ports:
-      - "8001:8001"
+      # This machine only. Use "8001:8001" to let other machines reach the mock
+      - "127.0.0.1:8001:8001"
     restart: unless-stopped
     volumes:
       - ./.llmockrc.json:/app/.llmockrc.json:ro
