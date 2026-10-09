@@ -656,6 +656,13 @@ await fetch('http://localhost:8001/admin/chaos', {
 - The dashboard shows the settings in use, so a change appears there within 2 seconds. The **Admin API** box on its **Settings** page has a **Reset** button that does the same as `POST /admin/reset`.
 - To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 
+#### Network exposure
+
+LLMock has no authentication, and by default it listens on every network interface (`"host": "0.0.0.0"`). Anyone who can reach the port can change the replies through the admin API, and can read or clear the [request log](#request-logging), which holds the prompts your app sent. Turning the admin API off does not cover the request log. To keep the mock to your own machine:
+
+- Run directly: set `"host": "127.0.0.1"` in the `server` block, or start with `--host=127.0.0.1`.
+- Run in Docker: leave `"host": "0.0.0.0"` in the config, which the container needs, and publish the port on the loopback address only, as `"127.0.0.1:8001:8001"`. The [Docker example](#standalone-docker-setup-no-scaffolding) does this. Other containers in the same compose file still reach the mock by its service name.
+
 ### Custom API paths
 
 Set the endpoint to match any provider's path structure:
@@ -694,32 +701,17 @@ Once running, open `http://localhost:8001` for the live dashboard:
 | `http://localhost:8001` | Main dashboard |
 | `http://localhost:8001/ping` | Health check |
 
-The dashboard has three pages, listed in the sidebar on the left (across the top on a narrow window):
 
-| Page | Address | Shows |
-| --- | --- | --- |
-| **Overview** | `http://localhost:8001/` | Server status and the llmock version, the base URL and endpoints to connect to, the main settings at a glance, and the request log |
-| **Settings** | `http://localhost:8001/#/settings` | The configuration in use, grouped into **Model**, **Responses**, **Diagnostics**, **Chaos**, **Embeddings** and **Admin API** |
-| **Response rules** | `http://localhost:8001/#/rules` | Every response rule, in the order they are matched |
-
-The figures across the top of the overview lead to the page that holds them. The dashboard refreshes automatically every 2 seconds.
 
 ![LLM Mock Server settings page](images/server-page-settings.png)
 
 The dashboard is dark by default. **Light theme** / **Dark theme** at the foot of the sidebar swaps between the two; the choice is kept by that browser and wins over the server's setting. To have the server start with a light one for everyone, set the `UI_THEME` environment variable, or `"uiTheme": "light"` in the `server` block of `.llmockrc.json`, or start with `--uiTheme=light`:
 
-```bash
-UI_THEME=light npx llmock start       # macOS, Linux, Git Bash
-$env:UI_THEME = 'light'; npx llmock start   # PowerShell
-```
-
-The flag wins over the environment variable, which wins over the config file. In Docker, add `UI_THEME=light` to `environment` in `docker-compose.yml`. Any value other than `light` gives the dark theme.
 
 With `responseType: "stored"` the **Settings** page names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** page lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. A rule that holds its reply as `text` shows **its own text** in place of a file; click it to read the text. A rule added through the [admin API](#admin-api-changing-rules-and-settings-while-running) is listed first and marked **runtime**; one with `times` also shows how many requests it has left. With no rules set, the page shows a blank rule with a note pointing to the setting.
 
-While the admin API is on, the values on the **Settings** page have a button beside them that changes the running server. The ones with two values switch at a click: **Response Type** (lorem or stored), **Streaming**, **Chaos**, **Request Validation** and **Request Log**. The others have **Change**, which opens boxes to fill in, with **Save** and **Cancel**: **Response Delay**, **Maximum sentences**, **Max Logged Requests** and, while chaos is on, **Error Frequency**, **Error Status**, **Failure Kind** and **Streams Fail**. A value the server refuses is explained in that box of the dashboard and the boxes stay open. A change made this way is not saved; **Reset** or a restart puts it back. (Streaming has no button on the `claude` template, where each request says whether it wants a stream.)
+While the admin API is on, the values on the **Settings** page have a button beside them that changes the running server. A change made this way is not saved; **Reset** or a restart puts it back. (Streaming has no button on the `claude` template, where each request says whether it wants a stream.)
 
-The **Admin API** box says whether the admin API is on and how many rules were added while running. **Reset** does what `POST /admin/reset` does, after asking you to confirm: it removes those rules, puts chaos and delay back to how the server started and sets the chaos count to 0.
 
 ### Available endpoints
 
@@ -1095,7 +1087,8 @@ services:
   llmock:
     build: .
     ports:
-      - "8001:8001"
+      # This machine only. Use "8001:8001" to let other machines reach the mock
+      - "127.0.0.1:8001:8001"
     restart: unless-stopped
     volumes:
       - ./.llmockrc.json:/app/.llmockrc.json:ro
@@ -1154,8 +1147,6 @@ docker compose down --volumes && docker compose up -d --force-recreate --build  
 **Server not responding**
 
 Confirm the server is running and the port matches `.llmockrc.json`. Open `http://localhost:8001` — if it's unreachable, the server may not have started.
-
-![LLM Mock Server error page](images/server-page-err.png)
 
 **`llmock start` exits with an error**
 
