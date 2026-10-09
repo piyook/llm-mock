@@ -702,26 +702,15 @@ With `TEST_MODE=false` your app talks to the real LLM service again.
 
 ### Dashboard
 
-Once running, open `http://localhost:8001` for the live dashboard:
+Once running, open `http://localhost:8001` for the live dashboard. A health check is at `http://localhost:8001/ping`.
 
 ![LLM Mock Server Page](images/server-page.png)
 
-| URL | Purpose |
-|---|---|
-| `http://localhost:8001` | Main dashboard |
-| `http://localhost:8001/ping` | Health check |
-
-
-
 ![LLM Mock Server settings page](images/server-page-settings.png)
 
-The dashboard is dark by default. **Light theme** / **Dark theme** at the foot of the sidebar swaps between the two; the choice is kept by that browser and wins over the server's setting. To have the server start with a light one for everyone, set the `UI_THEME` environment variable, or `"uiTheme": "light"` in the `server` block of `.llmockrc.json`, or start with `--uiTheme=light`:
-
-
-With `responseType: "stored"` the **Settings** page names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** page lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. A rule that holds its reply as `text` shows **its own text** in place of a file; click it to read the text. A rule added through the [admin API](#admin-api-changing-rules-and-settings-while-running) is listed first and marked **runtime**; one with `times` also shows how many requests it has left. With no rules set, the page shows a blank rule with a note pointing to the setting.
-
-While the admin API is on, the values on the **Settings** page have a button beside them that changes the running server. A change made this way is not saved; **Reset** or a restart puts it back. (Streaming has no button on the `claude` template, where each request says whether it wants a stream.)
-
+- **Settings** shows the configuration in use. While the [admin API](#admin-api-changing-rules-and-settings-while-running) is on, you can change values here on the running server; changes are not saved, and **Reset** or a restart puts them back.
+- **Response rules** lists the preset's `responseRules`; click a file or text entry to read the reply. Rules added through the admin API are marked **runtime**.
+- **Light theme** / **Dark theme** in the sidebar switches the colours for your browser. To change the default, set `"uiTheme": "light"` in the `server` block, start with `--uiTheme=light`, or set the `UI_THEME=light` environment variable.
 
 ### Available endpoints
 
