@@ -10,6 +10,7 @@
 	"keywords": [
 		"llm",
 		"mock",
+		"mock-server",
 		"api",
 		"server",
 		"testing",
@@ -17,7 +18,11 @@
 		"openai",
 		"chatgpt",
 		"gemini",
-		"embeddings"
+		"anthropic",
+		"claude",
+		"embeddings",
+		"streaming",
+		"docker"
 	],
 	"author": "Piyook <contact@piyook.com>",
 	"license": "MIT",
