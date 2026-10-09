@@ -17,6 +17,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - [Quick Start](#quick-start)
 - [Installation Options](#installation-options)
   - [CLI options](#cli-options)
+  - [Foreground mode](#foreground-mode)
 - [Configuration](#configuration)
   - [Configuration file](#configuration-file-llmockrcjson)
   - [Adding custom models](#adding-custom-models)
@@ -29,17 +30,22 @@ A lightweight local server that simulates LLM APIs for development and testing. 
   - [Chaos mode (error simulation)](#chaos-mode-error-simulation)
     - [Stream failures](#stream-failures)
   - [Admin API](#admin-api-changing-rules-and-settings-while-running)
+    - [Network exposure](#network-exposure)
   - [Custom API paths](#custom-api-paths)
+  - [Environment variables](#environment-variables)
 - [Features](#features)
   - [Dashboard](#dashboard)
+  - [Available endpoints](#available-endpoints)
   - [Request validation](#request-validation)
   - [Request logging](#request-logging)
+  - [Debug mode](#debug-mode)
 - [Integration Guide](#integration-guide)
   - [Chat completions](#chat-completions)
   - [Embeddings API](#embeddings-api)
   - [Using with LangChain](#using-with-langchain)
 - [Supporting Different LLM Providers](#supporting-different-llm-providers)
   - [Anthropic (Claude Messages API)](#anthropic-claude-messages-api)
+  - [Template locations](#template-locations)
   - [Creating a custom provider template](#creating-a-custom-provider-template)
 - [Docker Support](#docker-support)
   - [Standalone Docker setup](#standalone-docker-setup-no-scaffolding)
@@ -111,6 +117,8 @@ my-project/
 ```
 
 The template folders contain editable copies of the built-in OpenAI, Gemini and Claude templates. The server uses them for request validation and response shape. To add your own provider, see [Template locations](#template-locations).
+
+> **Note:** LLMock has no authentication and by default listens on every network interface. For a local mock server this is not usually a problem, but if you want to take extra precautions you can keep it to your own machine. See [Network exposure](#network-exposure).
 
 ---
 
@@ -658,7 +666,9 @@ await fetch('http://localhost:8001/admin/chaos', {
 
 #### Network exposure
 
-LLMock has no authentication, and by default it listens on every network interface (`"host": "0.0.0.0"`). Anyone who can reach the port can change the replies through the admin API, and can read or clear the [request log](#request-logging), which holds the prompts your app sent. Turning the admin API off does not cover the request log. To keep the mock to your own machine:
+LLMock has no authentication, and by default it listens on every network interface (`"host": "0.0.0.0"`). Anyone who can reach the port can change the replies through the admin API, and can read or clear the [request log](#request-logging), which holds the prompts your app sent. Turning the admin API off does not cover the request log.
+
+For a mock server running locally with test data this is not usually a problem. If you want to take extra precautions, you can keep the mock to your own machine:
 
 - Run directly: set `"host": "127.0.0.1"` in the `server` block, or start with `--host=127.0.0.1`.
 - Run in Docker: leave `"host": "0.0.0.0"` in the config, which the container needs, and publish the port on the loopback address only, as `"127.0.0.1:8001:8001"`. The [Docker example](#standalone-docker-setup-no-scaffolding) does this. Other containers in the same compose file still reach the mock by its service name.
