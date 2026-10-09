@@ -4,7 +4,8 @@ services:
   llmock-server:
     build: .
     ports:
-      - "8001:8001"
+      # This machine only. Use "8001:8001" to let other machines reach the mock
+      - "127.0.0.1:8001:8001"
     environment:
       - NODE_ENV=production
     restart: unless-stopped
