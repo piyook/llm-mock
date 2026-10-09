@@ -95,7 +95,7 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `chaos.kind` | `"http"` \| `"stream-error"` \| `"stream-drop"` \| `"stream-stall"` | `http` | What a failing call gets: an HTTP error, or a stream that starts and then errors, is cut, or goes silent. |
 | `chaos.afterChunks` | integer ≥ 0 | 2 | Content deltas a failing stream sends before a `stream-*` kind fails it. |
 | `server.port` | number | 8001 | Listen port. |
-| `server.host` | string | `0.0.0.0` | Bind address. Use `127.0.0.1` to keep the mock off the network; keep `0.0.0.0` in Docker. |
+| `server.host` | string | `0.0.0.0` | Bind address. Use `127.0.0.1` to keep the mock off the network; keep `0.0.0.0` in Docker and publish the port on loopback instead (`127.0.0.1:8001:8001`). |
 | `server.admin` | boolean | true | `false` leaves the `/admin/*` routes out (see Admin API). |
 | `server.uiTheme` | `"dark"` \| `"light"` | `dark` | Dashboard colours only; no effect on the API. Also set by the `UI_THEME` environment variable (wins over the config; `--uiTheme` wins over both). Any other value means `dark`. Reported as `uiTheme` by `GET /ui-meta`. |
 
@@ -156,7 +156,7 @@ The way to set up a reply or a failure from inside a test, with no fixture file,
 - An `id` is never reused, also after a reset. Config rules have `id: null` and can not be removed.
 - `POST /admin/reset` also drops connections a `stream-stall` is holding open. It does not touch the request log.
 - The state is per server process and shared by every client: tests that add rules to one server must not run in parallel against it unless their `match` strings differ.
-- Off with `"server": {"admin": false}` or `--admin=false` (the routes then 404); `0`, `off` and `no` are read as `false`, in any case. `GET /ui-meta` → `adminApi` is `ENABLED` or `DISABLED`. While it is on, a preset `endpoint` equal to `admin` or starting with `admin/` → startup error. No auth, like the rest of the server: use `server.host` `127.0.0.1` to keep it off the network.
+- Off with `"server": {"admin": false}` or `--admin=false` (the routes then 404); `0`, `off` and `no` are read as `false`, in any case. `GET /ui-meta` → `adminApi` is `ENABLED` or `DISABLED`. While it is on, a preset `endpoint` equal to `admin` or starting with `admin/` → startup error. No auth, like the rest of the server: use `server.host` `127.0.0.1` to keep it off the network (in Docker, publish the port as `127.0.0.1:8001:8001`). Turning the admin API off leaves `GET`/`DELETE /ui-request-log`, which holds the logged prompts, open to anyone who can reach the port.
 
 Per-test fixture (any runner):
 
@@ -340,4 +340,4 @@ EXPOSE 8001
 CMD ["npx", "llmock", "start", "--foreground"]
 ```
 
-Mount `.llmockrc.json` to `/app/.llmockrc.json`, with the fixtures folder (and any template folders) beside it. A `storedResponsesFile` must be mounted too, at the same path relative to the config (simplest: keep it inside the fixtures folder). `--foreground` is required or the container exits.
+Mount `.llmockrc.json` to `/app/.llmockrc.json`, with the fixtures folder (and any template folders) beside it. A `storedResponsesFile` must be mounted too, at the same path relative to the config (simplest: keep it inside the fixtures folder). `--foreground` is required or the container exits. Publish the port as `127.0.0.1:8001:8001` (`-p` or compose `ports`) unless other machines need the mock: `8001:8001` opens the admin API and the request log to the network. Containers in the same compose file reach it by service name either way.
