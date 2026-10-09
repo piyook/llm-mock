@@ -325,7 +325,7 @@ describe('Mock LLM Spec for Claude (Anthropic Messages API)', () => {
                     ]);
                 });
 
-            cy.visit('/');
+            cy.visit('/#/rules');
             cy.get('[cy-data="response_rules_count"]').should(
                 'contain',
                 '6 rules',
@@ -405,7 +405,7 @@ describe('Mock LLM Spec for Claude (Anthropic Messages API)', () => {
                     expect(rules[0].fail).to.eq(null);
                 });
 
-            cy.visit('/');
+            cy.visit('/#/rules');
             // Only the rule that fails says so, and it has no file to open
             cy.get('[cy-data="rule_fail"]')
                 .should('have.length', 1)

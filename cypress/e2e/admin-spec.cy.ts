@@ -373,7 +373,7 @@ describe('Mock LLM Spec for the admin API', () => {
                     .should('contain', '<html data-theme="light"');
             }
 
-            cy.visit('/');
+            cy.visit('/#/settings');
             cy.get('html').should('have.attr', 'data-theme', 'light');
             cy.get('[cy-data="admin"]').should(
                 'have.css',
@@ -384,14 +384,89 @@ describe('Mock LLM Spec for the admin API', () => {
         });
 
         it('shows the admin API as on, with nothing added yet', () => {
-            cy.visit('/');
+            cy.visit('/#/settings');
             cy.get('[cy-data="admin_status"]').should('contain', 'ENABLED');
             cy.get('[cy-data="admin_runtime_rules"]').should('contain', '0');
+
+            cy.get('[cy-data="nav_rules"]').click();
+            cy.get('[cy-data="response_rules_count"]').should(
+                'contain',
+                '6 rules',
+            );
             cy.get('[cy-data="rule_runtime"]').should('not.exist');
         });
 
-        it('switches the response type from the dashboard, and back with Reset', () => {
+        it('opens on the overview and moves between pages from the sidebar', () => {
             cy.visit('/');
+            cy.get('h1').should('have.text', 'Overview');
+            cy.get('[cy-data="nav_overview"]').should(
+                'have.attr',
+                'aria-current',
+                'page',
+            );
+            cy.get('[cy-data="server_status"]').should('contain', 'Running');
+            cy.get('[cy-data="server_facts"]').should('contain', 'claude');
+            cy.get('[cy-data="connect"]').should('contain', '/v1/messages');
+            cy.get('[cy-data="chaos"]').should('not.exist');
+            // The sidebar and the page fit side by side
+            cy.document().then((doc) => {
+                expect(doc.documentElement.scrollWidth).to.eq(
+                    doc.documentElement.clientWidth,
+                );
+            });
+
+            cy.get('[cy-data="nav_settings"]').click();
+            cy.location('hash').should('eq', '#/settings');
+            cy.get('h1').should('have.text', 'Settings');
+            cy.get('[cy-data="chaos"]').should('be.visible');
+            cy.get('[cy-data="connect"]').should('not.exist');
+
+            cy.get('[cy-data="nav_rules"]').should('contain', '6').click();
+            cy.get('h1').should('have.text', 'Response rules');
+            cy.get('[cy-data="response_rules"] .rule').should('have.length', 6);
+
+            // A page that isn't there shows the overview
+            cy.visit('/#/nowhere');
+            cy.get('h1').should('have.text', 'Overview');
+        });
+
+        it('sums up the settings on the overview and keeps up with changes', () => {
+            cy.visit('/');
+            cy.get('[cy-data="tile_model"]').should('contain', 'claude');
+            cy.get('[cy-data="tile_responses"]')
+                .should('contain', 'lorem')
+                .and('contain', 'No delay');
+            cy.get('[cy-data="tile_chaos"]').should('contain', 'Off');
+            cy.get('[cy-data="tile_rules"]').should('contain', '6');
+            cy.contains('[cy-data="feature"]', 'Admin API').should(
+                'contain',
+                'On',
+            );
+            cy.contains('[cy-data="feature"]', 'Chaos').should('contain', 'Off');
+
+            cy.request({
+                method: 'PATCH',
+                url: '/admin/chaos',
+                body: { enabled: true, frequency: 3 },
+            });
+            cy.request({
+                method: 'PATCH',
+                url: '/admin/delay',
+                body: { min: 10, max: 20 },
+            });
+            addRule({ match: 'E2E_ADMIN_TILE', text: 'counted' });
+
+            cy.get('[cy-data="tile_chaos"]').should('contain', 'Every 3 calls');
+            cy.get('[cy-data="tile_responses"]').should('contain', '10–20ms delay');
+            cy.get('[cy-data="tile_rules"]')
+                .should('contain', '7')
+                .and('contain', '1 added while running')
+                .click();
+            cy.get('h1').should('have.text', 'Response rules');
+        });
+
+        it('switches the response type from the dashboard, and back with Reset', () => {
+            cy.visit('/#/settings');
             cy.get('[cy-data="response_type"]').should('have.text', 'lorem');
 
             cy.get('[cy-data="switch_response_type"]')
@@ -410,7 +485,7 @@ describe('Mock LLM Spec for the admin API', () => {
         });
 
         it('switches chaos, validation and the request log from the dashboard', () => {
-            cy.visit('/');
+            cy.visit('/#/settings');
 
             cy.get('[cy-data="chaos_status"]').should('have.text', 'DISABLED');
             cy.get('[cy-data="switch_chaos"]').should('contain', 'Turn on').click();
@@ -439,7 +514,7 @@ describe('Mock LLM Spec for the admin API', () => {
             cy.get(`[cy-data="${box}"]`).clear().type(String(value));
 
         it('changes the response delay from the dashboard', () => {
-            cy.visit('/');
+            cy.visit('/#/settings');
             cy.get('[cy-data="response_delay"]').should('have.text', 'Off');
 
             cy.get('[cy-data="change_delay"]').click();
@@ -455,7 +530,7 @@ describe('Mock LLM Spec for the admin API', () => {
         });
 
         it('keeps the boxes open and says why when a change is refused', () => {
-            cy.visit('/');
+            cy.visit('/#/settings');
             cy.get('[cy-data="change_delay"]').click();
             fill('edit_delay_min', 50);
             fill('edit_delay_max', 10);
@@ -474,7 +549,7 @@ describe('Mock LLM Spec for the admin API', () => {
         });
 
         it('changes the lorem length and the log size from the dashboard', () => {
-            cy.visit('/');
+            cy.visit('/#/settings');
 
             cy.get('[cy-data="change_max_lorem"]').click();
             fill('edit_max_lorem_maxLoremParas', 2);
@@ -492,7 +567,7 @@ describe('Mock LLM Spec for the admin API', () => {
         });
 
         it('changes how chaos fails calls from the dashboard', () => {
-            cy.visit('/');
+            cy.visit('/#/settings');
             cy.get('[cy-data="switch_chaos"]').click();
 
             cy.get('[cy-data="change_chaos_frequency"]').click();
@@ -533,7 +608,7 @@ describe('Mock LLM Spec for the admin API', () => {
         });
 
         it('leaves a setting alone when a change is cancelled', () => {
-            cy.visit('/');
+            cy.visit('/#/settings');
             cy.get('[cy-data="change_delay"]').click();
             fill('edit_delay_max', 900);
             cy.contains('[cy-data="responses"] button', 'Cancel').click();
@@ -548,7 +623,7 @@ describe('Mock LLM Spec for the admin API', () => {
             addRule({ match: 'E2E_ADMIN_LEFT', text: 'twice', times: 2 });
             addRule({ match: 'E2E_ADMIN_STAYS', text: 'always' });
 
-            cy.visit('/');
+            cy.visit('/#/rules');
             cy.get('[cy-data="rule_times"]')
                 .should('have.length', 1)
                 .and('contain', '2 left');
@@ -559,18 +634,21 @@ describe('Mock LLM Spec for the admin API', () => {
 
             ask('E2E_ADMIN_LEFT');
             cy.get('[cy-data="rule_times"]').should('not.exist');
+            cy.get('[cy-data="nav_settings"]').click();
             cy.get('[cy-data="admin_runtime_rules"]').should('have.text', '1');
         });
 
         it('marks a rule added while running and shows its text', () => {
             addRule({ match: 'E2E_ADMIN_SHOWN', text: 'the reply as text' });
 
-            cy.visit('/');
+            cy.visit('/#/settings');
+            cy.get('[cy-data="admin_runtime_rules"]').should('contain', '1');
+
+            cy.get('[cy-data="nav_rules"]').click();
             cy.get('[cy-data="response_rules_count"]').should(
                 'contain',
                 '7 rules',
             );
-            cy.get('[cy-data="admin_runtime_rules"]').should('contain', '1');
             cy.get('[cy-data="rule_runtime"]').should('have.length', 1);
 
             // The runtime rule is listed first
@@ -593,7 +671,7 @@ describe('Mock LLM Spec for the admin API', () => {
             addRule({ match: 'E2E_ADMIN_FIRST', text: 'first' });
 
             // The first config rule: E2E_FIXTURE_JSON, replying with json-reply.json
-            cy.visit('/');
+            cy.visit('/#/rules');
             cy.get('[cy-data="rule_file_link"]').first().click();
             cy.get('[cy-data="viewer"]').should('contain', 'E2E_FIXTURE_JSON');
             cy.get('[cy-data="viewer_text"]').should(
@@ -610,16 +688,22 @@ describe('Mock LLM Spec for the admin API', () => {
                 body: { enabled: true, frequency: 3 },
             });
 
-            cy.visit('/');
-            cy.get('[cy-data="chaos_status"]').should('contain', 'ENABLED');
+            cy.visit('/#/rules');
             cy.get('[cy-data="rule_runtime"]').should('have.length', 1);
 
+            cy.get('[cy-data="nav_settings"]').click();
+            cy.get('[cy-data="chaos_status"]').should('contain', 'ENABLED');
             cy.get('[cy-data="admin_reset"]').click();
             cy.get('[cy-data="admin_reset_confirm"]').click();
 
-            cy.get('[cy-data="rule_runtime"]').should('not.exist');
             cy.get('[cy-data="admin_runtime_rules"]').should('contain', '0');
             cy.get('[cy-data="chaos_status"]').should('contain', 'DISABLED');
+            cy.get('[cy-data="nav_rules"]').click();
+            cy.get('[cy-data="response_rules_count"]').should(
+                'contain',
+                '6 rules',
+            );
+            cy.get('[cy-data="rule_runtime"]').should('not.exist');
             cy.request('/admin/rules')
                 .its('body.rules')
                 .should('have.length', 6);

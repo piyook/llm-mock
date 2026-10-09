@@ -49,7 +49,7 @@ describe('Mock LLM Spec with the admin API off', () => {
     });
 
     it('shows the settings on the dashboard with nothing to change them', () => {
-        cy.visit('/');
+        cy.visit('/#/settings');
 
         cy.get('[cy-data="admin_status"]').should('have.text', 'DISABLED');
         cy.get('[cy-data="admin_note"]').should('contain', 'are off');

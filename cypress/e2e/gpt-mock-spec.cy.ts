@@ -107,7 +107,7 @@ describe('Mock LLM Spec for chatGPT', () => {
     });
 
     it('shows an empty response rules box on the dashboard when no rules are set', () => {
-        cy.visit('/');
+        cy.visit('/#/rules');
         cy.get('[cy-data="response_rules_empty"]').should(
             'contain',
             'No response rules set',
@@ -155,7 +155,7 @@ describe('Mock LLM Spec for chatGPT', () => {
         after(reset);
 
         it('turns streaming on for the next request, and off again', () => {
-            cy.visit('/');
+            cy.visit('/#/settings');
             cy.get('[cy-data="streaming_status"]').should('contain', 'DISABLED');
             ask().its('body').should('be.jsonSchema', chatGPTSchema);
 
