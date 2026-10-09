@@ -706,7 +706,7 @@ The figures across the top of the overview lead to the page that holds them. The
 
 ![LLM Mock Server settings page](images/server-page-settings.png)
 
-The dashboard is dark by default. For a light one, set the `UI_THEME` environment variable, or `"uiTheme": "light"` in the `server` block of `.llmockrc.json`, or start with `--uiTheme=light`:
+The dashboard is dark by default. **Light theme** / **Dark theme** at the foot of the sidebar swaps between the two; the choice is kept by that browser and wins over the server's setting. To have the server start with a light one for everyone, set the `UI_THEME` environment variable, or `"uiTheme": "light"` in the `server` block of `.llmockrc.json`, or start with `--uiTheme=light`:
 
 ```bash
 UI_THEME=light npx llmock start       # macOS, Linux, Git Bash

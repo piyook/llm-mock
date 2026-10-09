@@ -383,6 +383,35 @@ describe('Mock LLM Spec for the admin API', () => {
             cy.get('h1').should('have.css', 'color', 'rgb(28, 33, 40)');
         });
 
+        it('swaps to the dark theme with the sidebar switch, and keeps it', () => {
+            cy.intercept('GET', '/ui-meta').as('meta');
+            cy.visit('/');
+            cy.get('html').should('have.attr', 'data-theme', 'light');
+
+            cy.get('[cy-data="theme_switch"]')
+                .should('contain', 'Dark theme')
+                .click();
+            cy.get('html').should('have.attr', 'data-theme', 'dark');
+            cy.get('[cy-data="connect"]').should(
+                'have.css',
+                'background-color',
+                'rgb(45, 51, 59)',
+            );
+            cy.get('[cy-data="theme_switch"]').should('contain', 'Light theme');
+
+            // The server still says light each time it is asked
+            cy.wait('@meta').its('response.body.uiTheme').should('eq', 'light');
+            cy.wait('@meta');
+            cy.get('html').should('have.attr', 'data-theme', 'dark');
+
+            cy.reload();
+            cy.get('html').should('have.attr', 'data-theme', 'dark');
+            cy.get('[cy-data="theme_switch"]')
+                .should('contain', 'Light theme')
+                .click();
+            cy.get('html').should('have.attr', 'data-theme', 'light');
+        });
+
         it('shows the admin API as on, with nothing added yet', () => {
             cy.visit('/#/settings');
             cy.get('[cy-data="admin_status"]').should('contain', 'ENABLED');

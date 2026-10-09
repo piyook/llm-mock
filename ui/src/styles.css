@@ -166,9 +166,19 @@ body {
 	white-space: nowrap;
 }
 
+/* The button that swaps the light and dark themes, at the foot of the sidebar */
+.themeSwitch {
+	margin-top: auto;
+	border: none;
+	background: none;
+	font: inherit;
+	font-weight: 650;
+	text-align: left;
+	cursor: pointer;
+}
+
 .sidebarFoot {
-	margin: auto 10px 0 10px;
-	padding-top: 16px;
+	margin: 8px 10px 0 10px;
 	font-size: 0.85rem;
 }
 
@@ -219,6 +229,11 @@ main {
 	.nav {
 		flex-direction: row;
 		flex-wrap: wrap;
+	}
+
+	/* At the far end of the bar */
+	.themeSwitch {
+		margin: 0 0 0 auto;
 	}
 
 	.navLink svg,

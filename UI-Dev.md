@@ -12,6 +12,8 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
 
 - It has three pages, chosen by the hash and listed in `pages` in `ui/src/App.svelte`: the overview (`/`, or any hash that names no page), `/#/settings` and `/#/rules`. The sidebar links are `cy-data="nav_overview"`, `nav_settings` and `nav_rules`. Only the page in view is drawn, so a test has to be on the right page (or click the sidebar link) before it looks for a setting or a rule.
 
+- The theme switch in the sidebar (`cy-data="theme_switch"`) keeps its choice in the browser's `localStorage` as `llmock-theme`. A small script in `ui/index.html` puts that choice on `<html data-theme>` before the page is drawn, and `App.svelte` keeps it there on each refresh; with nothing picked, the server's `uiTheme` is used.
+
 - The UI reads configuration and endpoint metadata from:
 
   ```bash

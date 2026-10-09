@@ -63,6 +63,43 @@
 		window.scrollTo(0, 0);
 	}
 
+	type Theme = UiMeta['uiTheme'];
+	// Also read by the script in index.html, before the page is drawn
+	const THEME_KEY = 'llmock-theme';
+	const themeIcons = {
+		// The sun, shown in the dark theme, and the moon
+		light:
+			'M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+		dark: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
+	};
+
+	// The theme picked with the sidebar's switch, kept by the browser; null
+	// until one is picked, or if the browser keeps nothing
+	function pickedTheme(): Theme | null {
+		try {
+			const picked = window.localStorage.getItem(THEME_KEY);
+			return picked === 'light' || picked === 'dark' ? picked : null;
+		} catch {
+			return null;
+		}
+	}
+
+	// The theme in view: the one picked here, otherwise the server's
+	let theme: Theme =
+		pickedTheme() ??
+		(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
+	$: otherTheme = (theme === 'dark' ? 'light' : 'dark') as Theme;
+
+	function switchTheme() {
+		theme = otherTheme;
+		document.documentElement.dataset.theme = theme;
+		try {
+			window.localStorage.setItem(THEME_KEY, theme);
+		} catch {
+			// Not kept, so the next visit starts from the server's theme
+		}
+	}
+
 	let meta: UiMeta | null = null;
 	let online: boolean | null = null;
 	let error: string | null = null;
@@ -306,9 +343,11 @@
 			const [m, p] = await Promise.all([fetchUiMeta(), fetchPing()]);
 			meta = m;
 			online = p;
-			// The server sets this on the page it serves; this covers the
-			// dashboard run on its own with `npm run ui-dev`
-			document.documentElement.dataset.theme = m.uiTheme;
+			// The server sets its theme on the page it serves; this covers
+			// the dashboard run on its own with `npm run ui-dev`. A theme
+			// picked here wins over the server's.
+			theme = pickedTheme() ?? m.uiTheme;
+			document.documentElement.dataset.theme = theme;
 			// Cleared only on success, so the message doesn't blink on every
 			// retry while the server is down
 			error = null;
@@ -371,6 +410,15 @@
 			</div>
 		</dl>
 
+		<button
+			class="navLink themeSwitch"
+			cy-data="theme_switch"
+			title="Kept by this browser. The server's own theme is set with uiTheme"
+			on:click={switchTheme}
+		>
+			<svg viewBox="0 0 24 24" aria-hidden="true"><path d={themeIcons[otherTheme]} /></svg>
+			<span>{otherTheme === 'light' ? 'Light theme' : 'Dark theme'}</span>
+		</button>
 		<p class="sidebarFoot muted">Refreshes every 2 seconds</p>
 	</aside>
 
