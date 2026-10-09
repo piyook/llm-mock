@@ -503,7 +503,7 @@ llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429
   `/v1/embeddings` always uses the `openai` shape.
 - A `429`, `503` or `529` carries `retry-after: 1`. Every chaos error carries `x-llmock-chaos: true`, so a test can tell it from a real failure.
 - A `frequency`, `mode`, `status`, `kind` or `afterChunks` in the config file that is not valid stops the server at startup.
-- The **Chaos** box on the dashboard shows the settings and how many calls have been failed since the server started.
+- The **Chaos** box on the dashboard's **Settings** page shows the settings and how many calls have been failed since the server started.
 
 #### Stream failures
 
@@ -653,7 +653,7 @@ await fetch('http://localhost:8001/admin/chaos', {
 - `PATCH /admin/settings` takes the same names and values as the model preset: `responseType` is `"lorem"` or `"stored"`, `stream`, `validateRequests` and `logRequests` are `true` or `false`, `maxLoremParas` is 1 to 1000 and `maxLoggedRequests` is 1 to 100.
 - `"responseType": "stored"` uses the preset's [`storedResponsesFile`](#response-types) if it has one, otherwise the texts that come with LLMock. If that file can not be read, the change is refused with a `400`.
 - `stream` has no effect on the `claude` template, where each request says whether it wants a stream.
-- The dashboard shows the settings in use, so a change appears there within 2 seconds. Its **Admin API** box has a **Reset** button that does the same as `POST /admin/reset`.
+- The dashboard shows the settings in use, so a change appears there within 2 seconds. The **Admin API** box on its **Settings** page has a **Reset** button that does the same as `POST /admin/reset`.
 - To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 
 #### Network exposure
@@ -701,9 +701,19 @@ Once running, open `http://localhost:8001` for the live dashboard:
 | `http://localhost:8001` | Main dashboard |
 | `http://localhost:8001/ping` | Health check |
 
-The dashboard shows server status, the llmock version, current configuration, available endpoints, and the most recent logged requests. Settings are grouped into **Connect**, **Model**, **Responses**, **Chaos**, **Response rules**, **Admin API**, **Embeddings** and **Diagnostics**. It refreshes automatically every 2 seconds.
+The dashboard has three pages, listed in the sidebar on the left (across the top on a narrow window):
 
-The dashboard is dark by default. For a light one, set the `UI_THEME` environment variable, or `"uiTheme": "light"` in the `server` block of `.llmockrc.json`, or start with `--uiTheme=light`:
+| Page | Address | Shows |
+| --- | --- | --- |
+| **Overview** | `http://localhost:8001/` | Server status and the llmock version, the base URL and endpoints to connect to, the main settings at a glance, and the request log |
+| **Settings** | `http://localhost:8001/#/settings` | The configuration in use, grouped into **Model**, **Responses**, **Diagnostics**, **Chaos**, **Embeddings** and **Admin API** |
+| **Response rules** | `http://localhost:8001/#/rules` | Every response rule, in the order they are matched |
+
+The figures across the top of the overview lead to the page that holds them. The dashboard refreshes automatically every 2 seconds.
+
+![LLM Mock Server settings page](images/server-page-settings.png)
+
+The dashboard is dark by default. **Light theme** / **Dark theme** at the foot of the sidebar swaps between the two; the choice is kept by that browser and wins over the server's setting. To have the server start with a light one for everyone, set the `UI_THEME` environment variable, or `"uiTheme": "light"` in the `server` block of `.llmockrc.json`, or start with `--uiTheme=light`:
 
 ```bash
 UI_THEME=light npx llmock start       # macOS, Linux, Git Bash
@@ -712,9 +722,9 @@ $env:UI_THEME = 'light'; npx llmock start   # PowerShell
 
 The flag wins over the environment variable, which wins over the config file. In Docker, add `UI_THEME=light` to `environment` in `docker-compose.yml`. Any value other than `light` gives the dark theme.
 
-With `responseType: "stored"` the dashboard names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** box lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. A rule that holds its reply as `text` shows **its own text** in place of a file; click it to read the text. A rule added through the [admin API](#admin-api-changing-rules-and-settings-while-running) is listed first and marked **runtime**; one with `times` also shows how many requests it has left. With no rules set, the box shows a blank rule with a note pointing to the setting.
+With `responseType: "stored"` the **Settings** page names the stored responses file in use (or `Bundled`); click it to read every response in the pool. The **Response rules** page lists each of the preset's `responseRules` as its `match` text beside the file(s) it replies with, how the reply ends when the rule sets a `stopReason` other than `end`, and how the call fails when the rule sets `fail`; click a file to read its contents. A rule that holds its reply as `text` shows **its own text** in place of a file; click it to read the text. A rule added through the [admin API](#admin-api-changing-rules-and-settings-while-running) is listed first and marked **runtime**; one with `times` also shows how many requests it has left. With no rules set, the page shows a blank rule with a note pointing to the setting.
 
-While the admin API is on, settings have a button beside them that changes the running server. The ones with two values switch at a click: **Response Type** (lorem or stored), **Streaming**, **Chaos**, **Request Validation** and **Request Log**. The others have **Change**, which opens boxes to fill in, with **Save** and **Cancel**: **Response Delay**, **Maximum sentences**, **Max Logged Requests** and, while chaos is on, **Error Frequency**, **Error Status**, **Failure Kind** and **Streams Fail**. A value the server refuses is explained in that box of the dashboard and the boxes stay open. A change made this way is not saved; **Reset** or a restart puts it back. (Streaming has no button on the `claude` template, where each request says whether it wants a stream.)
+While the admin API is on, the values on the **Settings** page have a button beside them that changes the running server. The ones with two values switch at a click: **Response Type** (lorem or stored), **Streaming**, **Chaos**, **Request Validation** and **Request Log**. The others have **Change**, which opens boxes to fill in, with **Save** and **Cancel**: **Response Delay**, **Maximum sentences**, **Max Logged Requests** and, while chaos is on, **Error Frequency**, **Error Status**, **Failure Kind** and **Streams Fail**. A value the server refuses is explained in that box of the dashboard and the boxes stay open. A change made this way is not saved; **Reset** or a restart puts it back. (Streaming has no button on the `claude` template, where each request says whether it wants a stream.)
 
 The **Admin API** box says whether the admin API is on and how many rules were added while running. **Reset** does what `POST /admin/reset` does, after asking you to confirm: it removes those rules, puts chaos and delay back to how the server started and sets the chaos count to 0.
 
@@ -1163,7 +1173,7 @@ The server refuses to start on a malformed `responseRules` entry, or on a `store
 
 **Calls fail with a 500 or another error you didn't expect**
 
-Check whether chaos is on: the **Chaos** box on the dashboard shows `ENABLED`, and a chaos error carries the header `x-llmock-chaos: true`. Set `"chaos": { "enabled": false }` in the preset (or drop `--chaos=true`) and restart.
+Check whether chaos is on: the **Chaos** box on the dashboard's **Settings** page shows `ENABLED`, and a chaos error carries the header `x-llmock-chaos: true`. Set `"chaos": { "enabled": false }` in the preset (or drop `--chaos=true`) and restart.
 
 **Port already in use**
 

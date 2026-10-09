@@ -4,6 +4,17 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Mock LLM Server Dashboard</title>
+		<script>
+			// A theme picked on the dashboard wins over the one the server
+			// names on this page, and is set here so the page is drawn in it
+			// from the start
+			try {
+				const picked = localStorage.getItem('llmock-theme');
+				if (picked === 'light' || picked === 'dark') {
+					document.documentElement.dataset.theme = picked;
+				}
+			} catch {}
+		</script>
 	</head>
 	<body>
 		<div id="app" style="padding:24px;font-family:Segoe UI,Roboto,Arial,sans-serif;">

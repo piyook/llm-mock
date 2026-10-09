@@ -10,6 +10,10 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
   http://localhost:8001/
   ```
 
+- It has three pages, chosen by the hash and listed in `pages` in `ui/src/App.svelte`: the overview (`/`, or any hash that names no page), `/#/settings` and `/#/rules`. The sidebar links are `cy-data="nav_overview"`, `nav_settings` and `nav_rules`. Only the page in view is drawn, so a test has to be on the right page (or click the sidebar link) before it looks for a setting or a rule.
+
+- The theme switch in the sidebar (`cy-data="theme_switch"`) keeps its choice in the browser's `localStorage` as `llmock-theme`. A small script in `ui/index.html` puts that choice on `<html data-theme>` before the page is drawn, and `App.svelte` keeps it there on each refresh; with nothing picked, the server's `uiTheme` is used.
+
 - The UI reads configuration and endpoint metadata from:
 
   ```bash
@@ -31,7 +35,7 @@ This project includes a Svelte-based dashboard for inspecting and testing the mo
   - `adminApi` (`ENABLED` or `DISABLED`)
   - `uiTheme` (`dark` or `light`, from `UI_THEME`, `--uiTheme` or `server.uiTheme`). The server also writes it to the page as `<html data-theme="…">`, which is what `ui/src/styles.css` goes by; colours are CSS variables on `:root`, with the light theme's under `:root[data-theme='light']`
 
-- The viewer dialog reads file contents from `/ui-stored-responses` and `/ui-rule-file?rule=<i>&file=<j>` (`i` is the rule's place among the config file's rules, not counting runtime rules), and the most recent logged requests (10 unless `maxLoggedRequests` is set) from `/ui-request-log`, shown one at a time. **Clear logs** sends `DELETE /ui-request-log`. A rule's own `text` is shown straight from `/ui-meta`. **Reset** in the Admin API box sends `POST /admin/reset`. The switch buttons (`cy-data="switch_…"`) and the **Change** buttons (`ui/src/SettingEditor.svelte`: `change_…`, `edit_…_<key>`, `save_…`) send `PATCH /admin/settings`, `/admin/chaos` or `/admin/delay` and are only drawn while `adminApi` is `ENABLED`.
+- The viewer dialog reads file contents from `/ui-stored-responses` and `/ui-rule-file?rule=<i>&file=<j>` (`i` is the rule's place among the config file's rules, not counting runtime rules), and the most recent logged requests (10 unless `maxLoggedRequests` is set) from `/ui-request-log`, shown one at a time. **Clear logs** sends `DELETE /ui-request-log`. A rule's own `text` is shown straight from `/ui-meta`. **View request log** is on the overview and in the Diagnostics box of the settings page. **Reset** in the Admin API box sends `POST /admin/reset`. The switch buttons (`cy-data="switch_…"`) and the **Change** buttons (`ui/src/SettingEditor.svelte`: `change_…`, `edit_…_<key>`, `save_…`) send `PATCH /admin/settings`, `/admin/chaos` or `/admin/delay` and are only drawn while `adminApi` is `ENABLED`.
 
 ### Running everything locally
 
@@ -56,5 +60,5 @@ npm run ui-dev
 ```
 
 - The UI dev server runs on `http://localhost:5173/`
-- API and meta requests such as `/ping`, `/ui-meta`, `/ui-request-log`, and typical LLM endpoints are proxied to `http://localhost:8001` (you’ll still want the main server running via `npm run dev` during UI work).
+- API and meta requests such as `/ping`, `/ui-meta`, `/ui-request-log`, `/admin`, and typical LLM endpoints are proxied to `http://localhost:8001` (you’ll still want the main server running via `npm run dev` during UI work).
 

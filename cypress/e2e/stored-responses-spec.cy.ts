@@ -42,7 +42,7 @@ describe('Mock LLM Spec for configured stored responses', () => {
     it('draws the dashboard in the dark theme unless told otherwise', () => {
         cy.request('/ui-meta').its('body.uiTheme').should('eq', 'dark');
 
-        cy.visit('/');
+        cy.visit('/#/settings');
         cy.get('html').should('have.attr', 'data-theme', 'dark');
         cy.get('[cy-data="responses"]').should(
             'have.css',
@@ -56,7 +56,7 @@ describe('Mock LLM Spec for configured stored responses', () => {
         cy.request('/ui-meta')
             .its('body.maxLoggedRequests')
             .then((max) => {
-                cy.visit('/');
+                cy.visit('/#/settings');
                 cy.get('[cy-data="max_logged_requests"]').should(
                     'contain',
                     max,
@@ -68,7 +68,7 @@ describe('Mock LLM Spec for configured stored responses', () => {
     });
 
     it('shows chaos as off when the preset does not set it', () => {
-        cy.visit('/');
+        cy.visit('/#/settings');
         cy.get('[cy-data="chaos_status"]').should('contain', 'DISABLED');
         cy.get('[cy-data="chaos_frequency"]').should('not.exist');
     });
@@ -136,7 +136,7 @@ describe('Mock LLM Spec for configured stored responses', () => {
 
     it('shows the configured pool in the dashboard viewer', () => {
         cy.readFile(storedPath).then((entries) => {
-            cy.visit('/');
+            cy.visit('/#/settings');
             cy.get('[cy-data="stored_responses_link"]')
                 .should('contain', storedPath)
                 .click();
@@ -153,7 +153,7 @@ describe('Mock LLM Spec for configured stored responses', () => {
     it('lists the response rules on the dashboard and shows a rule file', () => {
         cy.readFile('cypress/fixtures/mock-rules/plain-reply.txt').then(
             (expected) => {
-                cy.visit('/');
+                cy.visit('/#/rules');
                 cy.get('[cy-data="response_rules"]').should(
                     'contain',
                     'E2E_FIXTURE_TEXT',
@@ -171,12 +171,8 @@ describe('Mock LLM Spec for configured stored responses', () => {
         );
     });
 
-    it('leaves a short list of rules and of stored responses unscrolled', () => {
-        cy.visit('/');
-        cy.get('[cy-data="response_rules"] .rules').should(
-            'not.have.class',
-            'scrollList',
-        );
+    it('leaves a short list of stored responses unscrolled', () => {
+        cy.visit('/#/settings');
         cy.get('[cy-data="stored_responses_link"]').click();
         cy.get('[cy-data="viewer_text"]').should('exist');
         cy.get('[cy-data="viewer"] .viewerTexts').should(
@@ -185,8 +181,9 @@ describe('Mock LLM Spec for configured stored responses', () => {
         );
     });
 
-    // The dashboard routes are stubbed to return more than four of each
-    it('scrolls a long list of rules and of stored responses inside a fixed window', () => {
+    // The dashboard routes are stubbed to return more than four of each. The
+    // rules have a page to themselves, so only the viewer scrolls inside itself.
+    it('lists every rule on its page and scrolls a long list of stored responses inside a fixed window', () => {
         const scrolls = ($list: JQuery<HTMLElement>) => {
             expect($list).to.have.class('scrollList');
             expect($list[0].scrollHeight).to.be.greaterThan(
@@ -209,14 +206,18 @@ describe('Mock LLM Spec for configured stored responses', () => {
             body: { file: storedPath, responses },
         });
 
-        cy.visit('/');
+        cy.visit('/#/rules');
         cy.get('[cy-data="response_rules_count"]').should(
             'contain',
             '6 rules',
         );
         cy.get('[cy-data="rule_file_link"]').should('have.length', 6);
-        cy.get('[cy-data="response_rules"] .rules').should(scrolls);
+        cy.get('[cy-data="response_rules"] .rules').should(
+            'not.have.class',
+            'scrollList',
+        );
 
+        cy.get('[cy-data="nav_settings"]').click();
         cy.get('[cy-data="stored_responses_link"]').click();
         cy.get('[cy-data="viewer_text"]').should('have.length', 6);
         cy.get('[cy-data="viewer"] .viewerTexts').should(scrolls);
@@ -239,7 +240,7 @@ describe('Mock LLM Spec for configured stored responses', () => {
         });
 
         cy.viewport(360, 640);
-        cy.visit('/');
+        cy.visit('/#/rules');
         cy.get('[cy-data="rule_file_link"]').click();
         cy.get('[cy-data="viewer_text"]').should('have.text', 'A reply.');
         cy.get('[cy-data="viewer"] .viewerHeader .fileLink')
