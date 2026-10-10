@@ -389,7 +389,8 @@ describe('Mock LLM Spec for the admin API', () => {
             cy.get('html').should('have.attr', 'data-theme', 'light');
 
             cy.get('[cy-data="theme_switch"]')
-                .should('contain', 'Dark theme')
+                .should('contain', 'Dark mode')
+                .and('have.attr', 'aria-checked', 'false')
                 .click();
             cy.get('html').should('have.attr', 'data-theme', 'dark');
             cy.get('[cy-data="connect"]').should(
@@ -397,7 +398,11 @@ describe('Mock LLM Spec for the admin API', () => {
                 'background-color',
                 'rgb(45, 51, 59)',
             );
-            cy.get('[cy-data="theme_switch"]').should('contain', 'Light theme');
+            cy.get('[cy-data="theme_switch"]').should(
+                'have.attr',
+                'aria-checked',
+                'true',
+            );
 
             // The server still says light each time it is asked
             cy.wait('@meta').its('response.body.uiTheme').should('eq', 'light');
@@ -407,7 +412,7 @@ describe('Mock LLM Spec for the admin API', () => {
             cy.reload();
             cy.get('html').should('have.attr', 'data-theme', 'dark');
             cy.get('[cy-data="theme_switch"]')
-                .should('contain', 'Light theme')
+                .should('have.attr', 'aria-checked', 'true')
                 .click();
             cy.get('html').should('have.attr', 'data-theme', 'light');
         });
@@ -517,9 +522,13 @@ describe('Mock LLM Spec for the admin API', () => {
             cy.visit('/#/settings');
 
             cy.get('[cy-data="chaos_status"]').should('have.text', 'DISABLED');
-            cy.get('[cy-data="switch_chaos"]').should('contain', 'Turn on').click();
+            cy.get('[cy-data="switch_chaos"]')
+                .should('have.attr', 'aria-checked', 'false')
+                .click();
             cy.get('[cy-data="chaos_status"]').should('have.text', 'ENABLED');
-            cy.get('[cy-data="switch_chaos"]').should('contain', 'Turn off').click();
+            cy.get('[cy-data="switch_chaos"]')
+                .should('have.attr', 'aria-checked', 'true')
+                .click();
             cy.get('[cy-data="chaos_status"]').should('have.text', 'DISABLED');
 
             cy.get('[cy-data="validate_requests"]').should('have.text', 'ON');

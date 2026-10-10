@@ -160,7 +160,7 @@ describe('Mock LLM Spec for chatGPT', () => {
             ask().its('body').should('be.jsonSchema', chatGPTSchema);
 
             cy.get('[cy-data="switch_streaming"]')
-                .should('contain', 'Turn on')
+                .should('have.attr', 'aria-checked', 'false')
                 .click();
             cy.get('[cy-data="streaming_status"]').should('contain', 'ENABLED');
             cy.request('/admin/settings')
@@ -185,7 +185,7 @@ describe('Mock LLM Spec for chatGPT', () => {
                 });
 
             cy.get('[cy-data="switch_streaming"]')
-                .should('contain', 'Turn off')
+                .should('have.attr', 'aria-checked', 'true')
                 .click();
             cy.get('[cy-data="streaming_status"]').should('contain', 'DISABLED');
             ask().its('body').should('be.jsonSchema', chatGPTSchema);

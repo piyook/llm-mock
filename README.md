@@ -710,7 +710,7 @@ Once running, open `http://localhost:8001` for the live dashboard. A health chec
 
 - **Settings** shows the configuration in use. While the [admin API](#admin-api-changing-rules-and-settings-while-running) is on, you can change values here on the running server; changes are not saved, and **Reset** or a restart puts them back.
 - **Response rules** lists the preset's `responseRules`; click a file or text entry to read the reply. Rules added through the admin API are marked **runtime**.
-- **Light theme** / **Dark theme** in the sidebar switches the colours for your browser. To change the default, set `"uiTheme": "light"` in the `server` block, start with `--uiTheme=light`, or set the `UI_THEME=light` environment variable.
+- The **Dark mode** switch in the sidebar changes the colours for your browser. To change the default, set `"uiTheme": "light"` in the `server` block, start with `--uiTheme=light`, or set the `UI_THEME=light` environment variable.
 
 ### Available endpoints
 
