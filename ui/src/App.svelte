@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import SettingEditor from './SettingEditor.svelte';
+	import Toggle from './Toggle.svelte';
 	import {
 		changeRuntimeSettings,
 		clearRequestLog,
@@ -66,12 +67,8 @@
 	type Theme = UiMeta['uiTheme'];
 	// Also read by the script in index.html, before the page is drawn
 	const THEME_KEY = 'llmock-theme';
-	const themeIcons = {
-		// The sun, shown in the dark theme, and the moon
-		light:
-			'M12 8a4 4 0 1 0 0 8a4 4 0 0 0 0-8zM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
-		dark: 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
-	};
+	// The moon beside the sidebar's switch
+	const darkIcon = 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z';
 
 	// The theme picked with the sidebar's switch, kept by the browser; null
 	// until one is picked, or if the browser keeps nothing
@@ -88,10 +85,9 @@
 	let theme: Theme =
 		pickedTheme() ??
 		(document.documentElement.dataset.theme === 'light' ? 'light' : 'dark');
-	$: otherTheme = (theme === 'dark' ? 'light' : 'dark') as Theme;
 
 	function switchTheme() {
-		theme = otherTheme;
+		theme = theme === 'dark' ? 'light' : 'dark';
 		document.documentElement.dataset.theme = theme;
 		try {
 			window.localStorage.setItem(THEME_KEY, theme);
@@ -413,11 +409,14 @@
 		<button
 			class="navLink themeSwitch"
 			cy-data="theme_switch"
+			role="switch"
+			aria-checked={theme === 'dark'}
 			title="Kept by this browser. The server's own theme is set with uiTheme"
 			on:click={switchTheme}
 		>
-			<svg viewBox="0 0 24 24" aria-hidden="true"><path d={themeIcons[otherTheme]} /></svg>
-			<span>{otherTheme === 'light' ? 'Light theme' : 'Dark theme'}</span>
+			<svg viewBox="0 0 24 24" aria-hidden="true"><path d={darkIcon} /></svg>
+			<span>Dark mode</span>
+			<span class="toggle" class:on={theme === 'dark'}><span class="toggleThumb"></span></span>
 		</button>
 		<p class="sidebarFoot muted">Refreshes every 2 seconds</p>
 	</aside>
@@ -564,15 +563,13 @@
 									</span>
 									<!-- The claude template streams when a request asks it to -->
 									{#if canChange && meta?.llmName !== 'claude'}
-										<button
-											class="fileLink switch"
-											cy-data="switch_streaming"
-											title="Changes this on the running server. Reset or a restart puts it back"
+										<Toggle
+											name="switch_streaming"
+											label="Streaming"
+											on={meta?.streamingStatus === 'ENABLED'}
 											on:click={() =>
 												change('model', 'settings', { stream: meta?.streamingStatus !== 'ENABLED' })}
-										>
-											{meta?.streamingStatus === 'ENABLED' ? 'Turn off' : 'Turn on'}
-										</button>
+										/>
 									{/if}
 								</span>
 							</div>
@@ -660,14 +657,12 @@
 								<span class="kvValue">
 									<span class="badge" cy-data="validate_requests">{meta?.validateRequests || 'OFF'}</span>
 									{#if canChange}
-										<button
-											class="fileLink switch"
-											cy-data="switch_validate_requests"
-											title="Changes this on the running server. Reset or a restart puts it back"
+										<Toggle
+											name="switch_validate_requests"
+											label="Request Validation"
+											on={meta?.validateRequests === 'ON'}
 											on:click={() => change('diagnostics', 'settings', { validateRequests: meta?.validateRequests !== 'ON' })}
-										>
-											{meta?.validateRequests === 'ON' ? 'Turn off' : 'Turn on'}
-										</button>
+										/>
 									{/if}
 								</span>
 							</div>
@@ -680,14 +675,12 @@
 								<span class="kvValue">
 									<span class="badge" cy-data="log_requests">{meta?.logRequests || 'OFF'}</span>
 									{#if canChange}
-										<button
-											class="fileLink switch"
-											cy-data="switch_log_requests"
-											title="Changes this on the running server. Reset or a restart puts it back"
+										<Toggle
+											name="switch_log_requests"
+											label="Request Log"
+											on={meta?.logRequests?.toUpperCase() === 'ON'}
 											on:click={() => change('diagnostics', 'settings', { logRequests: meta?.logRequests?.toUpperCase() !== 'ON' })}
-										>
-											{meta?.logRequests?.toUpperCase() === 'ON' ? 'Turn off' : 'Turn on'}
-										</button>
+										/>
 									{/if}
 								</span>
 							</div>
@@ -735,14 +728,12 @@
 								<span class="kvValue">
 									<span class="badge" cy-data="chaos_status">{meta?.chaosStatus ?? 'DISABLED'}</span>
 									{#if canChange}
-										<button
-											class="fileLink switch"
-											cy-data="switch_chaos"
-											title="Changes this on the running server. Reset or a restart puts it back"
+										<Toggle
+											name="switch_chaos"
+											label="Chaos"
+											on={meta?.chaosStatus === 'ENABLED'}
 											on:click={() => change('chaos', 'chaos', { enabled: meta?.chaosStatus !== 'ENABLED' })}
-										>
-											{meta?.chaosStatus === 'ENABLED' ? 'Turn off' : 'Turn on'}
-										</button>
+										/>
 									{/if}
 								</span>
 							</div>
