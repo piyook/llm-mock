@@ -464,6 +464,23 @@ describe('Mock LLM Spec for the admin API', () => {
             cy.get('h1').should('have.text', 'Overview');
         });
 
+        it('fits the window, with the foot of the sidebar in view', () => {
+            cy.viewport(1440, 900);
+            cy.visit('/');
+            cy.get('[cy-data="feature"]').should('have.length', 8);
+            cy.contains('Refreshes every 2 seconds').should(($foot) => {
+                expect($foot[0].getBoundingClientRect().bottom).to.be.at.most(
+                    900,
+                );
+            });
+            // Nothing of the overview is below the window
+            cy.document().should((doc) => {
+                expect(doc.documentElement.scrollHeight).to.eq(
+                    doc.documentElement.clientHeight,
+                );
+            });
+        });
+
         it('sums up the settings on the overview and keeps up with changes', () => {
             cy.visit('/');
             cy.get('[cy-data="tile_model"]').should('contain', 'claude');

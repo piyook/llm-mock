@@ -17,8 +17,12 @@
 		</script>
 	</head>
 	<body>
-		<div id="app" style="padding:24px;font-family:Segoe UI,Roboto,Arial,sans-serif;">
-			Loading dashboard…
+		<!-- The padding is on the placeholder, not on #app, so it goes when the
+		     dashboard is mounted and the dashboard is no taller than the window -->
+		<div id="app">
+			<div style="padding:24px;font-family:Segoe UI,Roboto,Arial,sans-serif;">
+				Loading dashboard…
+			</div>
 		</div>
 		<noscript style="padding:24px;font-family:Segoe UI,Roboto,Arial,sans-serif;">
 			This page requires JavaScript enabled.
