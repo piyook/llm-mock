@@ -39,9 +39,14 @@ for (const rule of responseRules) {
 		}
 	}
 
-	// A contentFile that is there must hold valid blocks
+	// A contentFile that is there but holds bad JSON or blocks is warned about
+	// like a missing one: the requests it matches fail with the same message
 	if (rule.contentFile !== undefined && readable) {
-		readRuleContent(rule, rulesDir);
+		try {
+			readRuleContent(rule, rulesDir);
+		} catch (error) {
+			console.warn(`WARNING: ${(error as Error).message}`);
+		}
 	}
 }
 
