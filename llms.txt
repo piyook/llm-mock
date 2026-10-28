@@ -34,10 +34,13 @@ npx llmock stop                        # add --port=<n> if not 8001
 | Anthropic SDK | `claude` | `baseURL: "http://localhost:8001"`, `apiKey: "mock"` (or env `ANTHROPIC_BASE_URL`). SDK calls `POST /v1/messages`. |
 | OpenAI SDK / LangChain `ChatOpenAI` | `chatgpt` | `baseURL: "http://localhost:8001/chatgpt"`, `apiKey: "mock"`. SDK calls `POST /chatgpt/chat/completions`. |
 | OpenAI SDK, chat + embeddings on one base URL | custom | Set the preset `endpoint` to `"v1/chat/completions"` and use `baseURL: "http://localhost:8001/v1"`. |
+| Google Gen AI SDK (`@google/genai`) | `gemini`, endpoint changed | Set the preset `endpoint` to `"v1beta/models/gemini-pro:generateContent"`, then `new GoogleGenAI({ apiKey: "mock", httpOptions: { baseUrl: "http://localhost:8001" } })` and call `generateContent` with `model: "gemini-pro"`. SDK calls `POST /v1beta/models/<model>:generateContent`. |
 | Gemini-style REST | `gemini` | `POST http://localhost:8001/models/gemini-pro:generateContent` |
 | Raw HTTP | any | `POST http://localhost:8001/<endpoint>` with `Content-Type: application/json` |
 
 Embeddings are always at `/v1/embeddings`, not under the chat prefix: with the stock `chatgpt` preset an OpenAI client using base `…/chatgpt` will 404 on embeddings.
+
+Gemini SDKs need the endpoint change above: the stock `gemini` endpoint has no `/v1beta` prefix, so a Google SDK pointed at the mock gets a 404. The model is part of the path, so the `model` the client sends must match the one in `endpoint` (one model per preset; `gemini-2.5-flash` against a `gemini-pro` endpoint is a 404). `generateContentStream` is not mocked: it calls `:streamGenerateContent?alt=sse`, which has no route, and `stream: true` sends OpenAI-style chunks that the Google SDK cannot read. Use `generateContent` in tests.
 
 ## `.llmockrc.json`
 
@@ -360,7 +363,7 @@ To change a response envelope or the required request keys, or to mock a provide
 ## Limits to design around
 
 - CORS: only streamed replies carry `Access-Control-Allow-Origin`, and there is no `OPTIONS` handler. Browser code calling the mock cross-origin will fail preflight; call it from a server/test process or through your dev-server proxy.
-- Not mocked: tool/function calls in the `openai`, `gemini` and custom formats (and their `tool_calls`/`functionCall` stop reasons), server tools (`web_search` and the like), images, multiple choices (`n`), the stop reasons `stop_sequence` and `pause_turn` (and their equivalents in the other formats), `/v1/models`, `/v1/messages/count_tokens`. Claude tool calls come only from rules: the mock never picks a tool itself, and it does not check `tool_use_id`s against earlier turns.
+- Not mocked: tool/function calls in the `openai`, `gemini` and custom formats (and their `tool_calls`/`functionCall` stop reasons), server tools (`web_search` and the like), images, multiple choices (`n`), the stop reasons `stop_sequence` and `pause_turn` (and their equivalents in the other formats), Gemini's `streamGenerateContent`, `/v1/models`, `/v1/messages/count_tokens`. Claude tool calls come only from rules: the mock never picks a tool itself, and it does not check `tool_use_id`s against earlier turns.
 
 ## Recipes
 
