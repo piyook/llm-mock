@@ -4,6 +4,8 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
+	collectLastMessageStrings,
+	findMatchingRule,
 	loadRuleBlocks,
 	readRuleContent,
 	ruleFiles,
@@ -287,5 +289,115 @@ describe('splitInputJson', () => {
 
 	test('sends {} as one piece', () => {
 		expect(splitInputJson('{}')).toEqual(['{}']);
+	});
+});
+
+describe('a rule with in: "last"', () => {
+	const weatherTool = {
+		name: 'get_weather',
+		description: 'Weather for a city',
+		input_schema: { type: 'object' },
+	};
+	const step1 = {
+		role: 'user',
+		content: 'Plan a picnic in Paris',
+	};
+	const toolTurn = {
+		role: 'assistant',
+		content: [
+			{
+				type: 'tool_use',
+				id: 'toolu_01a',
+				name: 'get_weather',
+				input: { city: 'Paris' },
+			},
+		],
+	};
+	const resultTurn = (content: unknown, isError = false) => ({
+		role: 'user',
+		content: [
+			{
+				type: 'tool_result',
+				tool_use_id: 'toolu_01a',
+				content,
+				...(isError && { is_error: true }),
+			},
+		],
+	});
+	const body = (...messages: unknown[]) => ({
+		model: 'claude-opus-5-5',
+		max_tokens: 100,
+		system: 'You plan picnics',
+		tools: [weatherTool],
+		messages,
+	});
+
+	const rules = [
+		{ match: 'Plan a picnic', in: 'last', text: 'step 1' },
+		{ match: 'sunny', in: 'last', text: 'step 2' },
+		{ match: 'unavailable', in: 'last', text: 'tool failed' },
+	] as any;
+
+	test('a step-1 rule fires only on step 1', () => {
+		expect(findMatchingRule(rules, body(step1))?.text).toBe('step 1');
+		const later = body(step1, toolTurn, resultTurn('sunny, 21C'));
+		expect(findMatchingRule(rules, later)?.text).toBe('step 2');
+	});
+
+	test('searches tool_result content given as blocks, and an error result', () => {
+		const blocks = body(
+			step1,
+			toolTurn,
+			resultTurn([{ type: 'text', text: 'service unavailable' }], true),
+		);
+		expect(findMatchingRule(rules, blocks)?.text).toBe('tool failed');
+	});
+
+	test('does not search the system prompt, the tools or the role', () => {
+		for (const match of ['You plan picnics', 'get_weather', 'user']) {
+			const rule = [{ match, in: 'last', text: 'x' }] as any;
+			expect(findMatchingRule(rule, body(step1))).toBeUndefined();
+		}
+	});
+
+	test('the default still searches the whole body, tools included', () => {
+		const later = body(step1, toolTurn, resultTurn('sunny'));
+		const anyRules = [
+			{ match: 'Plan a picnic', text: 'any' },
+			{ match: 'Weather for a city', in: 'any', text: 'tools' },
+		] as any;
+		expect(findMatchingRule(anyRules, later)?.text).toBe('any');
+		expect(findMatchingRule([anyRules[1]], later)?.text).toBe('tools');
+	});
+
+	test('a body with no messages never matches', () => {
+		const rule = [{ match: 'x', in: 'last', text: 'x' }] as any;
+		for (const value of [
+			undefined,
+			{},
+			{ messages: [] },
+			{ messages: 'x' },
+		]) {
+			expect(findMatchingRule(rule, value)).toBeUndefined();
+		}
+	});
+
+	test('collectLastMessageStrings reads the last entry whatever its role', () => {
+		expect(
+			collectLastMessageStrings(
+				body(step1, { role: 'system', content: 'be brief' }),
+			),
+		).toEqual(['be brief']);
+	});
+
+	test('in must be "any" or "last"', () => {
+		expect(check(rule({ text: 'x', in: 'last' }))).not.toThrow();
+		expect(check(rule({ text: 'x', in: 'any' }))).not.toThrow();
+		expect(check(rule({ text: 'x', in: 'first' }))).toThrow(
+			'rule.in must be one of: any, last',
+		);
+		expect(check(rule({ content: [toolUse], in: 'everywhere' }))).toThrow(
+			/rule\.in must be one of/,
+		);
 	});
 });

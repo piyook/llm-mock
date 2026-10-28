@@ -56,7 +56,18 @@ export interface ResponseRule {
 	contentFile?: string;
 	stopReason?: StopReason | 'tool_use';
 	fail?: Partial<CallFailure>;
+	in?: RuleScope;
 }
+
+/**
+ * Where a rule's `match` is looked for: `any` string value in the request
+ * body (the default), or only the `last` message's content. In a tool loop
+ * the earlier turns, and the tools, are sent again on every step, so a rule
+ * keyed on the latest tool result needs `last`.
+ */
+const ruleScopes = ['any', 'last'] as const;
+
+export type RuleScope = (typeof ruleScopes)[number];
 
 // The keys that hold a rule's reply; a rule has at most one of them
 const replyKeys = ['text', 'file', 'files', 'content', 'contentFile'] as const;
@@ -83,8 +94,27 @@ export const collectStrings = (value: unknown): string[] => {
 };
 
 /**
+ * The string values of the last entry of `messages`: its content, as a
+ * string or blocks (tool_result content included). Its role is left out.
+ * Empty if the body has no messages.
+ */
+export const collectLastMessageStrings = (body: unknown): string[] => {
+	const messages =
+		typeof body === 'object' && body !== null
+			? (body as { messages?: unknown }).messages
+			: undefined;
+	if (!Array.isArray(messages) || messages.length === 0) return [];
+
+	const last: unknown = messages.at(-1);
+	return typeof last === 'object' && last !== null
+		? collectStrings((last as { content?: unknown }).content)
+		: [];
+};
+
+/**
  * Returns the first rule (in config order) whose `match` appears in the
- * request body, or undefined. Matching is case-sensitive.
+ * request body, or undefined. Matching is case-sensitive. A rule with
+ * `in: "last"` is matched against the last message only.
  */
 export const findMatchingRule = (
 	rules: ResponseRule[],
@@ -92,8 +122,16 @@ export const findMatchingRule = (
 ): ResponseRule | undefined => {
 	if (rules.length === 0) return undefined;
 
-	const text = collectStrings(body).join('\n');
-	return rules.find((rule) => text.includes(rule.match));
+	// Each is worked out once, and only if a rule needs it
+	const texts: Partial<Record<RuleScope, string>> = {};
+	const textIn = (scope: RuleScope) =>
+		(texts[scope] ??= (
+			scope === 'last'
+				? collectLastMessageStrings(body)
+				: collectStrings(body)
+		).join('\n'));
+
+	return rules.find((rule) => textIn(rule.in ?? 'any').includes(rule.match));
 };
 
 /**
@@ -302,6 +340,13 @@ export const validateResponseRule = (
 	}
 
 	if (fail !== undefined) validateRuleFail(fail, label);
+
+	const scope = (rule as Partial<ResponseRule>).in;
+	if (scope !== undefined && !ruleScopes.includes(scope)) {
+		throw new TypeError(
+			`${label}.in must be one of: ${ruleScopes.join(', ')}`,
+		);
+	}
 
 	if (content !== undefined || contentFile !== undefined) {
 		validateToolCallRule(rule as Partial<ResponseRule>, label, format);
