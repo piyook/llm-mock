@@ -8,6 +8,9 @@ import { loadConfig } from '../../config/config-loader.js';
 
 // A tool-call rule's reply through the real chat route, in the claude format
 
+// Eight words, so eight text deltas
+const textReply = 'Let me look that order up for you.';
+
 const lookupBlock = {
 	type: 'tool_use',
 	name: 'lookup_order',
@@ -52,12 +55,21 @@ describe('a tool-call reply', () => {
 							{
 								match: 'WANT_TEXT_AND_TOOL',
 								content: [
-									{
-										type: 'text',
-										text: 'Let me look that order up for you.',
-									},
+									{ type: 'text', text: textReply },
 									lookupBlock,
 								],
+							},
+							{
+								match: 'WANT_FAIL_AFTER_9',
+								content: [
+									{ type: 'text', text: textReply },
+									lookupBlock,
+								],
+								fail: {
+									kind: 'stream-error',
+									status: 529,
+									afterChunks: 9,
+								},
 							},
 							{
 								match: 'WANT_FILE',
@@ -107,6 +119,87 @@ describe('a tool-call reply', () => {
 				messages: [{ role: 'user', content: marker }],
 			},
 		});
+
+	// The JSON of every `data:` line of an SSE body
+	const streamData = (payload: string): any[] =>
+		payload
+			.split('\n')
+			.filter((line) => line.startsWith('data: {'))
+			.map((line) => JSON.parse(line.slice('data: '.length)));
+
+	describe('streamed', () => {
+		test('sends the blocks as the API streams them, ending with tool_use', async () => {
+			const response = await post('WANT_TEXT_AND_TOOL', true);
+			const events = streamData(response.payload);
+
+			expect(response.headers['content-type']).toBe('text/event-stream');
+			expect(events[0].type).toBe('message_start');
+			expect(events.at(-2)).toMatchObject({
+				type: 'message_delta',
+				delta: { stop_reason: 'tool_use', stop_sequence: null },
+			});
+			expect(events.at(-1).type).toBe('message_stop');
+
+			const start = events.find(
+				(e) => e.type === 'content_block_start' && e.index === 1,
+			);
+			expect(start.content_block).toEqual({
+				type: 'tool_use',
+				id: expect.stringMatching(/^toolu_01/),
+				name: 'lookup_order',
+				input: {},
+			});
+
+			const deltas = (index: number) =>
+				events.filter(
+					(e) =>
+						e.type === 'content_block_delta' && e.index === index,
+				);
+			expect(
+				deltas(0)
+					.map((e) => e.delta.text)
+					.join(''),
+			).toBe(textReply);
+			expect(
+				JSON.parse(
+					deltas(1)
+						.map((e) => e.delta.partial_json)
+						.join(''),
+				),
+			).toEqual(lookupBlock.input);
+		});
+
+		test('a stream-* failure counts input_json_delta events as deltas', async () => {
+			const response = await post('WANT_FAIL_AFTER_9', true);
+			const events = streamData(response.payload);
+			const deltas = events.filter(
+				(e) => e.type === 'content_block_delta',
+			);
+
+			expect(response.headers['x-llmock-chaos']).toBe('true');
+			expect(deltas.map((e) => e.delta.type)).toEqual([
+				...Array.from({ length: 8 }, () => 'text_delta'),
+				'input_json_delta',
+			]);
+			// The text block closed and the tool_use opened before the cut
+			expect(
+				events.filter((e) => e.type === 'content_block_start'),
+			).toHaveLength(2);
+			expect(events.at(-1)).toEqual({
+				type: 'error',
+				error: {
+					type: 'overloaded_error',
+					message: 'llmock chaos: simulated 529 error',
+				},
+			});
+			expect(events.some((e) => e.type === 'message_delta')).toBe(false);
+		});
+
+		test('a failing rule that is not streamed gets the HTTP error', async () => {
+			const response = await post('WANT_FAIL_AFTER_9');
+			expect(response.statusCode).toBe(529);
+		});
+	});
 
 	describe('not streamed', () => {
 		test('sends the text and tool_use blocks with stop_reason tool_use', async () => {
