@@ -59,7 +59,7 @@ The project includes editable templates for:
 Once started, the server will be available at:
 - Dashboard: `http://localhost:8001`
 - OpenAI compatible (`chatgpt`, `streaming`): `http://localhost:8001/chatgpt/chat/completions`
-- Gemini compatible (`gemini`): `http://localhost:8001/models/gemini-pro:generateContent`
+- Gemini compatible (`gemini`): `http://localhost:8001/v1beta/models/gemini-pro:generateContent`. This is the path Google's SDK (`@google/genai`) calls, so point it at `baseUrl: "http://localhost:8001"` and use `model: "gemini-pro"`.
 - Anthropic Messages (`claude`): `http://localhost:8001/v1/messages`
 - Embeddings: `http://localhost:8001/v1/embeddings`
 

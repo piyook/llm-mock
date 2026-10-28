@@ -108,10 +108,7 @@ async function copyTemplateFiles(targetDir, projectName) {
     
     let content = await fs.readFile(templatePath, 'utf-8');
     
-    // Replace placeholders in package.json
-    if (file === 'package.json') {
-      content = content.replace(/{{PROJECT_NAME}}/g, projectName);
-    }
+    content = content.replace(/{{PROJECT_NAME}}/g, projectName);
     
     await fs.writeFile(targetPath, content);
   }
