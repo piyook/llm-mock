@@ -11,7 +11,11 @@ import {
 	getStoredResponsesFile,
 	loadConfig,
 } from './config/config-loader.js';
-import { readRuleFile, ruleFiles } from './utilities/response-rules.js';
+import {
+	readRuleContent,
+	readRuleFile,
+	ruleFiles,
+} from './utilities/response-rules.js';
 import { loadStoredResponses } from './utilities/stored-responses.js';
 import { releaseStalledOnClose } from './utilities/chaos.js';
 
@@ -25,9 +29,21 @@ setEnvironmentFromConfig(modelName);
 // Fail fast on malformed responseRules and warn about fixture files that can't be read
 const { rules: responseRules, baseDir: rulesDir } = getResponseRules();
 for (const rule of responseRules) {
+	let readable = true;
 	for (const file of ruleFiles(rule)) {
 		try {
 			readRuleFile(rule, file, rulesDir);
+		} catch (error) {
+			readable = false;
+			console.warn(`WARNING: ${(error as Error).message}`);
+		}
+	}
+
+	// A contentFile that is there but holds bad JSON or blocks is warned about
+	// like a missing one: the requests it matches fail with the same message
+	if (rule.contentFile !== undefined && readable) {
+		try {
+			readRuleContent(rule, rulesDir);
 		} catch (error) {
 			console.warn(`WARNING: ${(error as Error).message}`);
 		}

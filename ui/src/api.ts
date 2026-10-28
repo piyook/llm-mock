@@ -13,10 +13,22 @@ export type UiMeta = {
 		id: string | null;
 		source: 'runtime' | 'config';
 		match: string;
+		// Where match is looked for: the whole request, or the last message only
+		in: 'any' | 'last';
 		// The reply itself, for a rule that holds it in place of a file
 		text: string | null;
+		// The tool-call blocks a rule holds in place of a file (claude format)
+		content: Array<
+			| { type: 'text'; text: string }
+			| {
+					type: 'tool_use';
+					id?: string;
+					name: string;
+					input?: Record<string, unknown>;
+			  }
+		> | null;
 		files: string[];
-		stopReason: 'end' | 'max_tokens' | 'refusal';
+		stopReason: 'end' | 'max_tokens' | 'refusal' | 'tool_use';
 		fail: {
 			kind: 'http' | 'stream-error' | 'stream-drop' | 'stream-stall';
 			status: number;
@@ -126,4 +138,3 @@ export async function fetchUiMeta(): Promise<UiMeta> {
 	}
 	return (await res.json()) as UiMeta;
 }
-

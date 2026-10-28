@@ -199,6 +199,18 @@ export function getModelConfig(modelName?: string): ModelConfig {
 }
 
 /**
+ * The format rules are checked against: LLM_NAME, which replies follow and
+ * which can override the preset's name, or else the active preset's name.
+ */
+export function getRulesFormat(): string | undefined {
+	const config = loadConfig();
+	const name =
+		process.env.LLM_MODEL_NAME || currentModelCache || config.defaultModel;
+
+	return process.env.LLM_NAME || config.models[name]?.name;
+}
+
+/**
  * Response rules of the active model preset, plus the folder their files
  * resolve against. Reads the config directly so it does not change the
  * current-model cache.
@@ -212,7 +224,10 @@ export function getResponseRules(): {
 		process.env.LLM_MODEL_NAME || currentModelCache || config.defaultModel;
 
 	return {
-		rules: validateResponseRules(config.models[name]?.responseRules),
+		rules: validateResponseRules(
+			config.models[name]?.responseRules,
+			getRulesFormat(),
+		),
 		baseDir: configDir,
 	};
 }

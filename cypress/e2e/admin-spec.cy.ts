@@ -32,6 +32,38 @@ describe('Mock LLM Spec for the admin API', () => {
         });
     });
 
+    it('replies with the tool calls of a rule added while running', () => {
+        addRule({
+            match: 'E2E_ADMIN_TOOL_CALL',
+            content: [
+                {
+                    type: 'tool_use',
+                    name: 'get_weather',
+                    input: { city: 'Paris' },
+                },
+            ],
+            times: 1,
+        });
+
+        ask('E2E_ADMIN_TOOL_CALL').then((response) => {
+            expect(response.body.stop_reason).to.eq('tool_use');
+            expect(response.body.content).to.have.length(1);
+            expect(response.body.content[0]).to.include({
+                type: 'tool_use',
+                name: 'get_weather',
+            });
+            expect(response.body.content[0].id).to.match(/^toolu_01/);
+            expect(response.body.content[0].input).to.deep.eq({
+                city: 'Paris',
+            });
+        });
+
+        // Used once, so the next call is a normal reply
+        ask('E2E_ADMIN_TOOL_CALL')
+            .its('body.stop_reason')
+            .should('eq', 'end_turn');
+    });
+
     it('replies with the text of a rule added while running', () => {
         const text = '{"priority":"high"}';
 
@@ -720,6 +752,47 @@ describe('Mock LLM Spec for the admin API', () => {
                 'have.text',
                 'the reply as text',
             );
+        });
+
+        it('lists a tool-call rule with its scope, tools and stop reason', () => {
+            const content = [
+                { type: 'text', text: 'Checking.' },
+                {
+                    type: 'tool_use',
+                    name: 'get_weather',
+                    input: { city: 'Paris' },
+                },
+                { type: 'tool_use', name: 'get_time', input: {} },
+            ];
+            addRule({ match: 'E2E_ADMIN_TOOLS', in: 'last', content });
+
+            cy.visit('/#/rules');
+            cy.get('[cy-data="response_rules"] .rule')
+                .first()
+                .within(() => {
+                    cy.get('[cy-data="rule_scope"]').should(
+                        'have.text',
+                        'Last message contains',
+                    );
+                    cy.get('[cy-data="rule_stop_reason"]').should(
+                        'have.text',
+                        'tool_use',
+                    );
+                    cy.get('[cy-data="rule_content_link"]')
+                        .should('have.text', 'get_weather, get_time')
+                        .click();
+                });
+
+            cy.get('[cy-data="viewer"]').should('contain', 'E2E_ADMIN_TOOLS');
+            cy.get('[cy-data="viewer_text"]').should(
+                'contain',
+                '"name": "get_weather"',
+            );
+
+            // A config rule still reads "Request contains"
+            cy.get('[cy-data="rule_scope"]')
+                .eq(1)
+                .should('have.text', 'Request contains');
         });
 
         it('still opens the file of a config rule listed after a runtime rule', () => {

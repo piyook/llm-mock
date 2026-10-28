@@ -8,9 +8,11 @@ import {
 } from './build-streaming-response.js';
 import { getStoredResponsesFile } from '../config/config-loader.js';
 import {
+	loadRuleBlocks,
 	loadRuleContent,
 	ruleFailure,
 	ruleHasReply,
+	ruleHasToolCalls,
 } from './response-rules.js';
 import { findRequestRule } from './runtime-rules.js';
 import { loadStoredResponses } from './stored-responses.js';
@@ -40,9 +42,19 @@ const getRuleReply = (matched: RequestRule): MockReply | undefined => {
 	if (!matched || !ruleHasReply(matched.rule)) return undefined;
 	const { rule, baseDir } = matched;
 
+	if (ruleHasToolCalls(rule)) {
+		const content = loadRuleBlocks(rule, baseDir);
+		const [first] = content;
+
+		// `text` is the leading text block, if any: what a stream that fails
+		// before reaching the tool calls has sent
+		return { text: first.type === 'text' ? first.text : '', content };
+	}
+
 	return {
 		text: loadRuleContent(rule, baseDir),
-		...(rule.stopReason && { stopReason: rule.stopReason }),
+		...(rule.stopReason &&
+			rule.stopReason !== 'tool_use' && { stopReason: rule.stopReason }),
 	};
 };
 

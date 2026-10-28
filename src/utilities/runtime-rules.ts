@@ -1,8 +1,9 @@
-import { getResponseRules } from '../config/config-loader.js';
+import { getResponseRules, getRulesFormat } from '../config/config-loader.js';
 import {
 	findMatchingRule,
 	ruleFailure,
 	ruleFiles,
+	ruleHasToolCalls,
 	validateResponseRule,
 	type ResponseRule,
 } from './response-rules.js';
@@ -12,9 +13,10 @@ import {
  * admin-api.ts). They are held in memory only: the config file is never
  * written, and a restart starts again with none.
  *
- * A runtime rule holds its reply as `text`. It can't name a `file`: the admin
- * API is open to whoever can reach the server, and a path would let them read
- * files from this machine through a reply.
+ * A runtime rule holds its reply as `text`, or as tool-call `content`. It
+ * can't name a `file` or `contentFile`: the admin API is open to whoever can
+ * reach the server, and a path would let them read files from this machine
+ * through a reply.
  *
  * `times` is how many more requests the rule answers. It goes down by one
  * with each request the rule replies to or fails (not one that chaos fails),
@@ -26,7 +28,15 @@ export interface RuntimeRule extends ResponseRule {
 	times?: number;
 }
 
-const allowedKeys = new Set(['match', 'text', 'stopReason', 'fail', 'times']);
+const allowedKeys = new Set([
+	'match',
+	'text',
+	'content',
+	'in',
+	'stopReason',
+	'fail',
+	'times',
+]);
 
 let runtimeRules: RuntimeRule[] = [];
 // Never reused, so an id that was removed can't come to mean another rule
@@ -41,9 +51,9 @@ export const addRuntimeRule = (rule: unknown): RuntimeRule => {
 		throw new TypeError('rule must be a JSON object');
 	}
 
-	if ('file' in rule || 'files' in rule) {
+	if ('file' in rule || 'files' in rule || 'contentFile' in rule) {
 		throw new TypeError(
-			'rule can not use file or files: give the reply as text',
+			'rule can not use file, files or contentFile: give the reply as text or content',
 		);
 	}
 
@@ -52,21 +62,25 @@ export const addRuntimeRule = (rule: unknown): RuntimeRule => {
 		throw new TypeError(`rule has unknown settings: ${unknown.join(', ')}`);
 	}
 
-	const { match, text, stopReason, fail, times } = rule as RuntimeRule;
-	if (text === undefined && fail === undefined) {
-		throw new TypeError('rule must have text or fail');
+	const { match, text, content, stopReason, fail, times } =
+		rule as RuntimeRule;
+	const scope = (rule as RuntimeRule).in;
+	if (text === undefined && content === undefined && fail === undefined) {
+		throw new TypeError('rule must have text, content or fail');
 	}
 
 	if (times !== undefined && !(Number.isInteger(times) && times >= 1)) {
 		throw new TypeError('rule.times must be an integer of 1 or more');
 	}
 
-	validateResponseRule(rule, 'rule');
+	validateResponseRule(rule, 'rule', getRulesFormat());
 
 	const added: RuntimeRule = {
 		id: `r${nextId++}`,
 		match,
 		...(text !== undefined && { text }),
+		...(content !== undefined && { content }),
+		...(scope !== undefined && { in: scope }),
 		...(stopReason !== undefined && { stopReason }),
 		...(fail !== undefined && { fail }),
 		...(times !== undefined && { times }),
@@ -143,9 +157,13 @@ export const describeActiveRules = () =>
 			id: runtime?.id ?? null,
 			source: runtime ? 'runtime' : 'config',
 			match: rule.match,
+			in: rule.in ?? 'any',
 			text: rule.text ?? null,
+			content: rule.content ?? null,
 			files: ruleFiles(rule),
-			stopReason: rule.stopReason ?? 'end',
+			stopReason:
+				rule.stopReason ??
+				(ruleHasToolCalls(rule) ? 'tool_use' : 'end'),
 			fail: ruleFailure(rule) ?? null,
 			times: runtime?.times ?? null,
 		};
