@@ -212,7 +212,10 @@ export function getResponseRules(): {
 		process.env.LLM_MODEL_NAME || currentModelCache || config.defaultModel;
 
 	return {
-		rules: validateResponseRules(config.models[name]?.responseRules),
+		rules: validateResponseRules(
+			config.models[name]?.responseRules,
+			config.models[name]?.name,
+		),
 		baseDir: configDir,
 	};
 }

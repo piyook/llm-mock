@@ -283,8 +283,13 @@ describe('admin API', () => {
 		],
 		[
 			'an unknown stop reason',
-			{ match: 'A', text: 'b', stopReason: 'tool_use' },
+			{ match: 'A', text: 'b', stopReason: 'stop' },
 			/rule\.stopReason must be one of/,
+		],
+		[
+			'a tool_use stop reason with no tool calls',
+			{ match: 'A', text: 'b', stopReason: 'tool_use' },
+			/"tool_use" needs content or contentFile/,
 		],
 		[
 			'a fail that is not valid',
