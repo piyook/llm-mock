@@ -962,7 +962,7 @@
 										its own text
 									</button>
 								{/if}
-								{#if rule.content !== null}
+								{#if rule.content}
 									<span class="muted">Calls</span>
 									<button
 										class="fileLink"
