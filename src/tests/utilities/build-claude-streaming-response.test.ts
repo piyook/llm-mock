@@ -1,7 +1,9 @@
 /* eslint-disable  @typescript-eslint/naming-convention */
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import {
+	eventsBeforeFailure,
 	generateClaudeStreamingChunks,
+	generateClaudeToolStreamingChunks,
 	handleClaudeStreamingResponse,
 	streamClaudeEvents,
 } from '../../utilities/build-claude-streaming-response.js';
@@ -147,6 +149,202 @@ describe('generateClaudeStreamingChunks', () => {
 		const id = () =>
 			parse(generateClaudeStreamingChunks('x'))[0].data.message.id;
 		expect(id()).not.toBe(id());
+	});
+});
+
+describe('generateClaudeToolStreamingChunks', () => {
+	const tool = (id: string, input: Record<string, unknown>) => ({
+		type: 'tool_use' as const,
+		id,
+		name: 'get_weather',
+		input,
+	});
+	const text = { type: 'text' as const, text: 'Checking the weather now.' };
+
+	test('streams a text block, then each tool_use block at its own index', () => {
+		const events = parse(
+			generateClaudeToolStreamingChunks(
+				[
+					text,
+					tool('toolu_a', { city: 'Paris', units: 'metric' }),
+					tool('toolu_b', {}),
+				],
+				'claude-test',
+				7,
+			),
+		);
+		const names = events.map((e) => e.event);
+
+		expect(names[0]).toBe('message_start');
+		expect(events[0].data.message).toMatchObject({
+			model: 'claude-test',
+			content: [],
+			stop_reason: null,
+			usage: { input_tokens: 7 },
+		});
+		expect(names.slice(-2)).toEqual(['message_delta', 'message_stop']);
+
+		const starts = events.filter((e) => e.event === 'content_block_start');
+		expect(starts.map((e) => e.data)).toEqual([
+			{
+				type: 'content_block_start',
+				index: 0,
+				content_block: { type: 'text', text: '' },
+			},
+			{
+				type: 'content_block_start',
+				index: 1,
+				content_block: {
+					type: 'tool_use',
+					id: 'toolu_a',
+					name: 'get_weather',
+					input: {},
+				},
+			},
+			{
+				type: 'content_block_start',
+				index: 2,
+				content_block: {
+					type: 'tool_use',
+					id: 'toolu_b',
+					name: 'get_weather',
+					input: {},
+				},
+			},
+		]);
+
+		// Each block opens, has its deltas, and closes before the next opens
+		let open: number | undefined;
+		for (const { event, data } of events.slice(1, -2)) {
+			if (event === 'content_block_start') {
+				expect(open).toBeUndefined();
+				open = data.index;
+			} else {
+				expect(data.index).toBe(open);
+				if (event === 'content_block_stop') open = undefined;
+			}
+		}
+
+		expect(open).toBeUndefined();
+	});
+
+	test('the text deltas join to the text, and the input deltas to the input JSON', () => {
+		const input = { city: 'Paris', units: 'metric', days: [1, 2, 3] };
+		const events = parse(
+			generateClaudeToolStreamingChunks([text, tool('toolu_a', input)]),
+		);
+		const deltas = (index: number) =>
+			events
+				.filter(
+					(e) =>
+						e.event === 'content_block_delta' &&
+						e.data.index === index,
+				)
+				.map((e) => e.data.delta);
+
+		expect(deltas(0).every((d) => d.type === 'text_delta')).toBe(true);
+		expect(
+			deltas(0)
+				.map((d) => d.text)
+				.join(''),
+		).toBe(text.text);
+
+		const json = deltas(1);
+		expect(json.length).toBeGreaterThan(1);
+		expect(json.every((d) => d.type === 'input_json_delta')).toBe(true);
+		expect(JSON.parse(json.map((d) => d.partial_json).join(''))).toEqual(
+			input,
+		);
+	});
+
+	test('an empty input is sent as one {} delta', () => {
+		const events = parse(
+			generateClaudeToolStreamingChunks([tool('t', {})]),
+		);
+		const deltas = events.filter((e) => e.event === 'content_block_delta');
+		expect(deltas.map((e) => e.data.delta)).toEqual([
+			{ type: 'input_json_delta', partial_json: '{}' },
+		]);
+	});
+
+	test('a reply with no text block starts with the tool_use at index 0', () => {
+		const events = parse(
+			generateClaudeToolStreamingChunks([tool('t', {})]),
+		);
+		expect(events[1].data).toMatchObject({
+			index: 0,
+			content_block: { type: 'tool_use' },
+		});
+	});
+
+	test('message_delta ends with tool_use and reports output tokens', () => {
+		const blocks = [tool('t', { city: 'Paris' })];
+		const events = parse(generateClaudeToolStreamingChunks(blocks));
+		expect(events.at(-2)?.data).toEqual({
+			type: 'message_delta',
+			delta: { stop_reason: 'tool_use', stop_sequence: null },
+			usage: { output_tokens: estimateTokens(blocks) },
+		});
+	});
+});
+
+describe('eventsBeforeFailure', () => {
+	const failure = (afterChunks: number) => ({
+		kind: 'stream-error' as const,
+		status: 500,
+		afterChunks,
+	});
+	const blocks = [
+		{ type: 'text' as const, text: 'one two three' },
+		{
+			type: 'tool_use' as const,
+			id: 't',
+			name: 'get_weather',
+			input: { city: 'Paris', units: 'metric' },
+		},
+	];
+	const events = generateClaudeToolStreamingChunks(blocks);
+	const sent = (afterChunks: number) =>
+		parse(eventsBeforeFailure(events, failure(afterChunks))).map(
+			(e) =>
+				e.event +
+				(e.event === 'content_block_delta'
+					? `:${e.data.delta.type}`
+					: ''),
+		);
+
+	test('counts text and input deltas alike, across blocks', () => {
+		expect(sent(4)).toEqual([
+			'message_start',
+			'content_block_start',
+			'content_block_delta:text_delta',
+			'content_block_delta:text_delta',
+			'content_block_delta:text_delta',
+			'content_block_stop',
+			'content_block_start',
+			'content_block_delta:input_json_delta',
+		]);
+	});
+
+	test('0 stops after the first content_block_start', () => {
+		expect(sent(0)).toEqual(['message_start', 'content_block_start']);
+	});
+
+	test('more than the reply has stops after its last delta', () => {
+		const all = sent(99);
+		expect(all.at(-1)).toBe('content_block_delta:input_json_delta');
+		expect(all).not.toContain('message_delta');
+	});
+
+	test('is what the text stream always sent, for a text reply', () => {
+		const text = generateClaudeStreamingChunks(
+			'one two three four five six',
+		);
+		for (const n of [0, 1, 3, 99]) {
+			expect(eventsBeforeFailure(text, failure(n))).toEqual(
+				text.slice(0, 2 + Math.min(n, text.length - 5)),
+			);
+		}
 	});
 });
 

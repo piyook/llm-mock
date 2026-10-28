@@ -57,6 +57,24 @@ export const buildClaudeStaticResponse = async (
 	const content = mockReply.text;
 	const template = (await buildResponse(content)) as Record<string, unknown>;
 
+	// A tool-call reply: the rule's blocks in place of the text block
+	if (mockReply.content) {
+		return {
+			...template,
+			id: newClaudeMessageId(),
+			model: resolveClaudeModel(body),
+			content: mockReply.content,
+			stop_reason: 'tool_use',
+			stop_sequence: null,
+			usage: {
+				input_tokens: estimateInputTokens(body),
+				output_tokens: estimateTokens(mockReply.content),
+				cache_creation_input_tokens: 0,
+				cache_read_input_tokens: 0,
+			},
+		};
+	}
+
 	return applyStopReason(
 		{
 			...template,

@@ -12,6 +12,11 @@ import {
 	type StopReason,
 } from './stop-reason.js';
 import { failStream, streamedCount, type StreamFailure } from './chaos.js';
+import {
+	splitInputJson,
+	type ReplyContentBlock,
+	type ReplyToolUseBlock,
+} from './tool-use.js';
 import type { MockReply } from '../types.js';
 
 // Split after each run of whitespace so the pieces join back to `content`
@@ -32,6 +37,74 @@ const splitIntoPieces = (content: string): string[] => {
 const toEvent = (type: string, payload: Record<string, unknown>) =>
 	`event: ${type}\ndata: ${JSON.stringify({ type, ...payload })}`;
 
+// The opening event: the message with no content yet
+const messageStart = (model: string, inputTokens: number) =>
+	toEvent('message_start', {
+		message: {
+			id: newClaudeMessageId(),
+			type: 'message',
+			role: 'assistant',
+			model,
+			content: [],
+			stop_reason: null,
+			stop_sequence: null,
+			usage: {
+				input_tokens: inputTokens,
+				output_tokens: 1,
+				cache_creation_input_tokens: 0,
+				cache_read_input_tokens: 0,
+			},
+		},
+	});
+
+// A text block at `index`: its start, a text_delta per piece, its stop
+const textBlockEvents = (text: string, index: number) => [
+	toEvent('content_block_start', {
+		index,
+		content_block: { type: 'text', text: '' },
+	}),
+	...splitIntoPieces(text).map((piece) =>
+		toEvent('content_block_delta', {
+			index,
+			delta: { type: 'text_delta', text: piece },
+		}),
+	),
+	toEvent('content_block_stop', { index }),
+];
+
+// A tool_use block at `index`: its start with an empty input, the input as
+// input_json_delta pieces, its stop
+const toolUseBlockEvents = (block: ReplyToolUseBlock, index: number) => [
+	toEvent('content_block_start', {
+		index,
+		content_block: {
+			type: 'tool_use',
+			id: block.id,
+			name: block.name,
+			input: {},
+		},
+	}),
+	...splitInputJson(JSON.stringify(block.input)).map((partial_json) =>
+		toEvent('content_block_delta', {
+			index,
+			delta: { type: 'input_json_delta', partial_json },
+		}),
+	),
+	toEvent('content_block_stop', { index }),
+];
+
+// The closing events: the stop reason and output tokens, then message_stop
+const closingEvents = (
+	delta: Record<string, unknown>,
+	outputTokens: number,
+) => [
+	toEvent('message_delta', {
+		delta,
+		usage: { output_tokens: outputTokens },
+	}),
+	toEvent('message_stop', {}),
+];
+
 /**
  * Builds the Anthropic Messages streaming events for `content`.
  *
@@ -50,51 +123,66 @@ export const generateClaudeStreamingChunks = (
 	model: string = DEFAULT_CLAUDE_MODEL,
 	inputTokens: number = 1,
 	stopReason: StopReason = 'end',
-): string[] => {
-	const id = newClaudeMessageId();
-	const outputTokens = estimateTokens(content);
-
-	return [
-		toEvent('message_start', {
-			message: {
-				id,
-				type: 'message',
-				role: 'assistant',
-				model,
-				content: [],
-				stop_reason: null,
-				stop_sequence: null,
-				usage: {
-					input_tokens: inputTokens,
-					output_tokens: 1,
-					cache_creation_input_tokens: 0,
-					cache_read_input_tokens: 0,
-				},
-			},
-		}),
-		toEvent('content_block_start', {
-			index: 0,
-			content_block: { type: 'text', text: '' },
-		}),
-		...splitIntoPieces(content).map((text) =>
-			toEvent('content_block_delta', {
-				index: 0,
-				delta: { type: 'text_delta', text },
+): string[] => [
+	messageStart(model, inputTokens),
+	...textBlockEvents(content, 0),
+	...closingEvents(
+		{
+			stop_reason: toWireStopReason('claude', stopReason),
+			stop_sequence: null,
+			...(stopReason === 'refusal' && {
+				stop_details: claudeRefusalStopDetails,
 			}),
-		),
-		toEvent('content_block_stop', { index: 0 }),
-		toEvent('message_delta', {
-			delta: {
-				stop_reason: toWireStopReason('claude', stopReason),
-				stop_sequence: null,
-				...(stopReason === 'refusal' && {
-					stop_details: claudeRefusalStopDetails,
-				}),
-			},
-			usage: { output_tokens: outputTokens },
-		}),
-		toEvent('message_stop', {}),
-	];
+		},
+		estimateTokens(content),
+	),
+];
+
+/**
+ * Builds the streaming events of a tool-call reply: each block in turn at its
+ * own index (a leading text block streams as text_delta events, each tool_use
+ * as input_json_delta events), then message_delta with stop_reason
+ * "tool_use".
+ */
+export const generateClaudeToolStreamingChunks = (
+	blocks: ReplyContentBlock[],
+	model: string = DEFAULT_CLAUDE_MODEL,
+	inputTokens: number = 1,
+): string[] => [
+	messageStart(model, inputTokens),
+	...blocks.flatMap((block, index) =>
+		block.type === 'text'
+			? textBlockEvents(block.text, index)
+			: toolUseBlockEvents(block, index),
+	),
+	...closingEvents(
+		{ stop_reason: 'tool_use', stop_sequence: null },
+		estimateTokens(blocks),
+	),
+];
+
+/**
+ * The events a stream that fails part-way through sends: everything up to
+ * and including its `afterChunks`th content_block_delta, of any block (or its
+ * last delta if it has fewer). With 0, or no deltas at all, it stops after
+ * the first content_block_start. The closing events are never reached.
+ */
+export const eventsBeforeFailure = (
+	events: string[],
+	failure: StreamFailure,
+): string[] => {
+	const isEvent = (type: string) => (event: string) =>
+		event.startsWith(`event: ${type}\n`);
+	const deltas = events.flatMap((event, index) =>
+		isEvent('content_block_delta')(event) ? [index] : [],
+	);
+	const sent = streamedCount(deltas.length, failure);
+	const end =
+		sent === 0
+			? events.findIndex(isEvent('content_block_start'))
+			: deltas[sent - 1];
+
+	return events.slice(0, end + 1);
 };
 
 /**
@@ -127,7 +215,8 @@ export const streamClaudeEvents = async (
 };
 
 /**
- * Sends a Claude-style SSE stream for the reply's text. Headers are written
+ * Sends a Claude-style SSE stream for the reply's text, or its blocks for a
+ * tool-call reply. Headers are written
  * on the raw response because the events are written to it directly. With a
  * chaos `failure` the stream is cut part-way through (see chaos.ts).
  */
@@ -138,12 +227,18 @@ export const handleClaudeStreamingResponse = async (
 	failure?: StreamFailure,
 ): Promise<void> => {
 	try {
-		const events = generateClaudeStreamingChunks(
-			mockReply.text,
-			resolveClaudeModel(body),
-			estimateInputTokens(body),
-			mockReply.stopReason,
-		);
+		const events = mockReply.content
+			? generateClaudeToolStreamingChunks(
+					mockReply.content,
+					resolveClaudeModel(body),
+					estimateInputTokens(body),
+				)
+			: generateClaudeStreamingChunks(
+					mockReply.text,
+					resolveClaudeModel(body),
+					estimateInputTokens(body),
+					mockReply.stopReason,
+				);
 
 		reply.hijack();
 		reply.raw.writeHead(200, {
@@ -154,13 +249,13 @@ export const handleClaudeStreamingResponse = async (
 		});
 
 		if (failure) {
-			// message_start, content_block_start and some deltas, then the
-			// failure in place of the three closing events
-			const sent = events.slice(
-				0,
-				2 + streamedCount(events.length - 5, failure),
+			// The opening events and some deltas, then the failure in place
+			// of the closing events
+			await streamClaudeEvents(
+				eventsBeforeFailure(events, failure),
+				reply,
+				false,
 			);
-			await streamClaudeEvents(sent, reply, false);
 			failStream(reply, failure, 'claude');
 			return;
 		}

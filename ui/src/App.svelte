@@ -220,6 +220,18 @@
 		}));
 	}
 
+	// A rule that holds tool calls: its blocks, as the JSON it was given
+	function viewRuleContent(match: string, content: NonNullable<UiMeta['responseRules'][number]['content']>) {
+		void openViewer(`Reply when request contains "${match}"`, 'Tool calls held by the rule', async () => ({
+			texts: [JSON.stringify(content, null, 2)],
+		}));
+	}
+
+	// The tools a rule's content calls, in order, e.g. "get_weather, get_time"
+	function toolNames(content: NonNullable<UiMeta['responseRules'][number]['content']>): string {
+		return content.flatMap((block) => (block.type === 'tool_use' ? [block.name] : [])).join(', ');
+	}
+
 	// Changes a setting on the running server, then shows the settings as they
 	// now are. Resolves to whether the change was made.
 	async function change(
@@ -904,7 +916,9 @@
 					{#each meta?.responseRules ?? [] as rule, ruleIndex (ruleIndex)}
 						<div class="rule">
 							<div class="ruleMatch">
-								<span class="muted">Request contains</span>
+								<span class="muted" cy-data="rule_scope">
+									{rule.in === 'last' ? 'Last message contains' : 'Request contains'}
+								</span>
 								<code>{rule.match}</code>
 								{#if rule.source === 'runtime'}
 									<span class="rulePills">
@@ -930,7 +944,11 @@
 							<div class="ruleFiles">
 								{#if rule.files.length > 0}
 									<span class="muted">
-										{rule.files.length > 1 ? 'Replies with one of, at random' : 'Replies with'}
+										{rule.stopReason === 'tool_use'
+											? 'Calls tools from'
+											: rule.files.length > 1
+												? 'Replies with one of, at random'
+												: 'Replies with'}
 									</span>
 								{/if}
 								{#if rule.text !== null}
@@ -942,6 +960,17 @@
 										on:click={() => viewRuleText(rule.match, rule.text ?? '')}
 									>
 										its own text
+									</button>
+								{/if}
+								{#if rule.content}
+									<span class="muted">Calls</span>
+									<button
+										class="fileLink"
+										cy-data="rule_content_link"
+										title="View these tool calls"
+										on:click={() => viewRuleContent(rule.match, rule.content ?? [])}
+									>
+										{toolNames(rule.content)}
 									</button>
 								{/if}
 								{#each rule.files as file, fileIndex (fileIndex)}

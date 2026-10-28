@@ -212,7 +212,11 @@ export function getResponseRules(): {
 		process.env.LLM_MODEL_NAME || currentModelCache || config.defaultModel;
 
 	return {
-		rules: validateResponseRules(config.models[name]?.responseRules),
+		rules: validateResponseRules(
+			config.models[name]?.responseRules,
+			// Replies follow LLM_NAME, which can override the preset's name.
+			process.env.LLM_NAME || config.models[name]?.name,
+		),
 		baseDir: configDir,
 	};
 }

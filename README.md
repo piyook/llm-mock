@@ -25,6 +25,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
   - [Response rules (fixture replies)](#response-rules-fixture-replies)
     - [Truncated and refused replies](#truncated-and-refused-replies-stopreason)
     - [Failing one prompt](#failing-one-prompt-fail)
+    - [Tool calls (Claude)](#tool-calls-claude-content)
   - [Streaming responses](#streaming-responses)
   - [Response delay simulation](#response-delay-simulation)
   - [Chaos mode (error simulation)](#chaos-mode-error-simulation)
@@ -371,7 +372,7 @@ With a request whose message contains `Classify this support ticket`, the server
 - `match` is a case-sensitive substring, tested against every string value in the request body (message text, system prompt, content blocks), not against JSON keys.
 - Rules are checked in order and the first match wins. `match` and `file` must be non-empty strings.
 - GET requests have no body, so rules never apply to them.
-- Matching covers the whole request, including earlier turns of a conversation. A rule that matched an early message keeps matching on every later turn, so use distinctive markers and put more specific rules first.
+- Matching covers the whole request, including earlier turns of a conversation (and, for Claude, the `tools` list). A rule that matched an early message keeps matching on every later turn, so use distinctive markers and put more specific rules first. To match only the newest message, give the rule `"in": "last"`: its `match` is then looked for in the content of the last entry of `messages` only (including any `tool_result` content; for Gemini, the parts of the last entry of `contents`), not in earlier turns, the system prompt or the tools. `"in": "any"` is the default.
 - `file` is resolved relative to the folder holding the config file, and is read exactly as written (including any trailing newline). It is read on every request, so you can edit it without restarting.
 - For varied replies to the same kind of request, give a rule `files` instead of `file`: `{ "match": "Summarise the thread", "files": ["fixtures/summary-a.txt", "fixtures/summary-b.txt"] }`. One of the files is picked at random on each matching request. A rule has either `file` or `files`, not both, and `files` must be a non-empty list of non-empty strings.
 - For a short reply, a rule can hold the reply itself as `text` in place of a file: `{ "match": "Classify this support ticket", "text": "{\"priority\":\"high\"}" }`. A rule has only one of `text`, `file` and `files`.
@@ -429,6 +430,74 @@ A real model does not always finish its answer: it can run out of tokens, or dec
 - The rule fails every time, so a client that retries the same prompt fails again. To have a retry succeed, use chaos with `frequency: 2`.
 - These failures are added to the dashboard's chaos count, but do not shift which of the other calls chaos fails.
 - A `fail` that is not valid stops the server at startup.
+
+#### Tool calls (Claude, `content`)
+
+An agent built on the Anthropic Messages API runs a tool loop: it calls the model, runs the `tool_use` blocks in the reply, sends `tool_result` blocks back, and repeats until the model ends its turn. To test that loop, give a rule on a `claude` preset `content` in place of a reply text:
+
+```json
+{
+  "responseRules": [
+    {
+      "match": "Plan a picnic in Paris",
+      "in": "last",
+      "content": [
+        { "type": "text", "text": "Let me check the weather first." },
+        { "type": "tool_use", "name": "get_weather", "input": { "city": "Paris" } }
+      ]
+    },
+    { "match": "sunny in Paris", "in": "last", "text": "Take the picnic to the park: it will be sunny." }
+  ]
+}
+```
+
+The first request gets the text block and the `get_weather` call, with `stop_reason: "tool_use"`. Your loop runs the tool and sends the result back. That request's last message is the `tool_result` (`sunny in Paris, 24C`), so the second rule answers it and the turn ends with `end_turn`. With `"in": "last"` the first rule does not fire again, even though the question is still in the conversation.
+
+- `content` is at most one `text` block, which must come first, then one or more `tool_use` blocks. They are returned in the order given (several `tool_use` blocks stand for parallel tool calls).
+- A `tool_use` block has `name` (required), `input` (a JSON object, `{}` if left out) and an optional `id`. A block without an `id` gets a new one (`toolu_01…`) on every reply. One with an `id` keeps it on every reply.
+- The reply ends with `stop_reason: "tool_use"`. `stopReason` can be left out or set to `"tool_use"`. Any other value, and `"tool_use"` on a rule with no tool calls, stops the server at startup.
+- To keep the blocks in a file, use `contentFile` in place of `content`: `{ "match": "...", "contentFile": "fixtures/step-1.json" }`. The file holds the same JSON array. Like any fixture it is read on every request; a missing file logs a warning at startup, and a file that is not a valid array of blocks stops the server at startup (or returns a `500` if it becomes invalid while running).
+- A rule has only one of `text`, `file`, `files`, `content` and `contentFile`. Tool calls are for the `claude` format only: a `content` or `contentFile` rule on any other preset stops the server at startup.
+- Not streamed, the message's `content` is the blocks. Streamed, each block is sent in turn at its own `index`: a text block as `text_delta` events, a `tool_use` block as `content_block_start` (with its `id`, `name` and `input: {}`), then its input JSON split into a few `input_json_delta` events, then `content_block_stop`. `message_delta` carries `stop_reason: "tool_use"`. The Anthropic SDK's `stream.finalMessage()` rebuilds the same blocks.
+- [`fail`](#failing-one-prompt-fail) and [chaos](#stream-failures) work on these replies. `afterChunks` counts `input_json_delta` events as deltas, as well as text deltas, so a stream can be cut part-way through a tool's input.
+- To set a tool-call reply from a test, send the rule with `content` to the [admin API](#admin-api-changing-rules-and-settings-while-running).
+
+Scripting each step of a loop from inside a test, with rules that each answer once:
+
+```js
+const addRule = (rule) =>
+  fetch('http://localhost:8001/admin/rules', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(rule),
+  });
+
+beforeEach(() => fetch('http://localhost:8001/admin/reset', { method: 'POST' }));
+
+test('the agent looks up the order, then the refund', async () => {
+  // Step 1: the question gets a tool call
+  await addRule({
+    match: 'Where is my refund for order A-1001?',
+    in: 'last',
+    content: [{ type: 'tool_use', name: 'lookup_order', input: { order_id: 'A-1001' } }],
+    times: 1,
+  });
+  // Step 2: the order lookup's result gets the next tool call
+  await addRule({
+    match: '"status":"returned"',
+    in: 'last',
+    content: [{ type: 'tool_use', name: 'lookup_refund', input: { order_id: 'A-1001' } }],
+    times: 1,
+  });
+  // Step 3: the refund lookup's result ends the turn
+  await addRule({ match: '"refund":"sent"', in: 'last', text: 'Your refund was sent on 2 May.', times: 1 });
+
+  // ...run the agent; with lookup_order and lookup_refund stubbed, it
+  // makes three calls to the mock and ends with the text above
+});
+```
+
+Out of scope for now: tool calls in the OpenAI and Gemini formats, server tools (`web_search` and the like), and `/v1/messages/count_tokens`.
 
 ### Streaming responses
 
@@ -555,7 +624,7 @@ data: {"type":"error","error":{"type":"api_error","message":"llmock chaos: simul
 
 - `frequency` and `mode` still decide which calls fail, and the dashboard's count includes these failures.
 - The stream has status `200`, because its headers have gone before it fails, and carries `x-llmock-chaos: true`. None of the closing events are sent: no `message_stop` for `claude`, no `data: [DONE]` for an OpenAI-style stream.
-- `afterChunks` counts content deltas. `0` fails straight after the opening events. If the reply has fewer deltas than `afterChunks`, the stream fails after the last one. A reply is split into about 5 deltas.
+- `afterChunks` counts content deltas: text deltas, and the `input_json_delta` events of a Claude [tool-call reply](#tool-calls-claude-content), across all its blocks. `0` fails straight after the opening events. If the reply has fewer deltas than `afterChunks`, the stream fails after the last one. A reply is split into about 5 deltas.
 - For `claude` the in-stream error is an `event: error` whose error `type` follows `status` (`rate_limit_error` for 429, `overloaded_error` for 529, otherwise `api_error`). An OpenAI-style stream (`openai`, `gemini` and custom templates) gets a `data:` line holding the `openai` error body.
 - A failing call that did not ask for a stream has no stream to cut. With `stream-error` it gets the HTTP error. With `stream-drop` the connection is cut without an answer, and with `stream-stall` it is held open without one. This includes `/v1/embeddings`.
 - `stream-stall` never times out on the server, so give the client you are testing a timeout. Stalled connections are dropped when the server stops.
@@ -595,7 +664,7 @@ await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
 | Route | What it does |
 |---|---|
 | `GET /admin/rules` | Lists every rule in the order requests are matched against them |
-| `POST /admin/rules` | Adds a rule: `{ "match", "text", "stopReason"?, "fail"?, "times"? }`. Answers `201` with the rule and its `id` |
+| `POST /admin/rules` | Adds a rule: `{ "match", "text" or "content", "in"?, "stopReason"?, "fail"?, "times"? }`. Answers `201` with the rule and its `id` |
 | `DELETE /admin/rules/<id>` | Removes one rule added this way |
 | `DELETE /admin/rules` | Removes every rule added this way |
 | `GET /admin/chaos` | Shows the [chaos](#chaos-mode-error-simulation) settings in use, and how many calls were counted and failed |
@@ -606,13 +675,13 @@ await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
 | `PATCH /admin/settings` | Changes the reply settings it is given: `responseType`, `maxLoremParas`, `stream`, `validateRequests`, `logRequests`, `maxLoggedRequests` |
 | `POST /admin/reset` | Goes back to how the server started: no rules added this way, the config file's chaos, delay and reply settings, and the chaos call count at 0 |
 
-- A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text` or `fail`.
-- The reply is given as `text`, never as `file` or `files`. The server has no login, so a path sent over HTTP would let anyone who can reach it read files from your machine.
+- A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional `in`, [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text`, `content` ([tool calls](#tool-calls-claude-content), `claude` only) or `fail`.
+- The reply is given as `text` or `content`, never as `file`, `files` or `contentFile`. The server has no login, so a path sent over HTTP would let anyone who can reach it read files from your machine.
 - Rules added this way are matched before the config file's rules, in the order they were added. To replace a config rule for one test, add a rule with the same `match`.
 - Give a rule `times` (a whole number, 1 or more) to have it answer that many matching requests and then remove itself. A call that [chaos](#chaos-mode-error-simulation) fails does not count, so the rule is still there for the retry. Without `times` a rule stays until you remove it or reset. `times` is for rules added this way only, not for the config file.
 - Nothing is saved. The config file is never written, and a restart starts again with the config file's rules only.
 - A rule that is not valid gets a `400` with `{ "error": "..." }` and is not added.
-- Each rule in a listing has `source` (`"runtime"` or `"config"`), `id` (`null` for a config rule, which can not be removed this way) and `times` (how many more requests it answers, or `null` if it stays).
+- Each rule in a listing has `source` (`"runtime"` or `"config"`), `id` (`null` for a config rule, which can not be removed this way), `in` (`"any"` or `"last"`), `content` (the tool-call blocks, or `null`) and `times` (how many more requests it answers, or `null` if it stays). A tool-call rule's `stopReason` is `"tool_use"`.
 - Everything else (the port, the endpoint, the preset with its template and model name, embeddings, debug mode) still comes from the config file and needs a restart to change.
 
 With `times`, a test can have the first call fail and the retry succeed, or give each call in turn its own reply:
@@ -728,6 +797,8 @@ Validate incoming requests against templates to confirm API compatibility:
 2. For a provider that is not built in, add a template to the `request-templates/` folder (see [Template locations](#template-locations))
 
 A request passes when it contains every top-level key of the template. The built-in templates require `model` and `messages` (OpenAI), `contents` (Gemini), and `model`, `max_tokens` and `messages` (Claude). Invalid requests return a `400`; the missing keys are shown under **View request log** on the dashboard.
+
+Only those keys are checked, not what is inside them, so every request of a tool loop passes: a `tools` list, assistant turns of `tool_use` blocks, and user turns of `tool_result` blocks (with string or block content, and `is_error`).
 
 ### Request logging
 
@@ -938,6 +1009,7 @@ Behaviour:
 - **Request validation** requires only `model`, `max_tokens` and `messages`. Extra fields (`system`, `output_config`, `temperature`, ...) are accepted.
 - **Streaming is per request.** `"stream": true` returns Anthropic SSE events in order: `message_start`, `content_block_start`, `content_block_delta` (text deltas that rejoin to the full text), `content_block_stop`, `message_delta` (`stop_reason: "end_turn"`), `message_stop`. Otherwise a single `message` object is returned. The preset's `stream` setting is ignored.
 - **Stop reasons.** A reply ends with `end_turn` unless its response rule sets a [`stopReason`](#truncated-and-refused-replies-stopreason) of `max_tokens` or `refusal`. A refusal also carries `stop_details`.
+- **Tool calls.** A response rule with [`content`](#tool-calls-claude-content) replies with `tool_use` blocks and `stop_reason: "tool_use"`, streamed or not, so a manual tool loop can run against the mock. `"in": "last"` lets each step's rule match its own `tool_result`.
 - **Mid-stream failures.** [Chaos mode](#stream-failures) can fail a stream part-way through with an `event: error`, a cut connection or a stall. A response rule with [`fail`](#failing-one-prompt-fail) does the same for one prompt.
 - **Responses** have a unique `msg_` id, echo the requested `model`, and report estimated `usage` (about 4 characters per token).
 - [Response rules](#response-rules-fixture-replies) and [stored responses](#response-types) work here too. Rules match against `system` as well as `messages`.
