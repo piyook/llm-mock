@@ -84,7 +84,11 @@ describe('claude request validation', () => {
 		const results = {
 			role: 'user',
 			content: [
-				{ type: 'tool_result', tool_use_id: 'toolu_01abc', content: '18C' },
+				{
+					type: 'tool_result',
+					tool_use_id: 'toolu_01abc',
+					content: '18C',
+				},
 				{
 					type: 'tool_result',
 					tool_use_id: 'toolu_01def',
