@@ -1,4 +1,4 @@
-import { getResponseRules } from '../config/config-loader.js';
+import { getResponseRules, getRulesFormat } from '../config/config-loader.js';
 import {
 	findMatchingRule,
 	ruleFailure,
@@ -73,7 +73,7 @@ export const addRuntimeRule = (rule: unknown): RuntimeRule => {
 		throw new TypeError('rule.times must be an integer of 1 or more');
 	}
 
-	validateResponseRule(rule, 'rule', process.env?.LLM_NAME ?? 'openai');
+	validateResponseRule(rule, 'rule', getRulesFormat());
 
 	const added: RuntimeRule = {
 		id: `r${nextId++}`,

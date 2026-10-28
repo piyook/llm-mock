@@ -4,6 +4,10 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { getResponseRules, loadConfig } from '../../config/config-loader.js';
+import {
+	addRuntimeRule,
+	clearRuntimeRules,
+} from '../../utilities/runtime-rules.js';
 
 // Replies follow LLM_NAME, which can override a preset's name, so tool-call
 // rules must be checked against LLM_NAME too.
@@ -52,6 +56,7 @@ describe('getResponseRules checks tool-call rules against LLM_NAME', () => {
 	});
 
 	afterAll(() => {
+		clearRuntimeRules();
 		rmSync(dir, { recursive: true, force: true });
 		for (const [key, value] of [
 			['LLM_NAME', previous.name],
@@ -80,5 +85,35 @@ describe('getResponseRules checks tool-call rules against LLM_NAME', () => {
 		expect(getResponseRules().rules).toHaveLength(1);
 		process.env.LLM_MODEL_NAME = 'named-openai';
 		expect(() => getResponseRules()).toThrow(/only for the claude format/);
+	});
+
+	test('admin API rules are checked the same way as config rules', () => {
+		const toolRule = {
+			match: 'Weather?',
+			content: [{ type: 'tool_use', name: 'get_weather' }],
+		};
+		for (const [llmName, model, allowed] of [
+			[undefined, 'named-claude', true],
+			[undefined, 'named-openai', false],
+			['claude', 'named-openai', true],
+			['openai', 'named-claude', false],
+		] as const) {
+			if (llmName === undefined) delete process.env.LLM_NAME;
+			else process.env.LLM_NAME = llmName;
+			process.env.LLM_MODEL_NAME = model;
+
+			const configAllows = (() => {
+				try {
+					getResponseRules();
+					return true;
+				} catch {
+					return false;
+				}
+			})();
+			const add = () => addRuntimeRule(toolRule);
+			expect(configAllows).toBe(allowed);
+			if (allowed) expect(add).not.toThrow();
+			else expect(add).toThrow(/only for the claude format/);
+		}
 	});
 });
