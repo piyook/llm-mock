@@ -308,7 +308,9 @@ describe('splitInputJson', () => {
 
 	test('never cuts an emoji in half', () => {
 		for (let length = 0; length < 12; length++) {
-			const json = JSON.stringify({ note: 'x'.repeat(length) + '🌞🌞🌞🌞' });
+			const json = JSON.stringify({
+				note: 'x'.repeat(length) + '🌞🌞🌞🌞',
+			});
 			const pieces = splitInputJson(json);
 			expect(pieces.join('')).toBe(json);
 			for (const piece of pieces) {
