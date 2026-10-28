@@ -146,17 +146,11 @@ export const findMatchingRule = (
  */
 export const ruleFiles = (rule: ResponseRule): string[] =>
 	rule.files ??
-	(rule.file === undefined
-		? rule.contentFile === undefined
-			? []
-			: [rule.contentFile]
-		: [rule.file]);
+	[rule.file ?? rule.contentFile].filter((file) => file !== undefined);
 
 // Whether a rule has a reply of its own: text, content or a fixture
 export const ruleHasReply = (rule: ResponseRule): boolean =>
-	rule.text !== undefined ||
-	rule.content !== undefined ||
-	ruleFiles(rule).length > 0;
+	replyKeys.some((key) => rule[key] !== undefined);
 
 /**
  * How a rule's matching requests fail, with the defaults filled in, or
@@ -283,8 +277,8 @@ const validateRuleFail = (fail: unknown, label: string): void => {
 	}
 };
 
-// Checks a rule that answers with tool calls: claude format only, one source
-// of blocks and no other reply, and a stop reason of tool_use if any
+// Checks a rule that answers with tool calls: claude format only, and a stop
+// reason of tool_use if any
 const validateToolCallRule = (
 	rule: Partial<ResponseRule>,
 	label: string,
@@ -293,13 +287,6 @@ const validateToolCallRule = (
 	if (format !== undefined && format !== 'claude') {
 		throw new TypeError(
 			`${label}: content and contentFile are only for the claude format (this preset is "${format}")`,
-		);
-	}
-
-	const given = replyKeys.filter((key) => rule[key] !== undefined);
-	if (given.length > 1) {
-		throw new TypeError(
-			`${label} must have only one of ${replyKeys.join(', ')} (has ${given.join(', ')})`,
 		);
 	}
 
@@ -347,6 +334,15 @@ export const validateResponseRule = (
 
 	if (fail !== undefined) validateRuleFail(fail, label);
 
+	const given = replyKeys.filter(
+		(key) => (rule as Partial<ResponseRule>)[key] !== undefined,
+	);
+	if (given.length > 1) {
+		throw new TypeError(
+			`${label} must have only one of ${replyKeys.join(', ')} (has ${given.join(', ')})`,
+		);
+	}
+
 	const scope = (rule as Partial<ResponseRule>).in;
 	if (scope !== undefined && !ruleScopes.includes(scope)) {
 		throw new TypeError(
@@ -370,22 +366,10 @@ export const validateResponseRule = (
 			throw new TypeError(`${label}.text must be a string`);
 		}
 
-		if (file !== undefined || files !== undefined) {
-			throw new TypeError(
-				`${label} must have only one of text, file or files`,
-			);
-		}
-
 		return;
 	}
 
 	if (files !== undefined) {
-		if (file !== undefined) {
-			throw new TypeError(
-				`${label} must have either file or files, not both`,
-			);
-		}
-
 		if (
 			!Array.isArray(files) ||
 			files.length === 0 ||

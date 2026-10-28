@@ -297,7 +297,7 @@ describe('validateResponseRules', () => {
 		[
 			'both file and files',
 			[{ match: 'a', file: 'b', files: ['c'] }],
-			/\[0\] must have either file or files/,
+			/\[0\] must have only one of text, file, files, content, contentFile \(has file, files\)/,
 		],
 		['files not an array', [{ match: 'a', files: 'b' }], /\[0\]\.files/],
 		['empty files', [{ match: 'a', files: [] }], /\[0\]\.files/],
@@ -368,7 +368,7 @@ describe('a rule that holds its reply as text', () => {
 		{ match: 'A', text: 'b', files: ['a.txt'] },
 	])('can not be combined with a file: %o', (rule) => {
 		expect(() => validateResponseRules([rule])).toThrow(
-			/\[0\] must have only one of text, file or files/,
+			/\[0\] must have only one of text, file, files/,
 		);
 	});
 });
