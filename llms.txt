@@ -25,7 +25,7 @@ npx llmock stop                        # add --port=<n> if not 8001
 - Confirm what is live: `GET /ui-meta` → JSON with `version` (llmock version), `llmName`, `llmUrlEndpoint`, `serverPort`, `streamingStatus`, `validateRequests`, delays.
 - `stop` kills whatever process is listening on the port (default 8001, it does not read the config). Do not point it at a port another service uses.
 - Run the CLI from the folder containing `.llmockrc.json`, or set `CONFIG_PATH=<path>` (relative to the cwd).
-- Scaffold alternative: `npm create llmock@latest <dir>` creates a standalone folder (config, Docker files, npm scripts). It prompts interactively if `<dir>` is omitted or already exists. Its scripts: `npm run llmock:start`, `llmock:stop`, `llmock:<preset>`. Its Docker setup mounts only `.llmockrc.json`; templates, fixtures and a stored responses file are copied into the image, so changing them needs `npm run docker:rebuild` (or an added volume).
+- Scaffold alternative: `npm create llmock@latest <dir>` creates a standalone folder (config, Docker files, npm scripts). It prompts interactively if `<dir>` is omitted or already exists. Its scripts: `npm run llmock:start`, `llmock:stop`, `llmock:<preset>`. Its Docker setup mounts only `.llmockrc.json`; templates, fixtures and a stored responses file are copied into the image, so changing them needs `npm run docker:rebuild` (or an added volume). Its `gemini` preset already uses the endpoint `v1beta/models/gemini-pro:generateContent`, so Google's SDK works there without the change described below.
 
 ## Point a client at it (default port 8001)
 
