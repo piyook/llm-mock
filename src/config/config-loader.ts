@@ -214,7 +214,8 @@ export function getResponseRules(): {
 	return {
 		rules: validateResponseRules(
 			config.models[name]?.responseRules,
-			config.models[name]?.name,
+			// Replies follow LLM_NAME, which can override the preset's name.
+			process.env.LLM_NAME || config.models[name]?.name,
 		),
 		baseDir: configDir,
 	};

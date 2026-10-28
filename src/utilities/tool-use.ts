@@ -48,6 +48,7 @@ export const validateRuleContent = (content: unknown, label: string): void => {
 		throw new TypeError(`${label} must be a non-empty array of blocks`);
 	}
 
+	const ids = new Set<string>();
 	for (const [index, block] of content.entries()) {
 		const where = `${label}[${index}]`;
 		if (!isPlainObject(block)) {
@@ -61,8 +62,9 @@ export const validateRuleContent = (content: unknown, label: string): void => {
 				);
 			}
 
-			if (typeof block.text !== 'string') {
-				throw new TypeError(`${where}.text must be a string`);
+			// The API rejects an empty text block sent back to it
+			if (typeof block.text !== 'string' || block.text === '') {
+				throw new TypeError(`${where}.text must be a non-empty string`);
 			}
 
 			const unknown = Object.keys(block).filter(
@@ -94,6 +96,15 @@ export const validateRuleContent = (content: unknown, label: string): void => {
 			(typeof block.id !== 'string' || block.id === '')
 		) {
 			throw new TypeError(`${where}.id must be a non-empty string`);
+		}
+
+		// Each tool_result names its call by id, so ids must not repeat
+		if (typeof block.id === 'string') {
+			if (ids.has(block.id)) {
+				throw new TypeError(`${where}.id "${block.id}" is used twice`);
+			}
+
+			ids.add(block.id);
 		}
 
 		const unknown = Object.keys(block).filter(
@@ -143,8 +154,14 @@ export const splitInputJson = (json: string, pieces: number = 3): string[] => {
 	const count = Math.max(1, Math.min(pieces, Math.ceil(json.length / 8)));
 	const size = Math.ceil(json.length / count);
 	const chunks: string[] = [];
-	for (let i = 0; i < json.length; i += size) {
-		chunks.push(json.slice(i, i + size));
+	let start = 0;
+	while (start < json.length) {
+		let end = Math.min(start + size, json.length);
+		// Never cut between the two halves of a surrogate pair (an emoji)
+		const code = json.charCodeAt(end - 1);
+		if (end < json.length && code >= 0xd8_00 && code <= 0xdb_ff) end += 1;
+		chunks.push(json.slice(start, end));
+		start = end;
 	}
 
 	return chunks.length > 0 ? chunks : [''];

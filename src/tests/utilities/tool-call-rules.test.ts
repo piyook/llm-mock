@@ -104,7 +104,22 @@ describe('a rule with content', () => {
 		[
 			'text that is not a string',
 			{ content: [{ type: 'text', text: 1 }, toolUse] },
-			/content\[0\]\.text must be a string/,
+			/content\[0\]\.text must be a non-empty string/,
+		],
+		[
+			'empty text',
+			{ content: [{ type: 'text', text: '' }, toolUse] },
+			/content\[0\]\.text must be a non-empty string/,
+		],
+		[
+			'an id used twice',
+			{
+				content: [
+					{ ...toolUse, id: 'toolu_1' },
+					{ ...toolUse, id: 'toolu_1' },
+				],
+			},
+			/content\[1\]\.id "toolu_1" is used twice/,
 		],
 		[
 			'a tool_use with no name',
@@ -290,6 +305,17 @@ describe('splitInputJson', () => {
 	test('sends {} as one piece', () => {
 		expect(splitInputJson('{}')).toEqual(['{}']);
 	});
+
+	test('never cuts an emoji in half', () => {
+		for (let length = 0; length < 12; length++) {
+			const json = JSON.stringify({ note: 'x'.repeat(length) + '🌞🌞🌞🌞' });
+			const pieces = splitInputJson(json);
+			expect(pieces.join('')).toBe(json);
+			for (const piece of pieces) {
+				expect(piece.isWellFormed()).toBe(true);
+			}
+		}
+	});
 });
 
 describe('a rule with in: "last"', () => {
@@ -388,6 +414,18 @@ describe('a rule with in: "last"', () => {
 				body(step1, { role: 'system', content: 'be brief' }),
 			),
 		).toEqual(['be brief']);
+	});
+
+	test('reads the last entry of a Gemini body contents', () => {
+		const gemini = {
+			contents: [
+				{ role: 'user', parts: [{ text: 'Plan a picnic in Paris' }] },
+				{ role: 'model', parts: [{ text: 'Where?' }] },
+				{ role: 'user', parts: [{ text: 'sunny, 21C' }] },
+			],
+		};
+		expect(collectLastMessageStrings(gemini)).toEqual(['sunny, 21C']);
+		expect(findMatchingRule(rules, gemini)?.text).toBe('step 2');
 	});
 
 	test('in must be "any" or "last"', () => {

@@ -94,20 +94,26 @@ export const collectStrings = (value: unknown): string[] => {
 };
 
 /**
- * The string values of the last entry of `messages`: its content, as a
- * string or blocks (tool_result content included). Its role is left out.
- * Empty if the body has no messages.
+ * The string values of the last message: the last entry of `messages` (its
+ * content, as a string or blocks, tool_result content included), or for
+ * Gemini the last entry of `contents` (its parts). Its role is left out.
+ * Empty if the body has neither.
  */
 export const collectLastMessageStrings = (body: unknown): string[] => {
-	const messages =
-		typeof body === 'object' && body !== null
-			? (body as { messages?: unknown }).messages
-			: undefined;
-	if (!Array.isArray(messages) || messages.length === 0) return [];
+	if (typeof body !== 'object' || body === null) return [];
 
-	const last: unknown = messages.at(-1);
+	const { messages, contents } = body as {
+		messages?: unknown;
+		contents?: unknown;
+	};
+	const [list, key] = Array.isArray(messages)
+		? [messages, 'content']
+		: [contents, 'parts'];
+	if (!Array.isArray(list) || list.length === 0) return [];
+
+	const last: unknown = list.at(-1);
 	return typeof last === 'object' && last !== null
-		? collectStrings((last as { content?: unknown }).content)
+		? collectStrings((last as Record<string, unknown>)[key])
 		: [];
 };
 
