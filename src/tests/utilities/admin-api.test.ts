@@ -150,7 +150,9 @@ describe('admin API', () => {
 			id: null,
 			source: 'config',
 			match: 'WANT_FILE',
+			in: 'any',
 			text: null,
+			content: null,
 			files: ['fixtures/text.txt'],
 			stopReason: 'end',
 			fail: null,
@@ -160,7 +162,9 @@ describe('admin API', () => {
 			id: null,
 			source: 'config',
 			match: 'WANT_INLINE',
+			in: 'any',
 			text: 'from the config',
+			content: null,
 			files: [],
 			stopReason: 'end',
 			fail: null,
@@ -190,7 +194,9 @@ describe('admin API', () => {
 			id: expect.stringMatching(/^r\d+$/),
 			source: 'runtime',
 			match: 'WANT_RUNTIME',
+			in: 'any',
 			text: '{"priority":"high"}',
+			content: null,
 			files: [],
 			stopReason: 'end',
 			fail: null,
@@ -253,17 +259,21 @@ describe('admin API', () => {
 		['an array', [{ match: 'A', text: 'b' }], /must be a JSON object/],
 		['no match', { text: 'b' }, /rule\.match must be a non-empty string/],
 		['an empty match', { match: '', text: 'b' }, /rule\.match/],
-		['neither text nor fail', { match: 'A' }, /must have text or fail/],
+		[
+			'neither text nor fail',
+			{ match: 'A' },
+			/must have text, content or fail/,
+		],
 		['a text that is not a string', { match: 'A', text: 5 }, /rule\.text/],
 		[
 			'a file',
 			{ match: 'A', file: '../../secret.txt' },
-			/can not use file or files/,
+			/can not use file, files or contentFile/,
 		],
 		[
 			'files',
 			{ match: 'A', files: ['a.txt'] },
-			/can not use file or files/,
+			/can not use file, files or contentFile/,
 		],
 		[
 			'an unknown setting',
@@ -304,6 +314,171 @@ describe('admin API', () => {
 		expect((await send('GET', '/admin/rules')).body.rules).toEqual(
 			configRules,
 		);
+	});
+
+	describe('a tool-call rule', () => {
+		const previousName = process.env.LLM_NAME;
+		beforeAll(() => {
+			process.env.LLM_NAME = 'claude';
+		});
+		afterAll(() => {
+			if (previousName === undefined) delete process.env.LLM_NAME;
+			else process.env.LLM_NAME = previousName;
+		});
+
+		const weather = {
+			type: 'tool_use',
+			name: 'get_weather',
+			input: { city: 'Paris' },
+		};
+
+		// A request of a tool loop: the question, then any tool turns
+		const loopRequest = (...results: string[]) => ({
+			messages: [
+				{ role: 'user', content: 'Plan a picnic in Paris' },
+				...results.flatMap((result, index) => [
+					{
+						role: 'assistant',
+						content: [{ ...weather, id: `toolu_${index}` }],
+					},
+					{
+						role: 'user',
+						content: [
+							{
+								type: 'tool_result',
+								tool_use_id: `toolu_${index}`,
+								content: result,
+							},
+						],
+					},
+				]),
+			],
+		});
+
+		test('is added with content and in, and listed with them', async () => {
+			const { status, body } = await addRule({
+				match: 'picnic',
+				in: 'last',
+				content: [{ type: 'text', text: 'Checking.' }, weather],
+			});
+
+			expect(status).toBe(201);
+			expect(body.rule).toEqual({
+				id: expect.stringMatching(/^r\d+$/),
+				source: 'runtime',
+				match: 'picnic',
+				in: 'last',
+				text: null,
+				content: [{ type: 'text', text: 'Checking.' }, weather],
+				files: [],
+				stopReason: 'tool_use',
+				fail: null,
+				times: null,
+			});
+
+			const reply = await generateResponseContent(loopRequest());
+			expect(reply.content?.[1]).toMatchObject({
+				...weather,
+				id: expect.stringMatching(/^toolu_01/),
+			});
+		});
+
+		test.each([
+			[
+				'a contentFile',
+				{ match: 'A', contentFile: 'steps/one.json' },
+				/can not use file, files or contentFile/,
+			],
+			[
+				'a tool_use with no name',
+				{ match: 'A', content: [{ type: 'tool_use', input: {} }] },
+				/rule\.content\[0\]\.name/,
+			],
+			[
+				'an input that is not an object',
+				{ match: 'A', content: [{ ...weather, input: 'Paris' }] },
+				/rule\.content\[0\]\.input must be a JSON object/,
+			],
+			[
+				'content and text',
+				{ match: 'A', content: [weather], text: 'b' },
+				/only one of/,
+			],
+			[
+				'an unknown in',
+				{ match: 'A', content: [weather], in: 'first' },
+				/rule\.in must be one of: any, last/,
+			],
+		])('answers 400 for %s', async (_name, payload, error) => {
+			const { status, body } = await addRule(payload);
+
+			expect(status).toBe(400);
+			expect(body.error).toMatch(error);
+			expect((await send('GET', '/admin/rules')).body.rules).toEqual(
+				configRules,
+			);
+		});
+
+		test('is refused for a preset that is not claude', async () => {
+			process.env.LLM_NAME = 'openai';
+			try {
+				const { status, body } = await addRule({
+					match: 'A',
+					content: [weather],
+				});
+				expect(status).toBe(400);
+				expect(body.error).toMatch(/only for the claude format/);
+			} finally {
+				process.env.LLM_NAME = 'claude';
+			}
+		});
+
+		test('with times and in: "last", scripts each step of a loop', async () => {
+			// Step 1 asks for the weather; step 2, keyed on the tool result,
+			// asks again; step 3 answers. Each step's rule is used once.
+			await addRule({
+				match: 'Plan a picnic',
+				in: 'last',
+				content: [weather],
+				times: 1,
+			});
+			await addRule({
+				match: 'rain',
+				in: 'last',
+				content: [{ ...weather, input: { city: 'Lyon' } }],
+				times: 1,
+			});
+			await addRule({
+				match: 'sunny',
+				in: 'last',
+				text: 'Go to Lyon.',
+				times: 1,
+			});
+
+			const step = async (body: unknown) => {
+				const matched = findRequestRule(body);
+				countRuleUse(matched?.rule);
+				return generateResponseContent(body, matched);
+			};
+
+			const first = await step(loopRequest());
+			expect(first.content?.[0]).toMatchObject({
+				input: { city: 'Paris' },
+			});
+
+			const second = await step(loopRequest('rain all day'));
+			expect(second.content?.[0]).toMatchObject({
+				input: { city: 'Lyon' },
+			});
+
+			const third = await step(loopRequest('rain all day', 'sunny'));
+			expect(third).toEqual({ text: 'Go to Lyon.' });
+
+			// Every step rule has removed itself
+			expect((await send('GET', '/admin/rules')).body.rules).toEqual(
+				configRules,
+			);
+		});
 	});
 
 	test('a rule with times answers that many requests, then is removed', async () => {
