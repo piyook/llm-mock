@@ -1,6 +1,7 @@
 /* eslint-disable  @typescript-eslint/naming-convention */
 import { expect, test, describe, vi, beforeEach } from 'vitest';
 import {
+	buildStreamingChunks,
 	generateStreamingChunks,
 	setStreamingHeaders,
 	streamWithDelay,
@@ -146,6 +147,29 @@ describe('build streaming response function works as expected', async () => {
 				Math.ceil('Fine thanks'.length / 4),
 		});
 	});
+
+	test.each([
+		['without usage', {}],
+		['with include_usage', { stream_options: { include_usage: true } }],
+	])(
+		'contentChunks counts the chunks that carry content, %s',
+		async (_, options) => {
+			const { chunks, contentChunks } = await buildStreamingChunks(
+				'one two three four five six seven eight nine ten',
+				undefined,
+				{ messages: [{ role: 'user', content: 'hi' }], ...options },
+			);
+			const parsed = parse(chunks);
+
+			// Role chunk, then contentChunks chunks with content, then none
+			expect(contentChunks).to.be.greaterThan(1);
+			parsed.forEach((chunk, index) => {
+				const hasContent =
+					chunk.choices[0]?.delta.content !== undefined;
+				expect(hasContent).to.eq(index >= 1 && index <= contentChunks);
+			});
+		},
+	);
 
 	test('other formats keep the template model and get no usage chunk', async () => {
 		process.env.LLM_NAME = 'gemini';

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import fastify, { type FastifyInstance } from 'fastify';
@@ -13,6 +13,7 @@ import {
 	getResponseRules,
 	getStoredResponsesFile,
 	loadConfig,
+	readConfigFile,
 	setEnvironmentFromConfig,
 	useConfig,
 	type LlmMockConfig,
@@ -27,6 +28,7 @@ import { releaseStalledOnClose, resetChaos } from './utilities/chaos.js';
 import { clearRuntimeRules } from './utilities/runtime-rules.js';
 import {
 	applyConfigDefaults,
+	reachableUrl,
 	resolveModelName,
 	serverEnv,
 } from '../bin/process-utils.js';
@@ -190,23 +192,7 @@ function readConfig(config: StartServerOptions['config']): {
 		return { config: getDefaultConfig(), dir: process.cwd() };
 	}
 
-	try {
-		return {
-			config: JSON.parse(readFileSync(path, 'utf8')) as LlmMockConfig,
-			dir: dirname(path),
-			path,
-		};
-	} catch (error) {
-		throw new Error(
-			`Failed to parse llmock config file ${path}: ${(error as Error).message}`,
-		);
-	}
-}
-
-// URL a client on this machine reaches `host` and `port` at
-function urlFor(host: string, port: number): string {
-	const reachable = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
-	return `http://${reachable.includes(':') ? `[${reachable}]` : reachable}:${port}`;
+	return { config: readConfigFile(path), dir: dirname(path), path };
 }
 
 // Settings live in process.env and in module state, so one server at a time
@@ -288,7 +274,7 @@ export async function startServer(
 	return {
 		port,
 		host,
-		url: urlFor(host, port),
+		url: reachableUrl(host, port),
 		close() {
 			closing ??= app.close().then(restore);
 			return closing;

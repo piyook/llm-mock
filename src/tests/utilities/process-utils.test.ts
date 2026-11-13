@@ -2,12 +2,30 @@ import { existsSync } from 'fs';
 import { describe, expect, test } from 'vitest';
 import {
 	applyConfigDefaults,
+	DEFAULT_STOP_PORT,
 	parseCliArgs,
 	parseListeningPids,
+	reachableUrl,
 	resolveModelName,
 	serverEnv,
 	tsxCliPath,
 } from '../../../bin/process-utils.js';
+
+describe('reachableUrl', () => {
+	test.each([
+		['0.0.0.0', 'http://127.0.0.1:8001'],
+		['::', 'http://127.0.0.1:8001'],
+		['127.0.0.1', 'http://127.0.0.1:8001'],
+		['localhost', 'http://localhost:8001'],
+		['::1', 'http://[::1]:8001'],
+	])('%s is reached at %s', (host, url) => {
+		expect(reachableUrl(host, 8001)).toBe(url);
+	});
+});
+
+test('stop with no --port stops DEFAULT_STOP_PORT', () => {
+	expect(parseCliArgs(['stop']).stopPort).toBe(DEFAULT_STOP_PORT);
+});
 
 describe('tsxCliPath', () => {
 	test('points at an existing tsx cli script', () => {

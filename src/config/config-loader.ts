@@ -172,13 +172,20 @@ export function loadConfig(configPath?: string): LlmMockConfig {
 		return getDefaultConfig();
 	}
 
+	configCache = readConfigFile(path);
+	return configCache;
+}
+
+/**
+ * Reads and parses the config file at `path`, which must exist. Throws an
+ * Error naming the file when it can't be read or isn't valid JSON.
+ */
+export function readConfigFile(path: string): LlmMockConfig {
 	try {
-		const configData = readFileSync(path, 'utf8');
-		configCache = JSON.parse(configData) as LlmMockConfig;
-		return configCache;
+		return JSON.parse(readFileSync(path, 'utf8')) as LlmMockConfig;
 	} catch (error) {
 		throw new Error(
-			`Failed to parse configuration file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			`Failed to parse llmock config file ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`,
 		);
 	}
 }

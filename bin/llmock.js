@@ -5,8 +5,10 @@ import { dirname, resolve } from 'path';
 import { existsSync } from 'fs';
 import {
   applyConfigDefaults,
+  DEFAULT_STOP_PORT,
   parseCliArgs,
   parseListeningPids,
+  reachableUrl,
   readsAsOff,
   resolveModelName,
   serverEnv,
@@ -127,7 +129,7 @@ Available models: ${Object.keys(config.models).join(', ')}
 }
 
 // Stop running llm-mock server
-async function stopServer(port = 8001) {
+async function stopServer(port = DEFAULT_STOP_PORT) {
   const { exec } = await import('child_process');
   
   const isWindows = process.platform === 'win32';
@@ -302,9 +304,7 @@ function setEnvironmentVariables(config, modelName, configPath) {
 
 // URL the CLI uses to reach the server it started
 function pingUrl(port = process.env.SERVER_PORT) {
-  const host = process.env.SERVER_HOST;
-  const reachable = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
-  return `http://${reachable.includes(':') ? `[${reachable}]` : reachable}:${port}/ping`;
+  return `${reachableUrl(process.env.SERVER_HOST, port)}/ping`;
 }
 
 // Where the server is, for messages: port 0 means a free port picked at start
@@ -504,7 +504,7 @@ async function main() {
 
         console.log(`Server started successfully!`);
         console.log(`Server is running at: ${serverAddress(port)}`);
-        console.log(`Use 'llmock stop${Number(port) === 8001 ? '' : ` --port=${port}`}' to stop the server.`);
+        console.log(`Use 'llmock stop${Number(port) === DEFAULT_STOP_PORT ? '' : ` --port=${port}`}' to stop the server.`);
         process.exit(0);
       }
     }

@@ -56,7 +56,20 @@ export const generateStreamingChunks = async (
 	content: string,
 	stopReason?: StopReason,
 	body?: unknown,
-): Promise<string[]> => {
+): Promise<string[]> =>
+	(await buildStreamingChunks(content, stopReason, body)).chunks;
+
+/**
+ * The chunks of generateStreamingChunks, plus `contentChunks`: how many
+ * content chunks follow the role chunk. The rest (finish_reason chunk, any
+ * usage chunk, [DONE]) come after them, so chaos can cut the stream off
+ * part-way through the content without working out the layout itself.
+ */
+export const buildStreamingChunks = async (
+	content: string,
+	stopReason?: StopReason,
+	body?: unknown,
+): Promise<{ chunks: string[]; contentChunks: number }> => {
 	const chunks: string[] = [];
 	const openAi = isOpenAiFormat();
 	const includeUsage = openAi && wantsStreamUsage(body);
@@ -127,6 +140,7 @@ export const generateStreamingChunks = async (
 		};
 		push(chunk);
 	}
+	const contentChunks = chunks.length - 1;
 
 	// Final chunk with finish_reason (OpenAI format requirement)
 	// Extract finish_reason from static template or default to stop. A rule's
@@ -169,7 +183,7 @@ export const generateStreamingChunks = async (
 	// This signals the end of the stream to clients
 	chunks.push('data: [DONE]');
 
-	return chunks;
+	return { chunks, contentChunks };
 };
 
 /**
