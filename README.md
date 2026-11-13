@@ -75,7 +75,7 @@ Built on [Fastify](https://www.fastify.io/) for high performance and reliability
 
 ## Quick Start
 
-**Prerequisites:** Node.js 20 or later (24 LTS recommended; it is the version LLMock is tested on)
+**Prerequisites:** Node.js 20 or later (26 LTS recommended; it is the version LLMock is tested on)
 
 The fastest way to get started is with the scaffolding tool, which creates a complete project with configuration files and example templates:
 
@@ -1122,7 +1122,7 @@ npm run docker:restart
 
 The Docker container uses the `--foreground` flag to keep the LLMock server process attached. This prevents the container from restarting continuously, which would happen if the server ran as a detached background process. The container includes:
 
-- **Dockerfile**: Node 24 Alpine image that runs the server as a non-root user
+- **Dockerfile**: Node 26 Alpine image that runs the server as a non-root user
 - **docker-compose.yml**: Port 8001 exposed, config file mounted read-only
 - **docker-start script**: Runs `llmock start --foreground` to keep the server attached
 
@@ -1144,7 +1144,7 @@ your-project/
 **Dockerfile**
 
 ```dockerfile
-FROM node:24-alpine
+FROM node:26-alpine
 WORKDIR /app
 RUN npm install --omit=dev llmock
 EXPOSE 8001

@@ -18,7 +18,7 @@ jobs:
             - uses: actions/checkout@v6
             - uses: actions/setup-node@v6
               with:
-                  node-version: '24'
+                  node-version: '26'
                   cache: 'npm'
             - run: npm ci
             - run: npm run lint -- --deny-warnings
@@ -29,7 +29,7 @@ jobs:
             - uses: actions/checkout@v6
             - uses: actions/setup-node@v6
               with:
-                  node-version: '24'
+                  node-version: '26'
                   cache: 'npm'
             - run: npm ci
             - run: npm run pretty
@@ -40,7 +40,7 @@ jobs:
             - uses: actions/checkout@v6
             - uses: actions/setup-node@v6
               with:
-                  node-version: '24'
+                  node-version: '26'
                   cache: 'npm'
             - run: npm ci
             - run: npm audit --omit=dev
@@ -53,7 +53,7 @@ jobs:
             - uses: actions/checkout@v6
             - uses: actions/setup-node@v6
               with:
-                  node-version: '24'
+                  node-version: '26'
                   cache: 'npm'
             - run: npm ci
             - run: npm run test:unit
@@ -68,7 +68,7 @@ jobs:
 
             - uses: actions/setup-node@v6
               with:
-                  node-version: '24'
+                  node-version: '26'
                   cache: 'npm'
 
             - name: Cache Cypress binary

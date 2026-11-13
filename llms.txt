@@ -403,7 +403,7 @@ Varied replies: `"responseType": "stored"` with `"storedResponsesFile": "fixture
 Docker (config and fixtures mounted, no rebuild on change):
 
 ```dockerfile
-FROM node:24-alpine
+FROM node:26-alpine
 WORKDIR /app
 RUN npm install --omit=dev llmock
 EXPOSE 8001
