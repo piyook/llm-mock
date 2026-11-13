@@ -75,7 +75,7 @@ Built on [Fastify](https://www.fastify.io/) for high performance and reliability
 
 ## Quick Start
 
-**Prerequisites:** Node.js 20 or later (26 LTS recommended; it is the version LLMock is tested on)
+**Prerequisites:** Node.js 24 or later (26 LTS recommended; it is the version LLMock is tested on)
 
 The fastest way to get started is with the scaffolding tool, which creates a complete project with configuration files and example templates:
 
