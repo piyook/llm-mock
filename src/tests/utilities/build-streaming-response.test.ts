@@ -71,7 +71,7 @@ describe('build streaming response function works as expected', async () => {
 		});
 	});
 
-	test('uses template values for id, model, and created', async () => {
+	test('uses template values for id and created, the preset model', async () => {
 		const content = 'Test content';
 		const chunks = await generateStreamingChunks(content);
 
@@ -81,8 +81,87 @@ describe('build streaming response function works as expected', async () => {
 		expect(firstChunk.id).to.match(
 			/^chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe/,
 		);
-		expect(firstChunk.model).to.eq('gpt-3.5-turbo-0301');
+		// No request model: the preset's
+		expect(firstChunk.model).to.eq('gpt-4o');
 		expect(firstChunk.created).to.eq(1678485525);
+	});
+
+	const parse = (chunks: string[]) =>
+		chunks.slice(0, -1).map((chunk) => JSON.parse(chunk.slice(6)));
+
+	test('echoes the request model in every chunk', async () => {
+		const chunks = await generateStreamingChunks(
+			'Test content',
+			undefined,
+			{
+				model: 'gpt-5-mini',
+				messages: [],
+			},
+		);
+
+		for (const chunk of parse(chunks)) {
+			expect(chunk.model).to.eq('gpt-5-mini');
+		}
+	});
+
+	test('sends no usage unless the request asks for it', async () => {
+		const chunks = await generateStreamingChunks(
+			'Test content',
+			undefined,
+			{
+				messages: [{ role: 'user', content: 'hi' }],
+				stream_options: { include_usage: false },
+			},
+		);
+
+		for (const chunk of parse(chunks)) {
+			expect(chunk).not.to.have.property('usage');
+		}
+	});
+
+	test('include_usage adds usage: null and a final usage chunk', async () => {
+		const body = {
+			messages: [{ role: 'user', content: 'How are you today?' }],
+			stream_options: { include_usage: true },
+		};
+		const chunks = await generateStreamingChunks(
+			'Fine thanks',
+			undefined,
+			body,
+		);
+		const parsed = parse(chunks);
+		const usageChunk = parsed.at(-1);
+
+		expect(chunks.at(-1)).to.eq('data: [DONE]');
+		for (const chunk of parsed.slice(0, -1)) {
+			expect(chunk.usage).to.eq(null);
+		}
+		expect(parsed.at(-2).choices[0].finish_reason).to.eq('stop');
+		expect(usageChunk.choices).to.deep.eq([]);
+		expect(usageChunk.usage).to.deep.eq({
+			prompt_tokens: Math.ceil(JSON.stringify(body.messages).length / 4),
+			completion_tokens: Math.ceil('Fine thanks'.length / 4),
+			total_tokens:
+				Math.ceil(JSON.stringify(body.messages).length / 4) +
+				Math.ceil('Fine thanks'.length / 4),
+		});
+	});
+
+	test('other formats keep the template model and get no usage chunk', async () => {
+		process.env.LLM_NAME = 'gemini';
+		const chunks = await generateStreamingChunks(
+			'Test content',
+			undefined,
+			{
+				model: 'gpt-5-mini',
+				stream_options: { include_usage: true },
+			},
+		);
+
+		for (const chunk of parse(chunks)) {
+			expect(chunk.model).not.to.eq('gpt-5-mini');
+			expect(chunk).not.to.have.property('usage');
+		}
 	});
 
 	test('splits content into multiple chunks', async () => {

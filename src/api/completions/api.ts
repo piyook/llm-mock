@@ -68,7 +68,7 @@ const handleRequest = async (reply: any, body?: unknown) => {
 		const response =
 			process.env?.LLM_NAME === 'claude'
 				? await buildClaudeStaticResponse(mockReply, body)
-				: await buildStaticResponse(mockReply);
+				: await buildStaticResponse(mockReply, body);
 		return reply.send(response);
 	}
 
@@ -87,7 +87,7 @@ const handleRequest = async (reply: any, body?: unknown) => {
 	// Returns OpenAI-style Server-Sent Events stream with chat.completion.chunk events
 	// Streaming format is compatible with OpenAI chat-completions streaming API
 	// Content is split into multiple chunks with proper SSE headers and timing
-	return await handleStreamingResponse(mockReply, reply, streamFailure);
+	return await handleStreamingResponse(mockReply, reply, streamFailure, body);
 };
 
 function handler(app: FastifyInstance, pathName: string) {
