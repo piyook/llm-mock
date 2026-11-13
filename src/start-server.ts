@@ -59,7 +59,10 @@ export interface RunningServer {
 	host: string;
 	/** Base URL to send requests to, e.g. `http://127.0.0.1:54321` */
 	url: string;
-	/** Stops the server and puts back the environment variables it set */
+	/**
+	 * Stops the server and puts back the environment variables and the
+	 * configuration it set
+	 */
 	close(): Promise<void>;
 }
 
@@ -112,36 +115,43 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 	resetChaos();
 
 	const app = fastify({ logger: false });
-
-	// A connection held open by chaos must not keep the server from stopping
-	releaseStalledOnClose(app);
-
-	const { apiRoutes } = await getApiRoutes(app, !quiet);
-
-	serverPage(app, apiRoutes);
-
-	if (adminApiEnabled()) adminApi(app);
-
-	// Load database from disk if persistence is enabled
-	const loaded = dbLoadFromDisk();
-
-	// Execute dB seeder functions only if database wasn't loaded from disk
-	const seedRequested =
-		process.env?.MOCK_DB_SEED_ON_START?.toUpperCase() === 'ON';
-	const shouldSeed = seedRequested || !loaded;
-
-	if (shouldSeed) {
-		if (!loaded) db.llm.__unsafe_replaceAll([]);
-		for (const seeder of Object.values(seeders)) {
-			seeder();
-		}
-	}
-
 	const host = process.env?.SERVER_HOST || '0.0.0.0';
-	await app.listen({
-		port: Number(process.env?.SERVER_PORT ?? 8001),
-		host,
-	});
+
+	// A server that fails part-way (e.g. the port is taken) is closed, so
+	// nothing of it is left running in the process
+	try {
+		// A connection held open by chaos must not keep the server from stopping
+		releaseStalledOnClose(app);
+
+		const { apiRoutes } = await getApiRoutes(app, !quiet);
+
+		serverPage(app, apiRoutes);
+
+		if (adminApiEnabled()) adminApi(app);
+
+		// Load database from disk if persistence is enabled
+		const loaded = dbLoadFromDisk();
+
+		// Execute dB seeder functions only if database wasn't loaded from disk
+		const seedRequested =
+			process.env?.MOCK_DB_SEED_ON_START?.toUpperCase() === 'ON';
+		const shouldSeed = seedRequested || !loaded;
+
+		if (shouldSeed) {
+			if (!loaded) db.llm.__unsafe_replaceAll([]);
+			for (const seeder of Object.values(seeders)) {
+				seeder();
+			}
+		}
+
+		await app.listen({
+			port: Number(process.env?.SERVER_PORT ?? 8001),
+			host,
+		});
+	} catch (error) {
+		await app.close().catch(() => undefined);
+		throw error;
+	}
 
 	// With port 0 the system picked one: everything that shows the port
 	// (dashboard, error messages) reads it from here
@@ -257,14 +267,18 @@ export async function startServer(
 
 	running = true;
 	Object.assign(process.env, env);
-	useConfig(config, dir);
+	const restoreConfig = useConfig(config, dir);
+	const restore = () => {
+		restoreEnv();
+		restoreConfig();
+		running = false;
+	};
 
 	let started: Awaited<ReturnType<typeof bootServer>>;
 	try {
 		started = await bootServer({ quiet: true });
 	} catch (error) {
-		restoreEnv();
-		running = false;
+		restore();
 		throw error;
 	}
 
@@ -276,10 +290,7 @@ export async function startServer(
 		host,
 		url: urlFor(host, port),
 		close() {
-			closing ??= app.close().then(() => {
-				restoreEnv();
-				running = false;
-			});
+			closing ??= app.close().then(restore);
 			return closing;
 		},
 	};

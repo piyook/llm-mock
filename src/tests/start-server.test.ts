@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer, type AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
@@ -7,6 +8,7 @@ import {
 	type LlmMockConfig,
 	type RunningServer,
 } from '../index.js';
+import { getConfigDir, loadConfig } from '../config/config-loader.js';
 
 const config: LlmMockConfig = {
 	defaultModel: 'claude',
@@ -143,10 +145,35 @@ describe('startServer', () => {
 		expect(reply.content[0].text).toBe('from the file');
 	});
 
-	test('close stops the server and puts the environment back', async () => {
+	test("the dashboard links to the preset's endpoint, for each server", async () => {
+		const links = async () =>
+			(
+				(await (await fetch(`${server!.url}/ui-meta`)).json()) as {
+					apiLinks: Array<{ href: string }>;
+				}
+			).apiLinks.map((link) => link.href);
+
 		server = await startServer({ config, port: 0 });
+		expect(await links()).toContain('/v1/messages');
+		await server.close();
+
+		server = await startServer({ config, model: 'chatgpt', port: 0 });
+		expect(await links()).toContain('/chatgpt/chat/completions');
+		expect(await links()).not.toContain('/v1/messages');
+	});
+
+	test('close stops the server and puts the environment and config back', async () => {
+		const previousConfigDir = getConfigDir();
+		const previousConfig = loadConfig();
+
+		// A config file in another folder, so the config folder changes too
+		const path = join(dir, 'close-config.json');
+		writeFileSync(path, JSON.stringify(config));
+
+		server = await startServer({ config: path, port: 0 });
 		const { url } = server;
 		expect(process.env.SERVER_PORT).toBe(String(server.port));
+		expect(getConfigDir()).toBe(dir);
 
 		await server.close();
 		await server.close(); // a second close is fine
@@ -154,6 +181,29 @@ describe('startServer', () => {
 		await expect(fetch(`${url}/ping`)).rejects.toThrow();
 		expect(process.env.SERVER_PORT).toBe(previousPort);
 		expect(process.env.SERVER_HOST).toBe(previousHost);
+		expect(getConfigDir()).toBe(previousConfigDir);
+		expect(loadConfig()).toEqual(previousConfig);
+	});
+
+	test('a port that is taken throws, and the next server starts clean', async () => {
+		const blocker = createServer();
+		await new Promise<void>((done) => blocker.listen(0, '127.0.0.1', done));
+		const { port } = blocker.address() as AddressInfo;
+		const previousConfigDir = getConfigDir();
+
+		try {
+			await expect(startServer({ config, port })).rejects.toThrow(
+				/EADDRINUSE/,
+			);
+		} finally {
+			await new Promise((done) => blocker.close(done));
+		}
+
+		expect(process.env.SERVER_PORT).toBe(previousPort);
+		expect(getConfigDir()).toBe(previousConfigDir);
+
+		server = await startServer({ config, port: 0 });
+		expect((await fetch(`${server.url}/ping`)).ok).toBe(true);
 	});
 
 	test('one server at a time; the next one starts clean', async () => {

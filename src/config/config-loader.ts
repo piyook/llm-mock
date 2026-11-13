@@ -186,12 +186,18 @@ export function loadConfig(configPath?: string): LlmMockConfig {
 /**
  * Makes `config` the configuration in use, with `dir` the folder its files
  * resolve against, in place of whatever was loaded before. Used when a server
- * is started from code rather than the CLI.
+ * is started from code rather than the CLI. Returns a function that puts back
+ * the configuration that was in use before.
  */
-export function useConfig(config: LlmMockConfig, dir: string): void {
+export function useConfig(config: LlmMockConfig, dir: string): () => void {
+	const previous = { configCache, configDir, currentModelCache };
 	configCache = config;
 	configDir = dir;
 	currentModelCache = null;
+
+	return () => {
+		({ configCache, configDir, currentModelCache } = previous);
+	};
 }
 
 export function getModelConfig(modelName?: string): ModelConfig {
