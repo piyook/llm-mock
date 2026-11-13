@@ -18,6 +18,9 @@
 	--text-on-accent: #10231a;
 	/* Text on a danger background, in either theme */
 	--text-on-colour: #fff;
+	/* The server status dot */
+	--status-on: #3fb950;
+	--status-off: #f85149;
 	--line: rgba(255, 255, 255, 0.12);
 	--border-radius: 14px;
 	--shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
@@ -37,6 +40,8 @@
 	--text-main: #1c2128;
 	--text-muted: #57606a;
 	--text-on-accent: #fff;
+	--status-on: #1a7f37;
+	--status-off: #cf222e;
 	--line: rgba(0, 0, 0, 0.12);
 	--shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
 }
@@ -471,24 +476,45 @@ h1 {
 	min-height: 1.4em;
 }
 
-.statusPill {
+/* The logo, with the server's status as a dot on its corner */
+.brandIcon {
+	position: relative;
 	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	border-radius: 10px;
-	padding: 6px 12px;
-	font-weight: 700;
-	letter-spacing: 0.3px;
+	flex-shrink: 0;
 }
 
-.statusOnline {
-	background: var(--accent);
-	color: var(--text-on-accent);
+.statusDot {
+	position: absolute;
+	right: -3px;
+	bottom: -3px;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	/* Ring in the sidebar's colour, so the dot stands off the logo */
+	border: 2px solid var(--bg-sidebar);
+	background: var(--text-muted);
+	transition: background-color 0.2s ease;
 }
 
-.statusOffline {
-	background: var(--danger);
-	color: var(--text-on-colour);
+.statusDotOn {
+	background: var(--status-on);
+}
+
+.statusDotOff {
+	background: var(--status-off);
+}
+
+/* Read by screen readers, not shown */
+.visuallyHidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
 }
 
 .grid {

@@ -98,6 +98,8 @@
 
 	let meta: UiMeta | null = null;
 	let online: boolean | null = null;
+	$: statusLabel =
+		online === null ? 'Checking server…' : online ? 'Server running' : 'Server not running';
 	let error: string | null = null;
 	let timer: number | null = null;
 	let viewer: Viewer | null = null;
@@ -380,7 +382,20 @@
 <div class="shell">
 	<aside class="sidebar">
 		<a class="brand" href="#/">
-			<img src="/favicon.svg" alt="" width="28" height="28" />
+			<span class="brandIcon">
+				<img src="/favicon.svg" alt="" width="28" height="28" />
+				<!-- The server's status as a dot, so nothing shifts when it changes -->
+				<span
+					class="statusDot"
+					class:statusDotOn={online === true}
+					class:statusDotOff={online === false}
+					title={statusLabel}
+					cy-data="server_status"
+					data-status={online === null ? 'checking' : online ? 'running' : 'not-running'}
+				>
+					<span class="visuallyHidden">{statusLabel}</span>
+				</span>
+			</span>
 			<span>llmock</span>
 		</a>
 
@@ -442,13 +457,6 @@
 						<span class="versionPill" cy-data="llmock_version" title="llmock version">
 							v{meta.version}
 						</span>
-					{/if}
-					{#if online === null}
-						<div class="statusPill statusOffline" cy-data="server_status">Checking…</div>
-					{:else if online}
-						<div class="statusPill statusOnline" cy-data="server_status">Running</div>
-					{:else}
-						<div class="statusPill statusOffline" cy-data="server_status">Not Running</div>
 					{/if}
 				</div>
 			</div>

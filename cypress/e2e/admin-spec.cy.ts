@@ -470,7 +470,12 @@ describe('Mock LLM Spec for the admin API', () => {
                 'aria-current',
                 'page',
             );
-            cy.get('[cy-data="server_status"]').should('contain', 'Running');
+            // The status dot on the logo: green, labelled for screen readers
+            cy.get('[cy-data="server_status"]')
+                .should('have.attr', 'data-status', 'running')
+                .and('have.attr', 'title', 'Server running')
+                .and('have.class', 'statusDotOn')
+                .and('contain', 'Server running');
             cy.get('[cy-data="server_facts"]').should('contain', 'claude');
             cy.get('[cy-data="connect"]').should('contain', '/v1/messages');
             cy.get('[cy-data="chaos"]').should('not.exist');
