@@ -97,7 +97,17 @@
 	}
 
 	let meta: UiMeta | null = null;
+	// null until the first /ping answers
 	let online: boolean | null = null;
+	// The server's status, stated once: the badge's class, mark, label and data-status all come from it
+	let status: 'checking' | 'running' | 'not-running';
+	$: status = online === null ? 'checking' : online ? 'running' : 'not-running';
+	const statusLabels = {
+		checking: 'Checking server…',
+		running: 'Server running',
+		'not-running': 'Server not running',
+	} as const;
+	$: statusLabel = statusLabels[status];
 	let error: string | null = null;
 	let timer: number | null = null;
 	let viewer: Viewer | null = null;
@@ -347,20 +357,22 @@
 	}
 
 	async function refresh() {
+		const [m, p] = await Promise.allSettled([fetchUiMeta(), fetchPing()]);
+		// Running or not is /ping's answer alone, so a failing /ui-meta on a
+		// running server shows its error without marking the server down
+		online = p.status === 'fulfilled' && p.value;
 		try {
-			const [m, p] = await Promise.all([fetchUiMeta(), fetchPing()]);
-			meta = m;
-			online = p;
+			if (m.status === 'rejected') throw m.reason;
+			meta = m.value;
 			// The server sets its theme on the page it serves; this covers
 			// the dashboard run on its own with `npm run ui-dev`. A theme
 			// picked here wins over the server's.
-			theme = pickedTheme() ?? m.uiTheme;
+			theme = pickedTheme() ?? meta.uiTheme;
 			document.documentElement.dataset.theme = theme;
 			// Cleared only on success, so the message doesn't blink on every
 			// retry while the server is down
 			error = null;
 		} catch (e) {
-			online = false;
 			error = e instanceof Error ? e.message : String(e);
 		}
 	}
@@ -380,9 +392,35 @@
 <div class="shell">
 	<aside class="sidebar">
 		<a class="brand" href="#/">
-			<img src="/favicon.svg" alt="" width="28" height="28" />
+			<span class="brandIcon">
+				<img src="/favicon.svg" alt="" width="28" height="28" />
+				<!-- The server's status on the logo's corner, so nothing shifts when it changes:
+				     a grey dot while checking, then a white tick on green (running) or a white cross on red (not running).
+				     Hidden from screen readers, so the link stays named "llmock": the live region below says it instead -->
+				<span
+					class="statusDot"
+					class:statusDotOn={status === 'running'}
+					class:statusDotOff={status === 'not-running'}
+					title={statusLabel}
+					aria-hidden="true"
+					cy-data="server_status"
+					data-status={status}
+				>
+					{#if status !== 'checking'}
+						<svg class="statusMark" viewBox="0 0 24 24" width="15" height="15" focusable="false">
+							{#if status === 'running'}
+								<path d="M5.5 12.5l4.5 4.5 8.5-9.5" />
+							{:else}
+								<path d="M7 7l10 10M17 7L7 17" />
+							{/if}
+						</svg>
+					{/if}
+				</span>
+			</span>
 			<span>llmock</span>
 		</a>
+		<!-- Announced when the server goes down or comes back -->
+		<span class="visuallyHidden" role="status" cy-data="server_status_text">{statusLabel}</span>
 
 		<nav class="nav" aria-label="Pages">
 			{#each pages as item (item.id)}
@@ -437,20 +475,11 @@
 		<header class="pageHeader">
 			<div class="titleRow">
 				<h1>{pages.find((item) => item.id === route)?.title}</h1>
-				<div class="titleGroup">
-					{#if meta?.version}
-						<span class="versionPill" cy-data="llmock_version" title="llmock version">
-							v{meta.version}
-						</span>
-					{/if}
-					{#if online === null}
-						<div class="statusPill statusOffline" cy-data="server_status">Checking…</div>
-					{:else if online}
-						<div class="statusPill statusOnline" cy-data="server_status">Running</div>
-					{:else}
-						<div class="statusPill statusOffline" cy-data="server_status">Not Running</div>
-					{/if}
-				</div>
+				{#if meta?.version}
+					<span class="versionPill" cy-data="llmock_version" title="llmock version">
+						v{meta.version}
+					</span>
+				{/if}
 			</div>
 			<p class="errorLine muted">{error ?? ''}</p>
 		</header>

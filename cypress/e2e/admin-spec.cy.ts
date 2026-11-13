@@ -470,7 +470,21 @@ describe('Mock LLM Spec for the admin API', () => {
                 'aria-current',
                 'page',
             );
-            cy.get('[cy-data="server_status"]').should('contain', 'Running');
+            // The status badge on the logo: a white tick on green. It is hidden from
+            // screen readers, so the home link keeps its name; a live region says it
+            cy.get('[cy-data="server_status"]')
+                .should('have.attr', 'data-status', 'running')
+                .and('have.attr', 'title', 'Server running')
+                .and('have.attr', 'aria-hidden', 'true')
+                .and('have.class', 'statusDotOn')
+                .find('svg.statusMark')
+                .should('exist');
+            cy.get('a.brand')
+                .invoke('text')
+                .should((text) => expect(text.trim()).to.eq('llmock'));
+            cy.get('[cy-data="server_status_text"]')
+                .should('have.attr', 'role', 'status')
+                .and('have.text', 'Server running');
             cy.get('[cy-data="server_facts"]').should('contain', 'claude');
             cy.get('[cy-data="connect"]').should('contain', '/v1/messages');
             cy.get('[cy-data="chaos"]').should('not.exist');
@@ -494,6 +508,31 @@ describe('Mock LLM Spec for the admin API', () => {
             // A page that isn't there shows the overview
             cy.visit('/#/nowhere');
             cy.get('h1').should('have.text', 'Overview');
+        });
+
+        it('marks the server as not running when /ping fails', () => {
+            cy.intercept('GET', '/ping', { forceNetworkError: true });
+            cy.visit('/');
+            cy.get('[cy-data="server_status"]')
+                .should('have.attr', 'data-status', 'not-running')
+                .and('have.attr', 'title', 'Server not running')
+                .and('have.class', 'statusDotOff')
+                .and('not.have.class', 'statusDotOn')
+                .find('svg.statusMark path')
+                .should('have.attr', 'd', 'M7 7l10 10M17 7L7 17');
+            cy.get('[cy-data="server_status_text"]').should(
+                'have.text',
+                'Server not running',
+            );
+        });
+
+        it('keeps the server marked as running when only /ui-meta fails', () => {
+            cy.intercept('GET', '/ui-meta', { statusCode: 500 });
+            cy.visit('/');
+            cy.get('.errorLine').should('contain', 'ui-meta failed: 500');
+            cy.get('[cy-data="server_status"]')
+                .should('have.attr', 'data-status', 'running')
+                .and('have.class', 'statusDotOn');
         });
 
         it('fits the window, with the foot of the sidebar in view', () => {
