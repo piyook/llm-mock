@@ -7,7 +7,7 @@ describe('Mock LLM Streaming Only Spec', () => {
         model: 'gpt-4o',
         temperature: 1,
         n: 1,
-        stream: false,
+        stream: true,
         messages: [
             {
                 role: 'user',

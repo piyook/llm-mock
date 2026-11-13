@@ -144,12 +144,38 @@ describe('Mock LLM Spec for chatGPT', () => {
         });
     });
 
-    // This template goes by the server's streaming setting, so the dashboard
-    // has a switch for it (the claude template has none)
+    // The request's own `stream: true` / `stream: false` decides, as with the
+    // real API, on a preset that does not stream by default
+    describe('the request decides whether to stream', () => {
+        it('streams a request that sends stream: true', () => {
+            cy.request({
+                method: 'POST',
+                url: '/chatgpt/chat/completions',
+                body: { ...requestData, stream: true },
+            }).then((response) => {
+                expect(response.headers['content-type']).to.contain(
+                    'text/event-stream',
+                );
+                expect(response.body).to.contain('chat.completion.chunk');
+                expect(response.body).to.contain('[DONE]');
+            });
+        });
+
+        it('sends JSON for a request that sends stream: false', () => {
+            cy.request('POST', '/chatgpt/chat/completions', requestData)
+                .its('body')
+                .should('be.jsonSchema', chatGPTSchema);
+        });
+    });
+
+    // A request with no `stream` key (or a GET) goes by the server's
+    // streaming setting, so the dashboard has a switch for it (the claude
+    // template has none)
     describe('the streaming switch on the dashboard', () => {
+        const { stream: _stream, ...noStreamKey } = requestData;
         const reset = () => cy.request({ method: 'POST', url: '/admin/reset' });
         const ask = () =>
-            cy.request('POST', '/chatgpt/chat/completions', requestData);
+            cy.request('POST', '/chatgpt/chat/completions', noStreamKey);
 
         beforeEach(reset);
         after(reset);
@@ -174,7 +200,7 @@ describe('Mock LLM Spec for chatGPT', () => {
                         .fetch('/chatgpt/chat/completions', {
                             method: 'POST',
                             headers: { 'content-type': 'application/json' },
-                            body: JSON.stringify(requestData),
+                            body: JSON.stringify(noStreamKey),
                         })
                         .then((response) => response.text()),
                 )

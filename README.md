@@ -273,7 +273,7 @@ The config file is read once at startup, so restart the server after changing it
 | `logRequests` | Save the most recent requests to the log file |
 | `maxLoggedRequests` | How many requests the log keeps (default `10`, at most `100`) |
 | `debug` | Enable verbose console logging |
-| `stream` | Return SSE streaming responses (the `claude` preset decides per request instead) |
+| `stream` | Return SSE streaming responses. For `openai` presets, only for requests that don't send their own `stream: true`/`false`; ignored by the `claude` preset, which decides per request |
 | `responseDelay.min/max` | Response delay range in milliseconds |
 | `responseRules` | Optional list of `{ match, file }` or `{ match, files }` fixture replies, each with an optional `stopReason`, or `{ match, fail }` to fail the calls that match (see [Response rules](#response-rules-fixture-replies)) |
 | `chaos.enabled` | Fail some calls (see [Chaos mode](#chaos-mode-error-simulation)) |
@@ -501,7 +501,13 @@ Out of scope for now: tool calls in the OpenAI and Gemini formats, server tools 
 
 ### Streaming responses
 
-Enable OpenAI-style Server-Sent Events (SSE) streaming in your config or via CLI:
+As with the real APIs, the request decides whether it gets a stream:
+
+- **`openai` presets:** a request with `"stream": true` gets an OpenAI-style Server-Sent Events (SSE) stream, and one with `"stream": false` gets a single JSON reply, whatever the preset says. A request with no `stream` key (or a `GET`) goes by the preset's `stream` setting.
+- **`claude` preset:** it streams when the request body has `"stream": true`, and the preset setting is ignored (see [Anthropic](#anthropic-claude-messages-api)).
+- **`gemini` and custom presets:** the preset's `stream` setting decides, since real Gemini chooses streaming by URL, not by a body field.
+
+Set the preset default in your config or via CLI:
 
 ```json
 { "stream": true }
@@ -511,9 +517,7 @@ Enable OpenAI-style Server-Sent Events (SSE) streaming in your config or via CLI
 llmock start --stream=true
 ```
 
-For the `claude` preset streaming is chosen per request instead: it streams when the request body has `"stream": true`, whatever this setting says (see [Anthropic](#anthropic-claude-messages-api)).
-
-When enabled, the endpoint returns a chunked SSE stream. The server waits for the configured response delay, then sends the chunks at least 50 ms apart.
+When a request streams, the endpoint returns a chunked SSE stream. The server waits for the configured response delay, then sends the chunks at least 50 ms apart.
 
 ```
 data: {"id":"chatcmpl-123","object":"chat.completion.chunk","choices":[{"delta":{"role":"assistant"}}]}
@@ -729,7 +733,7 @@ await fetch('http://localhost:8001/admin/chaos', {
 - `min` can not be more than `max`, and neither can be more than 2147483647 (about 24 days). Send both when you raise the delay from `0`.
 - `PATCH /admin/settings` takes the same names and values as the model preset: `responseType` is `"lorem"` or `"stored"`, `stream`, `validateRequests` and `logRequests` are `true` or `false`, `maxLoremParas` is 1 to 1000 and `maxLoggedRequests` is 1 to 100.
 - `"responseType": "stored"` uses the preset's [`storedResponsesFile`](#response-types) if it has one, otherwise the texts that come with LLMock. If that file can not be read, the change is refused with a `400`.
-- `stream` has no effect on the `claude` template, where each request says whether it wants a stream.
+- `stream` has no effect on the `claude` template, where each request says whether it wants a stream. On an `openai` template it only applies to requests that don't send their own `stream: true`/`false`.
 - The dashboard shows the settings in use, so a change appears there within 2 seconds. The **Admin API** box on its **Settings** page has a **Reset** button that does the same as `POST /admin/reset`.
 - To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 
@@ -849,7 +853,7 @@ curl http://localhost:8001/chatgpt/chat/completions \
 
 #### Streaming
 
-Enable `stream: true` in your config, then use the same endpoint:
+Send `"stream": true` to the same endpoint (or set `stream: true` in the preset for requests that don't say):
 
 ```bash
 curl -N http://localhost:8001/chatgpt/chat/completions \
