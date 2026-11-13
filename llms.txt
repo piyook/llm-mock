@@ -2,7 +2,7 @@
 
 > `llmock` is a local HTTP server that imitates LLM APIs (OpenAI chat completions, Anthropic Messages, Gemini generateContent, OpenAI embeddings) with generated or canned replies. Use it so an app or test suite can run without a real provider. This file is the compact reference for agents wiring llmock into a project; README.md is the human tutorial.
 
-Describes the llmock version this file ships with (read it from `node_modules/llmock/llms.txt`). Node >= 20 (tested on 24 LTS). Nothing here needs an API key or network access.
+Describes the llmock version this file ships with (read it from `node_modules/llmock/llms.txt`). Node >= 24 (tested on 26 LTS). Nothing here needs an API key or network access.
 
 ## Mental model
 
@@ -403,7 +403,7 @@ Varied replies: `"responseType": "stored"` with `"storedResponsesFile": "fixture
 Docker (config and fixtures mounted, no rebuild on change):
 
 ```dockerfile
-FROM node:24-alpine
+FROM node:26-alpine
 WORKDIR /app
 RUN npm install --omit=dev llmock
 EXPOSE 8001
