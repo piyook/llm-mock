@@ -18,8 +18,9 @@
 	--text-on-accent: #10231a;
 	/* Text on a danger background, in either theme */
 	--text-on-colour: #fff;
-	/* The server status dot */
-	--status-on: #3fb950;
+	/* The server status badge. Stronger than --accent and --danger, and each
+	   at least 3:1 against its white mark (--accent is 2.6:1) */
+	--status-on: #2ea043;
 	--status-off: #f85149;
 	--line: rgba(255, 255, 255, 0.12);
 	--border-radius: 14px;
@@ -392,13 +393,6 @@ h1 {
 	font-size: 1.2rem;
 }
 
-.titleGroup {
-	display: flex;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: 12px;
-}
-
 /* A card's heading with something at the far end of its line */
 .cardHead {
 	display: flex;
@@ -485,29 +479,23 @@ h1 {
 
 .statusDot {
 	/* Centred on the favicon's own dot, which it covers */
+	/* One size in every state, so only the colour changes when the first ping answers */
 	position: absolute;
-	right: 1px;
-	bottom: 1px;
-	width: 10px;
-	height: 10px;
-	border-radius: 50%;
-	/* Ring in the sidebar's colour, so the dot stands off the logo */
-	border: 2px solid var(--bg-sidebar);
-	background: var(--text-muted);
-	transition: background-color 0.2s ease;
-}
-
-/* Running or not: a larger coloured badge holding a white tick or cross */
-.statusDotOn,
-.statusDotOff {
 	right: -2px;
 	bottom: -2px;
 	width: 16px;
 	height: 16px;
 	display: grid;
 	place-items: center;
+	border-radius: 50%;
+	/* Ring in the sidebar's colour, so the badge stands off the logo */
+	border: 2px solid var(--bg-sidebar);
+	background: var(--text-muted);
 	color: var(--text-on-colour);
+	transition: background-color 0.2s ease;
 }
+
+/* Running or not: a white tick or cross on green or red */
 
 .statusDotOn {
 	background: var(--status-on);
