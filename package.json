@@ -2,7 +2,7 @@
 	"name": "llmock",
 	"version": "3.13.0",
 	"description": "A configurable mock LLM API server for testing and development",
-	"main": "./src/server.ts",
+	"main": "./src/index.ts",
 	"type": "module",
 	"bin": {
 		"llmock": "./bin/llmock.js"

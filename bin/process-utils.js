@@ -153,6 +153,91 @@ export function applyConfigDefaults(config, modelName) {
 }
 
 /**
+ * The environment variables the server reads its settings from, for preset
+ * `modelName` of `config` (already filled in by applyConfigDefaults).
+ * `settings` are the CLI options (`--port=3000` is `{ port: '3000' }`) and win
+ * over the config. `configPath` is left out of the result when not given.
+ * Throws an Error when the preset's endpoint clashes with a built-in route.
+ */
+export function serverEnv(config, modelName, settings = {}, configPath) {
+  const modelConfig = config.models[modelName];
+  const serverConfig = config.server;
+  const custom = Object.fromEntries(
+    Object.entries(settings)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => [key, String(value)]),
+  );
+  const flag = (key, configValue, on, off) =>
+    (custom[key] !== undefined ? custom[key] === 'true' : configValue) ? on : off;
+
+  const env = {
+    // The selected model name and config path
+    LLM_MODEL_NAME: modelName,
+    ...(configPath ? { CONFIG_PATH: configPath } : {}),
+
+    // Server settings
+    SERVER_PORT: custom.port || serverConfig.port.toString(),
+    SERVER_HOST: custom.host || serverConfig.host,
+    ADMIN_API: readsAsOff(custom.admin !== undefined ? custom.admin : serverConfig.admin)
+      ? 'false'
+      : 'true',
+    // The flag wins, then a UI_THEME already in the environment, then the config
+    UI_THEME: custom.uiTheme || process.env.UI_THEME || serverConfig.uiTheme || 'dark',
+    LLM_URL_ENDPOINT: custom.endpoint || modelConfig.endpoint,
+
+    // LLM settings
+    LLM_NAME: modelConfig.name,
+    LLM_MODEL: modelConfig.model,
+    MOCK_LLM_RESPONSE_TYPE: custom.responseType || modelConfig.responseType,
+    MAX_LOREM_PARAS: custom.maxLoremParas || modelConfig.maxLoremParas.toString(),
+
+    // Feature flags
+    VALIDATE_REQUESTS: flag('validateRequests', modelConfig.validateRequests, 'ON', 'OFF'),
+    LOG_REQUESTS: flag('logRequests', modelConfig.logRequests, 'ON', 'OFF'),
+    MAX_LOGGED_REQUESTS: custom.maxLoggedRequests || modelConfig.maxLoggedRequests.toString(),
+    DEBUG: flag('debug', modelConfig.debug, '*', 'OFF'),
+    STREAM: flag('stream', modelConfig.stream, 'true', 'false'),
+
+    // Response delays
+    RESPONSE_DELAY_MIN: custom.delayMin || modelConfig.responseDelay.min.toString(),
+    RESPONSE_DELAY_MAX: custom.delayMax || modelConfig.responseDelay.max.toString(),
+
+    // Chaos
+    CHAOS_ENABLED: flag('chaos', modelConfig.chaos.enabled, 'true', 'false'),
+    CHAOS_FREQUENCY: custom.chaosFrequency || modelConfig.chaos.frequency.toString(),
+    CHAOS_MODE: custom.chaosMode || modelConfig.chaos.mode,
+    CHAOS_STATUS: custom.chaosStatus || modelConfig.chaos.status.toString(),
+    CHAOS_KIND: custom.chaosKind || modelConfig.chaos.kind,
+    CHAOS_AFTER_CHUNKS: custom.chaosAfterChunks || modelConfig.chaos.afterChunks.toString(),
+
+    // Embeddings
+    ENABLE_EMBEDDINGS_MOCK: flag('embeddings', modelConfig.embeddings.enabled, 'true', 'false'),
+    EMBEDDING_DIMENSION: custom.embeddingDimensions || modelConfig.embeddings.dimensions.toString(),
+  };
+
+  // The embeddings mock owns /v1/embeddings, so the chat endpoint can't use it too
+  const endpoint = env.LLM_URL_ENDPOINT.replace(/^\/+/, '');
+  if (endpoint === 'v1/embeddings' && env.ENABLE_EMBEDDINGS_MOCK === 'true') {
+    throw new Error(
+      `Model "${modelName}" uses the endpoint "v1/embeddings", which the embeddings mock already serves. Use a different endpoint or set embeddings.enabled to false.`
+    );
+  }
+
+  // The admin API owns everything under /admin
+  if (env.ADMIN_API === 'true' && (endpoint === 'admin' || endpoint.startsWith('admin/'))) {
+    throw new Error(
+      `Model "${modelName}" uses the endpoint "${endpoint}", but paths under "admin" belong to the admin API. Use a different endpoint or set server.admin to false.`
+    );
+  }
+
+  return env;
+}
+
+// Whether a setting reads as "off" (see readsAsOff in src/config/config-loader.ts)
+export const readsAsOff = (value) =>
+  ['false', '0', 'off', 'no'].includes(String(value).trim().toLowerCase());
+
+/**
  * Pids LISTENING on `port`, from `netstat -ano` output. Client connections
  * to the port are ignored so stopping the server never kills a browser or
  * test runner that merely has a connection open. Listening rows are found by

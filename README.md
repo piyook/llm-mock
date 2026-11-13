@@ -18,6 +18,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - [Installation Options](#installation-options)
   - [CLI options](#cli-options)
   - [Foreground mode](#foreground-mode)
+  - [Starting a server from code (tests)](#starting-a-server-from-code-tests)
 - [Configuration](#configuration)
   - [Configuration file](#configuration-file-llmockrcjson)
   - [Adding custom models](#adding-custom-models)
@@ -148,6 +149,7 @@ llmock start                        # uses defaultModel from .llmockrc.json (cha
 llmock start --model=gemini
 llmock start --model=claude         # Anthropic Messages API
 llmock start --port=3000 --stream=true
+llmock start --port=0               # any free port; the port is printed
 llmock stop                         # add --port=3000 if not on 8001
 llmock config                       # show current settings (accepts --model)
 llmock help
@@ -157,6 +159,8 @@ All CLI flags support both `--key=value` and `--key value` formats and override 
 
 `llmock start` returns once the server is answering. If the server cannot start (for example a config error), or one is already running on that port, it exits with an error instead; run with `--foreground` to see the server's own output.
 
+`--port=0` lets the system pick a free port. `llmock start` then prints the port it got (`Server is running at: http://0.0.0.0:54321`) and the `llmock stop --port=54321` that stops it; with `--foreground` the server prints it in its `SERVER UP AND RUNNING` line. The dashboard and `GET /ui-meta` show the real port.
+
 ### CLI options
 
 Each option overrides the matching setting of the selected preset for that run:
@@ -164,7 +168,7 @@ Each option overrides the matching setting of the selected preset for that run:
 | Option | Overrides | Value |
 |---|---|---|
 | `--model` | `defaultModel` | Name of a preset in `.llmockrc.json` |
-| `--port` / `--host` | `server.port` / `server.host` | Port number / address |
+| `--port` / `--host` | `server.port` / `server.host` | Port number (`0`: any free port) / address |
 | `--admin` | `server.admin` | `true` or `false` |
 | `--uiTheme` | `server.uiTheme` | `dark` or `light` |
 | `--endpoint` | `endpoint` | Path without a leading slash |
@@ -199,6 +203,36 @@ llmock start --foreground
 The `--foreground` flag keeps the server process attached and forwards all output to your console. This is essential for Docker containers and useful for debugging. Without this flag, the server runs as a detached background process.
 
 On Windows the background server starts without opening a console window. Use `llmock stop` to shut it down, or `llmock start --foreground` to keep it visible in your terminal.
+
+### Starting a server from code (tests)
+
+`startServer` runs a mock server inside your test process, with no CLI, fixed port or background process to clean up:
+
+```ts
+import { startServer } from 'llmock';
+
+const server = await startServer({ config: '.llmockrc.json', model: 'claude', port: 0 });
+// server.port: the port it got; server.url: 'http://127.0.0.1:54321'
+const client = new Anthropic({ apiKey: 'mock', baseURL: server.url });
+// ...
+await server.close();
+```
+
+In Vitest, start it in `beforeAll` and close it in `afterAll`. Options, all optional:
+
+| Option | Default | |
+|---|---|---|
+| `config` | `./.llmockrc.json`, else the built-in presets | A config file path (relative to the working directory), or the config object itself. Rule and stored-response files resolve against the file's folder (the working directory for an object). |
+| `model` | the config's `defaultModel` | Preset to run |
+| `port` | the config's `server.port` | `0` picks a free port |
+| `host` | `127.0.0.1` | Address to listen on. Not taken from the config, so a test server stays off the network unless you ask. |
+| `settings` | | Any [CLI option](#cli-options) by name, e.g. `{ stream: true, delayMin: 0, chaos: true }` |
+
+It returns `{ port, host, url, close() }`; `close()` stops the server and puts back the environment variables it set.
+
+- One server per process at a time: settings live in environment variables and module state, so a second `startServer` before `close()` throws. Vitest runs each test file in its own process by default, so files can each run their own server in parallel. A server started after an earlier one is closed starts clean (no runtime rules, chaos count at 0).
+- LLMock ships TypeScript source, so import it from a runner that loads TypeScript (Vitest, tsx). Plain `node` will not load it from `node_modules`; use the CLI with `--port=0` there.
+- The [request log](#request-logging) is one file shared by every LLMock server on the machine, so servers running in parallel log into the same file.
 
 ### Option 3: Docker
 

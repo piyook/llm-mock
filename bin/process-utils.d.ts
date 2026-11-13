@@ -13,4 +13,11 @@ export function applyConfigDefaults<T extends { models?: Record<string, any>; se
   config: T,
   modelName: string,
 ): T & { models: Record<string, any>; server: { port: number; host: string } };
+export function serverEnv(
+  config: { models: Record<string, any>; server: Record<string, any> },
+  modelName: string,
+  settings?: Record<string, string | number | boolean | undefined>,
+  configPath?: string,
+): Record<string, string>;
+export function readsAsOff(value: unknown): boolean;
 export function parseListeningPids(netstatOutput: string, port: number | string): string[];
