@@ -846,10 +846,13 @@ curl http://localhost:8001/chatgpt/chat/completions \
   "id": "chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe",
   "object": "chat.completion",
   "created": 1678485525,
-  "model": "gpt-3.5-turbo-0301",
+  "model": "gpt-4o-mini",
+  "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
   "choices": [{"message": {"role": "assistant", "content": "Generated response"}}]
 }
 ```
+
+`model` echoes the request's `model` (the preset's `model` when the request has none), and `usage` is estimated at about 4 characters per token: the request's `messages` in, the reply text out.
 
 #### Streaming
 

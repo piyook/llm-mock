@@ -58,11 +58,11 @@ curl -X POST http://localhost:8001/chatgpt/chat/completions \
   "id": "chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe",
   "object": "chat.completion",
   "created": 1678485525,
-  "model": "gpt-3.5-turbo-0301",
+  "model": "gpt-4o",
   "usage": {
-    "prompt_tokens": 12,
-    "completion_tokens": 99,
-    "total_tokens": 111
+    "prompt_tokens": 11,
+    "completion_tokens": 9,
+    "total_tokens": 20
   },
   "choices": [{
     "message": {
@@ -93,15 +93,21 @@ curl -N -X POST http://localhost:8001/chatgpt/chat/completions \
 
 3. **Expected Response**: Multiple SSE events
 ```
-data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-0","object":"chat.completion.chunk","created":1678485525,"model":"gpt-3.5-turbo-0301","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-0","object":"chat.completion.chunk","created":1678485525,"model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-1","object":"chat.completion.chunk","created":1678485525,"model":"gpt-3.5-turbo-0301","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
+data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-1","object":"chat.completion.chunk","created":1678485525,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-2","object":"chat.completion.chunk","created":1678485525,"model":"gpt-3.5-turbo-0301","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}
+data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-2","object":"chat.completion.chunk","created":1678485525,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-final","object":"chat.completion.chunk","created":1678485525,"model":"gpt-3.5-turbo-0301","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-final","object":"chat.completion.chunk","created":1678485525,"model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
 
 data: [DONE]
+```
+
+`model` echoes the request's `model` (the preset's `model` if the request has none) and `usage` is an estimate (about 4 characters per token). To get usage on a stream, send `"stream_options": {"include_usage": true}`, as with the OpenAI API: every chunk then carries `"usage": null`, and one more chunk with `"choices": []` and the estimated `usage` comes just before `data: [DONE]`:
+
+```
+data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-usage","object":"chat.completion.chunk","created":1678485525,"model":"gpt-4o","choices":[],"usage":{"prompt_tokens":11,"completion_tokens":3,"total_tokens":14}}
 ```
 
 ## Response Headers Verification
