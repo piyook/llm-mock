@@ -2,7 +2,7 @@ import { faker } from '@faker-js/faker';
 import { db } from '../models/db.js';
 import { buildResponse } from './build-response.js';
 import {
-	generateStreamingChunks,
+	buildStreamingChunks,
 	setStreamingHeaders,
 	streamWithDelay,
 } from './build-streaming-response.js';
@@ -20,7 +20,6 @@ import { applyStopReason } from './stop-reason.js';
 import {
 	applyOpenAiRequestFields,
 	isOpenAiFormat,
-	wantsStreamUsage,
 } from './build-openai-response.js';
 import {
 	failStream,
@@ -176,7 +175,7 @@ export const handleStreamingResponse = async (
 	body?: unknown,
 ) => {
 	try {
-		const chunks = await generateStreamingChunks(
+		const { chunks, contentChunks } = await buildStreamingChunks(
 			mockReply.text,
 			mockReply.stopReason,
 			body,
@@ -187,10 +186,9 @@ export const handleStreamingResponse = async (
 		if (failure) {
 			// The role chunk and some content chunks, then the failure in
 			// place of the finish_reason chunk, any usage chunk and [DONE]
-			const trailing = isOpenAiFormat() && wantsStreamUsage(body) ? 3 : 2;
 			const sent = chunks.slice(
 				0,
-				1 + streamedCount(chunks.length - 1 - trailing, failure),
+				1 + streamedCount(contentChunks, failure),
 			);
 			await streamWithDelay(sent, reply, false);
 			failStream(reply, failure, 'openai');

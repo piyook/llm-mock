@@ -18,6 +18,9 @@ export function resolveModelName(flagValue, config) {
   return flagValue || config?.defaultModel || 'chatgpt';
 }
 
+/** The port `llmock stop` stops when it is given no --port */
+export const DEFAULT_STOP_PORT = 8001;
+
 const COMMAND_ARGS = new Set([
   'start', 'stop', 'help', '--help', '-h', 'config', '--config', '-c',
 ]);
@@ -34,7 +37,7 @@ export function parseCliArgs(args) {
     showConfig: false,
     modelName: undefined, // from --model; otherwise the config's defaultModel
     customSettings: {},
-    stopPort: 8001,
+    stopPort: DEFAULT_STOP_PORT,
     foregroundMode: false,
   };
 
@@ -168,7 +171,7 @@ export function serverEnv(config, modelName, settings = {}, configPath) {
       .map(([key, value]) => [key, String(value)]),
   );
   const flag = (key, configValue, on, off) =>
-    (custom[key] !== undefined ? custom[key] === 'true' : configValue) ? on : off;
+    (custom[key] !== undefined ? readsAsOn(custom[key]) : configValue) ? on : off;
 
   const env = {
     // The selected model name and config path
@@ -233,9 +236,26 @@ export function serverEnv(config, modelName, settings = {}, configPath) {
   return env;
 }
 
+/**
+ * Base URL a client on this machine reaches a server listening on `host` and
+ * `port` at: a wildcard address (0.0.0.0 or ::) is reached on 127.0.0.1, and
+ * an IPv6 address is put in brackets.
+ */
+export function reachableUrl(host, port) {
+  const reachable = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
+  return `http://${reachable.includes(':') ? `[${reachable}]` : reachable}:${port}`;
+}
+
 // Whether a setting reads as "off" (see readsAsOff in src/config/config-loader.ts)
 export const readsAsOff = (value) =>
   ['false', '0', 'off', 'no'].includes(String(value).trim().toLowerCase());
+
+/**
+ * Whether a setting reads as "on": true, or "true", "1", "on" or "yes" in any
+ * case. The on/off options (stream, debug, chaos, ...) are on only then.
+ */
+export const readsAsOn = (value) =>
+  ['true', '1', 'on', 'yes'].includes(String(value).trim().toLowerCase());
 
 /**
  * Pids LISTENING on `port`, from `netstat -ano` output. Client connections

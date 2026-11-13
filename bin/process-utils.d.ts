@@ -1,3 +1,4 @@
+export const DEFAULT_STOP_PORT: number;
 export function tsxCliPath(): string;
 export function resolveModelName(flagValue: string | undefined, config: { defaultModel?: string }): string;
 export function parseCliArgs(args: string[]): {
@@ -20,4 +21,6 @@ export function serverEnv(
   configPath?: string,
 ): Record<string, string>;
 export function readsAsOff(value: unknown): boolean;
+export function readsAsOn(value: unknown): boolean;
+export function reachableUrl(host: string, port: number | string): string;
 export function parseListeningPids(netstatOutput: string, port: number | string): string[];

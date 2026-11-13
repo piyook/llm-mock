@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { dirname, resolve } from 'node:path';
 import fastify, { type FastifyInstance } from 'fastify';
@@ -13,6 +13,7 @@ import {
 	getResponseRules,
 	getStoredResponsesFile,
 	loadConfig,
+	readConfigFile,
 	setEnvironmentFromConfig,
 	useConfig,
 	type LlmMockConfig,
@@ -27,6 +28,7 @@ import { releaseStalledOnClose, resetChaos } from './utilities/chaos.js';
 import { clearRuntimeRules } from './utilities/runtime-rules.js';
 import {
 	applyConfigDefaults,
+	reachableUrl,
 	resolveModelName,
 	serverEnv,
 } from '../bin/process-utils.js';
@@ -59,7 +61,10 @@ export interface RunningServer {
 	host: string;
 	/** Base URL to send requests to, e.g. `http://127.0.0.1:54321` */
 	url: string;
-	/** Stops the server and puts back the environment variables it set */
+	/**
+	 * Stops the server and puts back the environment variables and the
+	 * configuration it set
+	 */
 	close(): Promise<void>;
 }
 
@@ -112,36 +117,43 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 	resetChaos();
 
 	const app = fastify({ logger: false });
-
-	// A connection held open by chaos must not keep the server from stopping
-	releaseStalledOnClose(app);
-
-	const { apiRoutes } = await getApiRoutes(app, !quiet);
-
-	serverPage(app, apiRoutes);
-
-	if (adminApiEnabled()) adminApi(app);
-
-	// Load database from disk if persistence is enabled
-	const loaded = dbLoadFromDisk();
-
-	// Execute dB seeder functions only if database wasn't loaded from disk
-	const seedRequested =
-		process.env?.MOCK_DB_SEED_ON_START?.toUpperCase() === 'ON';
-	const shouldSeed = seedRequested || !loaded;
-
-	if (shouldSeed) {
-		if (!loaded) db.llm.__unsafe_replaceAll([]);
-		for (const seeder of Object.values(seeders)) {
-			seeder();
-		}
-	}
-
 	const host = process.env?.SERVER_HOST || '0.0.0.0';
-	await app.listen({
-		port: Number(process.env?.SERVER_PORT ?? 8001),
-		host,
-	});
+
+	// A server that fails part-way (e.g. the port is taken) is closed, so
+	// nothing of it is left running in the process
+	try {
+		// A connection held open by chaos must not keep the server from stopping
+		releaseStalledOnClose(app);
+
+		const { apiRoutes } = await getApiRoutes(app, !quiet);
+
+		serverPage(app, apiRoutes);
+
+		if (adminApiEnabled()) adminApi(app);
+
+		// Load database from disk if persistence is enabled
+		const loaded = dbLoadFromDisk();
+
+		// Execute dB seeder functions only if database wasn't loaded from disk
+		const seedRequested =
+			process.env?.MOCK_DB_SEED_ON_START?.toUpperCase() === 'ON';
+		const shouldSeed = seedRequested || !loaded;
+
+		if (shouldSeed) {
+			if (!loaded) db.llm.__unsafe_replaceAll([]);
+			for (const seeder of Object.values(seeders)) {
+				seeder();
+			}
+		}
+
+		await app.listen({
+			port: Number(process.env?.SERVER_PORT ?? 8001),
+			host,
+		});
+	} catch (error) {
+		await app.close().catch(() => undefined);
+		throw error;
+	}
 
 	// With port 0 the system picked one: everything that shows the port
 	// (dashboard, error messages) reads it from here
@@ -180,23 +192,7 @@ function readConfig(config: StartServerOptions['config']): {
 		return { config: getDefaultConfig(), dir: process.cwd() };
 	}
 
-	try {
-		return {
-			config: JSON.parse(readFileSync(path, 'utf8')) as LlmMockConfig,
-			dir: dirname(path),
-			path,
-		};
-	} catch (error) {
-		throw new Error(
-			`Failed to parse llmock config file ${path}: ${(error as Error).message}`,
-		);
-	}
-}
-
-// URL a client on this machine reaches `host` and `port` at
-function urlFor(host: string, port: number): string {
-	const reachable = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
-	return `http://${reachable.includes(':') ? `[${reachable}]` : reachable}:${port}`;
+	return { config: readConfigFile(path), dir: dirname(path), path };
 }
 
 // Settings live in process.env and in module state, so one server at a time
@@ -257,14 +253,18 @@ export async function startServer(
 
 	running = true;
 	Object.assign(process.env, env);
-	useConfig(config, dir);
+	const restoreConfig = useConfig(config, dir);
+	const restore = () => {
+		restoreEnv();
+		restoreConfig();
+		running = false;
+	};
 
 	let started: Awaited<ReturnType<typeof bootServer>>;
 	try {
 		started = await bootServer({ quiet: true });
 	} catch (error) {
-		restoreEnv();
-		running = false;
+		restore();
 		throw error;
 	}
 
@@ -274,12 +274,9 @@ export async function startServer(
 	return {
 		port,
 		host,
-		url: urlFor(host, port),
+		url: reachableUrl(host, port),
 		close() {
-			closing ??= app.close().then(() => {
-				restoreEnv();
-				running = false;
-			});
+			closing ??= app.close().then(restore);
 			return closing;
 		},
 	};

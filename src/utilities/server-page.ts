@@ -15,8 +15,6 @@ import { getDelay } from './runtime-settings.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
 import { adminApiEnabled } from './admin-api.js';
 
-const prefix = process.env?.LLM_URL_ENDPOINT ?? '';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uiDistDir = path.resolve(__dirname, '../../ui/dist');
@@ -221,7 +219,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		const apiLinksSet = new Set<string>();
 
 		// Add main API endpoint
-		apiLinksSet.add(`/${prefix}`);
+		// Read per request: startServer sets it after this module has loaded
+		apiLinksSet.add(`/${process.env?.LLM_URL_ENDPOINT ?? ''}`);
 
 		// Add embeddings endpoint link if enabled
 		if (embeddingsEnabled) {

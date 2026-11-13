@@ -5,8 +5,10 @@ import { dirname, resolve } from 'path';
 import { existsSync } from 'fs';
 import {
   applyConfigDefaults,
+  DEFAULT_STOP_PORT,
   parseCliArgs,
   parseListeningPids,
+  reachableUrl,
   readsAsOff,
   resolveModelName,
   serverEnv,
@@ -127,7 +129,7 @@ Available models: ${Object.keys(config.models).join(', ')}
 }
 
 // Stop running llm-mock server
-async function stopServer(port = 8001) {
+async function stopServer(port = DEFAULT_STOP_PORT) {
   const { exec } = await import('child_process');
   
   const isWindows = process.platform === 'win32';
@@ -302,9 +304,7 @@ function setEnvironmentVariables(config, modelName, configPath) {
 
 // URL the CLI uses to reach the server it started
 function pingUrl(port = process.env.SERVER_PORT) {
-  const host = process.env.SERVER_HOST;
-  const reachable = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
-  return `http://${reachable.includes(':') ? `[${reachable}]` : reachable}:${port}/ping`;
+  return `${reachableUrl(process.env.SERVER_HOST, port)}/ping`;
 }
 
 // Where the server is, for messages: port 0 means a free port picked at start
@@ -328,6 +328,26 @@ function waitForPort(serverProcess, ms) {
     });
     serverProcess.on('exit', () => finish(null));
   });
+}
+
+// Kills a detached server with everything it started. Killing only `pid`
+// would leave the node process tsx runs the server in, which would go on to
+// hold the port. On Windows taskkill /T takes the tree; elsewhere the server
+// was detached, so it leads its own process group.
+async function killTree(pid) {
+  if (!pid) return;
+  if (process.platform === 'win32') {
+    const { execFile } = await import('child_process');
+    await new Promise((done) =>
+      execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, () => done())
+    );
+    return;
+  }
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {
+    // Already gone
+  }
 }
 
 async function isServerUp(url) {
@@ -454,10 +474,12 @@ async function main() {
           process.exit(1);
         });
 
-        // Wait until the server reports its port and answers on it, then exit
-        // the CLI. A failure can only be reported generally.
-        const deadline = Date.now() + 20000;
+        // Wait until the server reports its port, then until it answers on it,
+        // and exit the CLI. Each step has its own time limit, so a server that
+        // reports its port late still gets time to answer. A failure can only
+        // be reported generally.
         const port = await waitForPort(serverProcess, 20000);
+        const deadline = Date.now() + 10000;
         let started = false;
         while (port !== null && !started && exitCode === null && Date.now() < deadline) {
           started = await isServerUp(pingUrl(port));
@@ -466,12 +488,14 @@ async function main() {
 
         if (!started) {
           console.error(
-            exitCode === null
-              ? 'Server did not respond within 20 seconds.'
-              : `Server failed to start (exit code ${exitCode}).`
+            exitCode !== null
+              ? `Server failed to start (exit code ${exitCode}).`
+              : port === null
+                ? 'Server did not start within 20 seconds.'
+                : 'Server did not respond within 10 seconds of starting.'
           );
           console.error(`Run 'llmock start --foreground' with the same options to see the error.`);
-          if (exitCode === null) serverProcess.kill();
+          if (exitCode === null) await killTree(serverProcess.pid);
           process.exit(1);
         }
 
@@ -480,7 +504,7 @@ async function main() {
 
         console.log(`Server started successfully!`);
         console.log(`Server is running at: ${serverAddress(port)}`);
-        console.log(`Use 'llmock stop${Number(port) === 8001 ? '' : ` --port=${port}`}' to stop the server.`);
+        console.log(`Use 'llmock stop${Number(port) === DEFAULT_STOP_PORT ? '' : ` --port=${port}`}' to stop the server.`);
         process.exit(0);
       }
     }
