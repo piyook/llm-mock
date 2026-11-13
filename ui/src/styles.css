@@ -484,9 +484,10 @@ h1 {
 }
 
 .statusDot {
+	/* Centred on the favicon's own dot, which it covers */
 	position: absolute;
-	right: -3px;
-	bottom: -3px;
+	right: 1px;
+	bottom: 1px;
 	width: 10px;
 	height: 10px;
 	border-radius: 50%;
@@ -496,12 +497,33 @@ h1 {
 	transition: background-color 0.2s ease;
 }
 
+/* Running or not: a larger coloured badge holding a white tick or cross */
+.statusDotOn,
+.statusDotOff {
+	right: -2px;
+	bottom: -2px;
+	width: 16px;
+	height: 16px;
+	display: grid;
+	place-items: center;
+	color: var(--text-on-colour);
+}
+
 .statusDotOn {
 	background: var(--status-on);
 }
 
 .statusDotOff {
 	background: var(--status-off);
+}
+
+.statusMark {
+	display: block;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2.5;
+	stroke-linecap: round;
+	stroke-linejoin: round;
 }
 
 /* Read by screen readers, not shown */

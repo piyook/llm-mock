@@ -384,7 +384,8 @@
 		<a class="brand" href="#/">
 			<span class="brandIcon">
 				<img src="/favicon.svg" alt="" width="28" height="28" />
-				<!-- The server's status as a dot, so nothing shifts when it changes -->
+				<!-- The server's status on the logo's corner, so nothing shifts when it changes:
+				     a grey dot while checking, then a white tick on green (running) or a white cross on red (not running) -->
 				<span
 					class="statusDot"
 					class:statusDotOn={online === true}
@@ -393,6 +394,22 @@
 					cy-data="server_status"
 					data-status={online === null ? 'checking' : online ? 'running' : 'not-running'}
 				>
+					{#if online !== null}
+						<svg
+							class="statusMark"
+							viewBox="0 0 24 24"
+							width="15"
+							height="15"
+							aria-hidden="true"
+							focusable="false"
+						>
+							{#if online}
+								<path d="M5.5 12.5l4.5 4.5 8.5-9.5" />
+							{:else}
+								<path d="M7 7l10 10M17 7L7 17" />
+							{/if}
+						</svg>
+					{/if}
 					<span class="visuallyHidden">{statusLabel}</span>
 				</span>
 			</span>
