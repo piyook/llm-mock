@@ -85,7 +85,7 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `logRequests` | boolean | false | Record the most recent validated requests (shown at `GET /ui-request-log`). |
 | `maxLoggedRequests` | number | 10 | How many requests the log keeps. Capped at 100; a value below 1 or not a number falls back to 10. |
 | `debug` | boolean | false | Verbose console output. |
-| `stream` | boolean | false | SSE for `openai`/`gemini` formats. Ignored by `claude`. |
+| `stream` | boolean | false | SSE for `openai`/`gemini` formats. On `openai`, only for requests without a boolean `stream` of their own. Ignored by `claude`. |
 | `responseDelay.min/max` | ms | 0 / 0 | Random wait before each reply. `0`/`0` disables. |
 | `embeddings.enabled` | boolean | false | Registers `/v1/embeddings`. When false the route 404s. |
 | `embeddings.dimensions` | number | 128 | Default vector length. |
@@ -215,14 +215,14 @@ Nothing inside the keys is checked, so every request of a claude tool loop passe
 **OpenAI format** (`name: "openai"`), non-streaming:
 `{"id","object":"chat.completion","created","model","usage":{…},"choices":[{"message":{"role":"assistant","content":"<text>"},"finish_reason":"stop","index":0}]}`. `id`, `created`, `model` (`gpt-3.5-turbo-0301`) and `usage` (12/99/111) are constants; the request's `model` is not echoed.
 
-Streaming is decided by the preset's `stream` setting only; the request's `stream` field is ignored. So a client that sends `stream: true` to a non-streaming preset receives plain JSON, and vice versa: keep the two in agreement. Stream shape: `data: {chat.completion.chunk}` lines — one role delta, then content deltas (which concatenate to the exact text), then an empty delta with `finish_reason: "stop"`, then `data: [DONE]`.
+Streaming is decided per request, as by the real API: `"stream": true` in the body gets SSE and `"stream": false` gets JSON, whatever the preset says. A request with no boolean `stream` (or a `GET`) goes by the preset's `stream` setting. Stream shape: `data: {chat.completion.chunk}` lines — one role delta, then content deltas (which concatenate to the exact text), then an empty delta with `finish_reason: "stop"`, then `data: [DONE]`.
 
 **Claude format** (`name: "claude"`), non-streaming:
 `{"id":"msg_<random>","type":"message","role":"assistant","model":"<request model>","content":[{"type":"text","text":"<text>"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens","output_tokens","cache_creation_input_tokens":0,"cache_read_input_tokens":0}}`. Token counts are estimates (~4 chars per token).
 
 Streaming is per request: SSE if and only if the body has `"stream": true`. Events, in order: `message_start`, `content_block_start`, `content_block_delta` × n (`text_delta`, concatenating to the exact text), `content_block_stop`, `message_delta` (`stop_reason: "end_turn"`), `message_stop`. One text block, except for a tool-call reply (see Tool calls).
 
-**Gemini format** (`name: "gemini"`): `{"candidates":[{"content":{"parts":[{"text":"<text>"}],"role":"model"},"finishReason":"STOP","index":0,"safetyRatings":[…]}]}`. With `stream: true` the output is OpenAI-style chunks, not Gemini's stream format.
+**Gemini format** (`name: "gemini"`): `{"candidates":[{"content":{"parts":[{"text":"<text>"}],"role":"model"},"finishReason":"STOP","index":0,"safetyRatings":[…]}]}`. With the preset's `stream: true` the output is OpenAI-style chunks, not Gemini's stream format. Only the preset setting decides; a `stream` field in the body is ignored.
 
 **Stop reasons**: a reply produced by a response rule with `stopReason` ends with the value below, streamed or not. Every other reply ends as shown above.
 
@@ -270,7 +270,7 @@ The way to test retries, backoff and error handling: some calls fail. By default
 - The in-stream error of `stream-error`:
   - `claude`: the SSE event `event: error` with `data: {"type":"error","error":{"type","message"}}`. `type` follows `chaos.status` as in the HTTP error (429 `rate_limit_error`, 529 `overloaded_error`, else `api_error`); `message` is `llmock chaos: simulated <status> error`.
   - OpenAI-style stream (`openai`, `gemini` and custom names): a `data:` line holding the `openai` error body above (also for `gemini`).
-- Whether a call "asked for a stream" follows the usual rule: the request's `stream: true` for `claude`, the preset's `stream` setting for the others. `/v1/embeddings` never streams, so it takes the right-hand column.
+- Whether a call "asked for a stream" follows the usual rule: the request's `stream: true` for `claude`; for `openai`, the request's boolean `stream` if it has one, else the preset's `stream` setting; the preset's setting for the others. `/v1/embeddings` never streams, so it takes the right-hand column.
 - `stream-stall` sends no keep-alive and never times out on the server side: set a timeout in the client under test. Stalled connections are dropped when the server stops, so `stop` and a `SIGTERM` still work.
 - In the config file, a `frequency` that is not an integer ≥ 1, a `mode` other than `every`/`random`, a `status` outside 400–599, an unknown `kind`, or an `afterChunks` that is not an integer ≥ 0 → server refuses to start. An invalid CLI flag value falls back to the default instead.
 - `GET /ui-meta` → `chaosStatus` (`ENABLED`/`DISABLED`), `chaosFrequency`, `chaosMode`, `chaosErrorStatus`, `chaosKind`, `chaosAfterChunks`, and `chaosInjected` (failures of any kind since startup).

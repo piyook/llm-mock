@@ -1,9 +1,14 @@
 /**
  * Decides whether a request should get an SSE stream or a single JSON body.
  *
- * Claude clients (the Anthropic SDK) choose per request with `stream: true`,
- * and send it even for calls that only want the final message, so the request
- * wins. The OpenAI/Gemini presets keep the server-wide STREAM setting.
+ * - claude: the request decides. The Anthropic SDK sends `stream: true` for
+ *   every streamed call, and a request without it gets JSON, as the real API
+ *   does.
+ * - openai: the request's `stream: true` / `stream: false` decides, as with
+ *   the real chat completions API. A request without a boolean `stream` (or a
+ *   GET, which has no body) gets the server-wide STREAM setting.
+ * - gemini and anything else: the server-wide STREAM setting. Real Gemini
+ *   chooses streaming by URL, not by a body field.
  *
  * @param llmName - Template name from config (LLM_NAME), e.g. 'claude'
  * @param body - Parsed request body (may be undefined for GET routes)
@@ -14,12 +19,15 @@ export const shouldStream = (
 	body: unknown,
 	streamEnv: string | undefined,
 ): boolean => {
-	if (llmName === 'claude') {
-		return (
-			typeof body === 'object' &&
-			body !== null &&
-			(body as { stream?: unknown }).stream === true
-		);
+	const requested =
+		typeof body === 'object' && body !== null
+			? (body as { stream?: unknown }).stream
+			: undefined;
+
+	if (llmName === 'claude') return requested === true;
+
+	if (llmName === 'openai' && typeof requested === 'boolean') {
+		return requested;
 	}
 
 	return streamEnv?.toLowerCase() === 'true';

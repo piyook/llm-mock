@@ -5,8 +5,10 @@ This guide provides manual testing steps for the streaming functionality of the 
 ## Overview
 
 The mock LLM API supports two response modes:
-- **Static Mode (STREAM=false)**: Returns a single JSON response
-- **Streaming Mode (STREAM=true)**: Returns OpenAI-style Server-Sent Events (SSE) stream
+- **Static Mode**: Returns a single JSON response
+- **Streaming Mode**: Returns OpenAI-style Server-Sent Events (SSE) stream
+
+With the `openai` format the request picks the mode, as with the real API: `"stream": true` in the body streams and `"stream": false` does not. A request with no `stream` key (or a GET) uses the server setting (`STREAM=true` / `false`, or the preset's `stream`). The `gemini` format always uses the server setting.
 
 ## Quick Setup
 
@@ -36,7 +38,7 @@ The server will start on `http://localhost:8001`
 
 ### Static Mode Testing
 
-1. **Set STREAM=false** in your `.env` file
+1. **Send `"stream": false`** (or set STREAM=false and leave `stream` out of the request)
 2. **Make a request**:
 ```bash
 curl -X POST http://localhost:8001/chatgpt/chat/completions \
@@ -75,8 +77,8 @@ curl -X POST http://localhost:8001/chatgpt/chat/completions \
 
 ### Streaming Mode Testing
 
-1. **Set STREAM=true** in your `.env` file
-2. **Make the same request**:
+1. **Send `"stream": true`** (or set STREAM=true and leave `stream` out of the request)
+2. **Make the request**:
 ```bash
 curl -N -X POST http://localhost:8001/chatgpt/chat/completions \
   -H "Content-Type: application/json" \
@@ -85,7 +87,7 @@ curl -N -X POST http://localhost:8001/chatgpt/chat/completions \
     "messages": [{"role": "user", "content": "Hello world"}],
     "temperature": 1,
     "n": 1,
-    "stream": false
+    "stream": true
   }'
 ```
 
@@ -186,7 +188,8 @@ npm run test:streaming
    - Verify `VALIDATE_REQUESTS=ON` if validation is expected
 
 3. **Streaming not working**
-   - Confirm `STREAM=true` in `.env`
+   - Check the request doesn't send `"stream": false` (it wins over the server setting)
+   - Confirm `STREAM=true` in `.env` if the request has no `stream` key
    - Restart server after changing environment variables
    - Check response headers include `text/event-stream`
 
@@ -240,7 +243,7 @@ const response = await fetch('http://localhost:8001/chatgpt/chat/completions', {
     messages: [{ role: 'user', content: 'Hello' }],
     temperature: 1,
     n: 1,
-    stream: false
+    stream: true
   })
 });
 
@@ -293,7 +296,7 @@ response = requests.post(
         'messages': [{'role': 'user', 'content': 'Hello'}],
         'temperature': 1,
         'n': 1,
-        'stream': False
+        'stream': True
     },
     stream=True
 )

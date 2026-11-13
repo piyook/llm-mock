@@ -19,6 +19,7 @@ import {
 
 // Static JSON vs SSE stream is decided per request by shouldStream():
 // - claude preset: the request body's `stream` field
+// - openai preset: the body's boolean `stream` if it has one, else STREAM
 // - other presets: the STREAM env variable (true = OpenAI-style SSE, default false)
 
 /**
