@@ -331,6 +331,28 @@ describe('serverEnv', () => {
 		});
 	});
 
+	test.each([
+		[1, 'true'],
+		['1', 'true'],
+		['on', 'true'],
+		['YES', 'true'],
+		[' True ', 'true'],
+		[0, 'false'],
+		['off', 'false'],
+		['no', 'false'],
+		['nonsense', 'false'],
+	])('an on/off setting of %j reads as %s', (value, expected) => {
+		const env = serverEnv(config, 'claude', {
+			stream: value,
+			chaos: value,
+			embeddings: value,
+		});
+
+		expect(env.STREAM).toBe(expected);
+		expect(env.CHAOS_ENABLED).toBe(expected);
+		expect(env.ENABLE_EMBEDDINGS_MOCK).toBe(expected);
+	});
+
 	test('an endpoint under /admin is refused while the admin API is on', () => {
 		expect(() =>
 			serverEnv(config, 'claude', { endpoint: 'admin/chat' }),

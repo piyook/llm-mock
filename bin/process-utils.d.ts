@@ -20,4 +20,5 @@ export function serverEnv(
   configPath?: string,
 ): Record<string, string>;
 export function readsAsOff(value: unknown): boolean;
+export function readsAsOn(value: unknown): boolean;
 export function parseListeningPids(netstatOutput: string, port: number | string): string[];

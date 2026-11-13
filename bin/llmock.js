@@ -330,6 +330,26 @@ function waitForPort(serverProcess, ms) {
   });
 }
 
+// Kills a detached server with everything it started. Killing only `pid`
+// would leave the node process tsx runs the server in, which would go on to
+// hold the port. On Windows taskkill /T takes the tree; elsewhere the server
+// was detached, so it leads its own process group.
+async function killTree(pid) {
+  if (!pid) return;
+  if (process.platform === 'win32') {
+    const { execFile } = await import('child_process');
+    await new Promise((done) =>
+      execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, () => done())
+    );
+    return;
+  }
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {
+    // Already gone
+  }
+}
+
 async function isServerUp(url) {
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(1000) });
@@ -454,10 +474,12 @@ async function main() {
           process.exit(1);
         });
 
-        // Wait until the server reports its port and answers on it, then exit
-        // the CLI. A failure can only be reported generally.
-        const deadline = Date.now() + 20000;
+        // Wait until the server reports its port, then until it answers on it,
+        // and exit the CLI. Each step has its own time limit, so a server that
+        // reports its port late still gets time to answer. A failure can only
+        // be reported generally.
         const port = await waitForPort(serverProcess, 20000);
+        const deadline = Date.now() + 10000;
         let started = false;
         while (port !== null && !started && exitCode === null && Date.now() < deadline) {
           started = await isServerUp(pingUrl(port));
@@ -466,12 +488,14 @@ async function main() {
 
         if (!started) {
           console.error(
-            exitCode === null
-              ? 'Server did not respond within 20 seconds.'
-              : `Server failed to start (exit code ${exitCode}).`
+            exitCode !== null
+              ? `Server failed to start (exit code ${exitCode}).`
+              : port === null
+                ? 'Server did not start within 20 seconds.'
+                : 'Server did not respond within 10 seconds of starting.'
           );
           console.error(`Run 'llmock start --foreground' with the same options to see the error.`);
-          if (exitCode === null) serverProcess.kill();
+          if (exitCode === null) await killTree(serverProcess.pid);
           process.exit(1);
         }
 
