@@ -10,7 +10,7 @@ type ApiFile = Promise<{
 	default: (app: FastifyInstance, pathName: string) => void;
 }>;
 
-export default async function getApiRoutes(app: FastifyInstance) {
+export default async function getApiRoutes(app: FastifyInstance, log = true) {
 	const apiRootDirectoryPath = `${__dirname}/../api`;
 
 	const apiFileImportPromises: ApiFile[] = [];
@@ -23,9 +23,11 @@ export default async function getApiRoutes(app: FastifyInstance) {
 		const stats = fs.statSync(filePath);
 
 		if (stats.isDirectory()) {
-			console.log(
-				`Found folder in src/api: Adding New Route ${directory}`,
-			);
+			if (log) {
+				console.log(
+					`Found folder in src/api: Adding New Route ${directory}`,
+				);
+			}
 			// Add directory/route name to list of api paths
 			apiRoutes.push(directory);
 

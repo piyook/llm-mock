@@ -18,11 +18,14 @@ npm install --save-dev llmock
 npx llmock start --model=claude        # detached; returns once the server answers
 npx llmock start --model=claude --foreground   # attached; use in Docker/CI or to see errors
 npx llmock stop                        # add --port=<n> if not 8001
+npx llmock start --model=claude --port=0   # any free port: prints it, and the stop command
 ```
 
 - Detached `start` waits until the server answers, then exits 0. It exits 1 if the server fails to start (the server's output is not attached: rerun with `--foreground` to see the error) or if a server already answers on that port.
 - With `--foreground` the command never returns; poll for readiness yourself: `GET /ping` → `200 {"response":"server is running"}`.
 - Confirm what is live: `GET /ui-meta` → JSON with `version` (llmock version), `llmName`, `llmUrlEndpoint`, `serverPort`, `streamingStatus`, `validateRequests`, delays.
+- `--port=0`: the system picks a free port. Detached `start` prints `Server is running at: http://<host>:<port>` and `Use 'llmock stop --port=<port>'`; `--foreground` prints `SERVER UP AND RUNNING ON LOCALHOST:<port>`. `GET /ui-meta` → `serverPort` is the real port.
+- In-process (TypeScript runners such as Vitest or tsx; plain `node` will not load llmock's `.ts` source from `node_modules`): `import { startServer } from 'llmock'`; `startServer({ config?, model?, port?, host?, settings? })` → `{ port, host, url, close() }`. `config` is a file path (relative to the cwd; rule files resolve against its folder) or the config object; default `./.llmockrc.json`, else the built-in presets. `port` defaults to the config's; `host` defaults to `127.0.0.1` (not the config's). `settings` takes any CLI flag by name (`{ stream: true, delayMin: 0 }`). One server per process at a time (a second call before `close()` throws; Vitest's per-file processes can each run one); `close()` restores the env vars it set. The request log file is shared by every llmock server on the machine.
 - `stop` kills whatever process is listening on the port (default 8001, it does not read the config). Do not point it at a port another service uses.
 - Run the CLI from the folder containing `.llmockrc.json`, or set `CONFIG_PATH=<path>` (relative to the cwd).
 - Scaffold alternative: `npm create llmock@latest <dir>` creates a standalone folder (config, Docker files, npm scripts). It prompts interactively if `<dir>` is omitted or already exists. Its scripts: `npm run llmock:start`, `llmock:stop`, `llmock:<preset>`. Its Docker setup mounts only `.llmockrc.json`; templates, fixtures and a stored responses file are copied into the image, so changing them needs `npm run docker:rebuild` (or an added volume). Its `gemini` preset already uses the endpoint `v1beta/models/gemini-pro:generateContent`, so Google's SDK works there without the change described below.
@@ -366,6 +369,19 @@ To change a response envelope or the required request keys, or to mock a provide
 - Not mocked: tool/function calls in the `openai`, `gemini` and custom formats (and their `tool_calls`/`functionCall` stop reasons), server tools (`web_search` and the like), images, multiple choices (`n`), the stop reasons `stop_sequence` and `pause_turn` (and their equivalents in the other formats), Gemini's `streamGenerateContent`, `/v1/models`, `/v1/messages/count_tokens`. Claude tool calls come only from rules: the mock never picks a tool itself, and it does not check `tool_use_id`s against earlier turns.
 
 ## Recipes
+
+Test setup (Vitest or another TypeScript runner), a server per test file on a free port:
+
+```ts
+import { startServer, type RunningServer } from 'llmock';
+
+let server: RunningServer;
+beforeAll(async () => {
+  server = await startServer({ config: '.llmockrc.json', model: 'claude', port: 0, settings: { delayMin: 0, delayMax: 0 } });
+});
+afterAll(() => server.close());
+// client baseURL: server.url
+```
 
 Test setup (any runner):
 

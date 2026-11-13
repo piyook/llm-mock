@@ -81,7 +81,7 @@ let configDir = process.cwd();
 let currentModelCache: string | null = null;
 
 // Default configuration for global installation
-function getDefaultConfig(): LlmMockConfig {
+export function getDefaultConfig(): LlmMockConfig {
 	return {
 		defaultModel: 'chatgpt',
 		models: {
@@ -181,6 +181,17 @@ export function loadConfig(configPath?: string): LlmMockConfig {
 			`Failed to parse configuration file: ${error instanceof Error ? error.message : 'Unknown error'}`,
 		);
 	}
+}
+
+/**
+ * Makes `config` the configuration in use, with `dir` the folder its files
+ * resolve against, in place of whatever was loaded before. Used when a server
+ * is started from code rather than the CLI.
+ */
+export function useConfig(config: LlmMockConfig, dir: string): void {
+	configCache = config;
+	configDir = dir;
+	currentModelCache = null;
 }
 
 export function getModelConfig(modelName?: string): ModelConfig {
