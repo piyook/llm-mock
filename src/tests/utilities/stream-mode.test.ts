@@ -48,13 +48,46 @@ describe('shouldStream', () => {
 			},
 		);
 
-		test('ignores the request body stream field', () => {
-			expect(shouldStream('openai', { stream: true }, 'false')).toBe(
+		test('gemini ignores the request body stream field', () => {
+			expect(shouldStream('gemini', { stream: true }, 'false')).toBe(
 				false,
 			);
-			expect(shouldStream('openai', { stream: false }, 'true')).toBe(
+			expect(shouldStream('gemini', { stream: false }, 'true')).toBe(
 				true,
 			);
+		});
+	});
+
+	describe('openai preset (request first, then STREAM)', () => {
+		test('stream: true in the request streams on a non-streaming preset', () => {
+			expect(shouldStream('openai', { stream: true }, 'false')).toBe(
+				true,
+			);
+			expect(shouldStream('openai', { stream: true }, undefined)).toBe(
+				true,
+			);
+		});
+
+		test('stream: false in the request gets JSON on a streaming preset', () => {
+			expect(shouldStream('openai', { stream: false }, 'true')).toBe(
+				false,
+			);
+		});
+
+		test('a request without a boolean stream follows STREAM', () => {
+			expect(shouldStream('openai', { messages: [] }, 'true')).toBe(true);
+			expect(shouldStream('openai', { messages: [] }, 'false')).toBe(
+				false,
+			);
+			expect(shouldStream('openai', { stream: 'true' }, 'false')).toBe(
+				false,
+			);
+			expect(shouldStream('openai', { stream: null }, 'true')).toBe(true);
+		});
+
+		test('a GET (no body) follows STREAM', () => {
+			expect(shouldStream('openai', undefined, 'true')).toBe(true);
+			expect(shouldStream('openai', undefined, 'false')).toBe(false);
 		});
 	});
 });

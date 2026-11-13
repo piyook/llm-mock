@@ -2,6 +2,13 @@ import { faker } from '@faker-js/faker';
 import { delay, getDelayConfig } from './delay.js';
 import { buildResponse } from './build-response.js';
 import { toWireStopReason, type StopReason } from './stop-reason.js';
+import {
+	estimateOpenAiUsage,
+	isOpenAiFormat,
+	resolveOpenAiModel,
+	wantsStreamUsage,
+	type OpenAiUsage,
+} from './build-openai-response.js';
 
 export interface StreamingChunk {
 	id: string;
@@ -16,6 +23,7 @@ export interface StreamingChunk {
 		};
 		finish_reason: string | null;
 	}>;
+	usage?: OpenAiUsage | null;
 }
 
 /**
@@ -35,14 +43,36 @@ export interface StreamingChunk {
  * - Uses same created timestamp and model as static template
  *
  * @param content - The full content to be streamed
+ * The openai format also echoes the request's model, and when the request
+ * sends `stream_options.include_usage` every chunk carries `usage: null` and a
+ * usage chunk (no choices, estimated usage) comes before [DONE].
+ *
+ * @param content - The full content to be streamed
  * @param stopReason - How the reply ends, if a response rule set it
+ * @param body - Parsed request body (undefined for GET requests)
  * @returns Promise<string[]> Array of SSE-formatted chunks
  */
 export const generateStreamingChunks = async (
 	content: string,
 	stopReason?: StopReason,
-): Promise<string[]> => {
+	body?: unknown,
+): Promise<string[]> =>
+	(await buildStreamingChunks(content, stopReason, body)).chunks;
+
+/**
+ * The chunks of generateStreamingChunks, plus `contentChunks`: how many
+ * content chunks follow the role chunk. The rest (finish_reason chunk, any
+ * usage chunk, [DONE]) come after them, so chaos can cut the stream off
+ * part-way through the content without working out the layout itself.
+ */
+export const buildStreamingChunks = async (
+	content: string,
+	stopReason?: StopReason,
+	body?: unknown,
+): Promise<{ chunks: string[]; contentChunks: number }> => {
 	const chunks: string[] = [];
+	const openAi = isOpenAiFormat();
+	const includeUsage = openAi && wantsStreamUsage(body);
 
 	// Get the static response template to extract id, model, etc.
 	// This ensures streaming responses match static template structure
@@ -51,8 +81,17 @@ export const generateStreamingChunks = async (
 	// Extract base properties from the static template for consistency
 	const baseId =
 		staticResponse.id || `chatcmpl-${faker.string.alphanumeric(10)}`;
-	const model = staticResponse.model || (process.env.LLM_MODEL ?? 'gpt-4o');
+	const model = openAi
+		? resolveOpenAiModel(body)
+		: staticResponse.model || (process.env.LLM_MODEL ?? 'gpt-4o');
 	const created = staticResponse.created || Math.floor(Date.now() / 1000);
+
+	// With include_usage, every chunk before the usage chunk has usage: null
+	const push = (chunk: StreamingChunk) => {
+		chunks.push(
+			`data: ${JSON.stringify(includeUsage ? { ...chunk, usage: null } : chunk)}`,
+		);
+	};
 
 	// Split content into words for realistic streaming simulation
 	// This mimics how real LLMs stream responses token by token
@@ -77,7 +116,7 @@ export const generateStreamingChunks = async (
 			},
 		],
 	};
-	chunks.push(`data: ${JSON.stringify(firstChunk)}`);
+	push(firstChunk);
 
 	// Content chunks - streaming the actual response text
 	for (let i = 0; i < words.length; i += chunkSize) {
@@ -99,8 +138,9 @@ export const generateStreamingChunks = async (
 				},
 			],
 		};
-		chunks.push(`data: ${JSON.stringify(chunk)}`);
+		push(chunk);
 	}
+	const contentChunks = chunks.length - 1;
 
 	// Final chunk with finish_reason (OpenAI format requirement)
 	// Extract finish_reason from static template or default to stop. A rule's
@@ -123,13 +163,27 @@ export const generateStreamingChunks = async (
 			},
 		],
 	};
-	chunks.push(`data: ${JSON.stringify(finalChunk)}`);
+	push(finalChunk);
+
+	// Usage chunk (OpenAI stream_options.include_usage): no choices, the
+	// whole reply's usage
+	if (includeUsage) {
+		const usageChunk: StreamingChunk = {
+			id: `${baseId}-usage`,
+			object: 'chat.completion.chunk',
+			created,
+			model,
+			choices: [],
+			usage: estimateOpenAiUsage(body, content),
+		};
+		chunks.push(`data: ${JSON.stringify(usageChunk)}`);
+	}
 
 	// Add [DONE] sentinel (OpenAI streaming requirement)
 	// This signals the end of the stream to clients
 	chunks.push('data: [DONE]');
 
-	return chunks;
+	return { chunks, contentChunks };
 };
 
 /**
@@ -144,11 +198,15 @@ export const generateStreamingChunks = async (
  * @param reply - Fastify reply object
  */
 export const setStreamingHeaders = (reply: any) => {
-	reply.header('Content-Type', 'text/event-stream');
-	reply.header('Cache-Control', 'no-cache');
-	reply.header('Connection', 'keep-alive');
-	reply.header('Access-Control-Allow-Origin', '*');
-	reply.header('Access-Control-Allow-Headers', 'Cache-Control');
+	// Set on the raw response: the stream is written to reply.raw, so headers
+	// set with reply.header() would never be sent (Fastify only sends them
+	// with reply.send()). setHeader keeps any header already set there, such
+	// as chaos's x-llmock-chaos.
+	reply.raw.setHeader('Content-Type', 'text/event-stream');
+	reply.raw.setHeader('Cache-Control', 'no-cache');
+	reply.raw.setHeader('Connection', 'keep-alive');
+	reply.raw.setHeader('Access-Control-Allow-Origin', '*');
+	reply.raw.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
 };
 
 /**

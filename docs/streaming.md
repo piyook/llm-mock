@@ -5,8 +5,10 @@ This guide provides manual testing steps for the streaming functionality of the 
 ## Overview
 
 The mock LLM API supports two response modes:
-- **Static Mode (STREAM=false)**: Returns a single JSON response
-- **Streaming Mode (STREAM=true)**: Returns OpenAI-style Server-Sent Events (SSE) stream
+- **Static Mode**: Returns a single JSON response
+- **Streaming Mode**: Returns OpenAI-style Server-Sent Events (SSE) stream
+
+With the `openai` format the request picks the mode, as with the real API: `"stream": true` in the body streams and `"stream": false` does not. A request with no `stream` key (or a GET) uses the server setting (`STREAM=true` / `false`, or the preset's `stream`). The `gemini` format always uses the server setting.
 
 ## Quick Setup
 
@@ -36,7 +38,7 @@ The server will start on `http://localhost:8001`
 
 ### Static Mode Testing
 
-1. **Set STREAM=false** in your `.env` file
+1. **Send `"stream": false`** (or set STREAM=false and leave `stream` out of the request)
 2. **Make a request**:
 ```bash
 curl -X POST http://localhost:8001/chatgpt/chat/completions \
@@ -56,11 +58,11 @@ curl -X POST http://localhost:8001/chatgpt/chat/completions \
   "id": "chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe",
   "object": "chat.completion",
   "created": 1678485525,
-  "model": "gpt-3.5-turbo-0301",
+  "model": "gpt-4o",
   "usage": {
-    "prompt_tokens": 12,
-    "completion_tokens": 99,
-    "total_tokens": 111
+    "prompt_tokens": 11,
+    "completion_tokens": 9,
+    "total_tokens": 20
   },
   "choices": [{
     "message": {
@@ -75,8 +77,8 @@ curl -X POST http://localhost:8001/chatgpt/chat/completions \
 
 ### Streaming Mode Testing
 
-1. **Set STREAM=true** in your `.env` file
-2. **Make the same request**:
+1. **Send `"stream": true`** (or set STREAM=true and leave `stream` out of the request)
+2. **Make the request**:
 ```bash
 curl -N -X POST http://localhost:8001/chatgpt/chat/completions \
   -H "Content-Type: application/json" \
@@ -85,21 +87,27 @@ curl -N -X POST http://localhost:8001/chatgpt/chat/completions \
     "messages": [{"role": "user", "content": "Hello world"}],
     "temperature": 1,
     "n": 1,
-    "stream": false
+    "stream": true
   }'
 ```
 
 3. **Expected Response**: Multiple SSE events
 ```
-data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-0","object":"chat.completion.chunk","created":1678485525,"model":"gpt-3.5-turbo-0301","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
+data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-0","object":"chat.completion.chunk","created":1678485525,"model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-1","object":"chat.completion.chunk","created":1678485525,"model":"gpt-3.5-turbo-0301","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
+data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-1","object":"chat.completion.chunk","created":1678485525,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-2","object":"chat.completion.chunk","created":1678485525,"model":"gpt-3.5-turbo-0301","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}
+data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-2","object":"chat.completion.chunk","created":1678485525,"model":"gpt-4o","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-final","object":"chat.completion.chunk","created":1678485525,"model":"gpt-3.5-turbo-0301","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-final","object":"chat.completion.chunk","created":1678485525,"model":"gpt-4o","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
 
 data: [DONE]
+```
+
+`model` echoes the request's `model` (the preset's `model` if the request has none) and `usage` is an estimate (about 4 characters per token). To get usage on a stream, send `"stream_options": {"include_usage": true}`, as with the OpenAI API: every chunk then carries `"usage": null`, and one more chunk with `"choices": []` and the estimated `usage` comes just before `data: [DONE]`:
+
+```
+data: {"id":"chatcmpl-6sf37lXn5paUcuf8UaurpMIKRMsTe-usage","object":"chat.completion.chunk","created":1678485525,"model":"gpt-4o","choices":[],"usage":{"prompt_tokens":11,"completion_tokens":3,"total_tokens":14}}
 ```
 
 ## Response Headers Verification
@@ -186,7 +194,8 @@ npm run test:streaming
    - Verify `VALIDATE_REQUESTS=ON` if validation is expected
 
 3. **Streaming not working**
-   - Confirm `STREAM=true` in `.env`
+   - Check the request doesn't send `"stream": false` (it wins over the server setting)
+   - Confirm `STREAM=true` in `.env` if the request has no `stream` key
    - Restart server after changing environment variables
    - Check response headers include `text/event-stream`
 
@@ -240,7 +249,7 @@ const response = await fetch('http://localhost:8001/chatgpt/chat/completions', {
     messages: [{ role: 'user', content: 'Hello' }],
     temperature: 1,
     n: 1,
-    stream: false
+    stream: true
   })
 });
 
@@ -293,7 +302,7 @@ response = requests.post(
         'messages': [{'role': 'user', 'content': 'Hello'}],
         'temperature': 1,
         'n': 1,
-        'stream': False
+        'stream': True
     },
     stream=True
 )

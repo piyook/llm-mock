@@ -7,7 +7,7 @@ describe('Mock LLM Streaming Only Spec', () => {
         model: 'gpt-4o',
         temperature: 1,
         n: 1,
-        stream: false,
+        stream: true,
         messages: [
             {
                 role: 'user',
@@ -29,10 +29,10 @@ describe('Mock LLM Streaming Only Spec', () => {
             }).then((response) => {
                 // Should return 200 status for streaming
                 expect(response.status).to.eq(200);
-                
-                // For streaming responses, Cypress may not capture the body properly
-                // but we can verify the request was successful
-                expect(response).to.have.property('status', 200);
+                expect(response.headers['content-type']).to.contain(
+                    'text/event-stream',
+                );
+                expect(response.body).to.contain('data: [DONE]');
             });
         });
 

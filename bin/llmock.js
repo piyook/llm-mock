@@ -5,18 +5,18 @@ import { dirname, resolve } from 'path';
 import { existsSync } from 'fs';
 import {
   applyConfigDefaults,
+  DEFAULT_STOP_PORT,
   parseCliArgs,
   parseListeningPids,
+  reachableUrl,
+  readsAsOff,
   resolveModelName,
+  serverEnv,
   tsxCliPath,
 } from './process-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// Whether a setting reads as "off" (see readsAsOff in src/config/config-loader.ts)
-const readsAsOff = (value) =>
-  ['false', '0', 'off', 'no'].includes(String(value).trim().toLowerCase());
 
 // Parse command line arguments
 const {
@@ -45,7 +45,7 @@ COMMANDS:
 
 OPTIONS:
   --model=<name>          Model preset to use (chatgpt, gemini, streaming, embeddings, claude)
-  --port=<number>         Server port (default: 8001)
+  --port=<number>         Server port (default: 8001; 0 picks a free port and prints it)
   --host=<address>        Server host (default: 0.0.0.0)
   --admin=<bool>          Serve the admin API under /admin (default: true)
   --uiTheme=<theme>       Dashboard colours: dark (default) or light
@@ -73,6 +73,7 @@ EXAMPLES:
   llmock start                              # Start with default chatgpt model
   llmock start --model=gemini              # Use gemini model preset
   llmock start --port=3000 --host=localhost # Custom server settings
+  llmock start --port=0                     # Any free port; the port is printed
   llmock start --debug=true --stream=true   # Enable debug and streaming
   llmock start --delayMin=1000 --delayMax=2000 # Custom response delays
   llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429 # Every 3rd call fails with a 429
@@ -128,7 +129,7 @@ Available models: ${Object.keys(config.models).join(', ')}
 }
 
 // Stop running llm-mock server
-async function stopServer(port = 8001) {
+async function stopServer(port = DEFAULT_STOP_PORT) {
   const { exec } = await import('child_process');
   
   const isWindows = process.platform === 'win32';
@@ -296,81 +297,57 @@ async function loadConfig() {
   return { config, modelName: selectedModel };
 }
 
-// Set environment variables based on configuration
+// Set environment variables based on configuration (CLI options win)
 function setEnvironmentVariables(config, modelName, configPath) {
-  const modelConfig = config.models[modelName];
-  const serverConfig = config.server;
-
-  // Pass the selected model name and config path to the server
-  process.env.LLM_MODEL_NAME = modelName;
-  process.env.CONFIG_PATH = configPath;
-
-  // Server settings (with custom overrides)
-  process.env.SERVER_PORT = customSettings.port || serverConfig.port.toString();
-  process.env.SERVER_HOST = customSettings.host || serverConfig.host;
-  process.env.ADMIN_API = readsAsOff(customSettings.admin !== undefined ?
-    customSettings.admin : serverConfig.admin) ? 'false' : 'true';
-  // The flag wins, then a UI_THEME already in the environment, then the config
-  process.env.UI_THEME = customSettings.uiTheme || process.env.UI_THEME || serverConfig.uiTheme || 'dark';
-  process.env.LLM_URL_ENDPOINT = customSettings.endpoint || modelConfig.endpoint;
-  
-  // LLM settings (with custom overrides)
-  process.env.LLM_NAME = modelConfig.name;
-  process.env.LLM_MODEL = modelConfig.model;
-  process.env.MOCK_LLM_RESPONSE_TYPE = customSettings.responseType || modelConfig.responseType;
-  process.env.MAX_LOREM_PARAS = customSettings.maxLoremParas || modelConfig.maxLoremParas.toString();
-  
-  // Feature flags (with custom overrides)
-  process.env.VALIDATE_REQUESTS = (customSettings.validateRequests !== undefined ? 
-    customSettings.validateRequests === 'true' : modelConfig.validateRequests) ? 'ON' : 'OFF';
-  process.env.LOG_REQUESTS = (customSettings.logRequests !== undefined ? 
-    customSettings.logRequests === 'true' : modelConfig.logRequests) ? 'ON' : 'OFF';
-  process.env.MAX_LOGGED_REQUESTS = customSettings.maxLoggedRequests || modelConfig.maxLoggedRequests.toString();
-  process.env.DEBUG = (customSettings.debug !== undefined ? 
-    customSettings.debug === 'true' : modelConfig.debug) ? '*' : 'OFF';
-  process.env.STREAM = (customSettings.stream !== undefined ? 
-    customSettings.stream === 'true' : modelConfig.stream) ? 'true' : 'false';
-  
-  // Response delays (with custom overrides)
-  process.env.RESPONSE_DELAY_MIN = customSettings.delayMin || modelConfig.responseDelay.min.toString();
-  process.env.RESPONSE_DELAY_MAX = customSettings.delayMax || modelConfig.responseDelay.max.toString();
-
-  // Chaos (with custom overrides)
-  process.env.CHAOS_ENABLED = (customSettings.chaos !== undefined ?
-    customSettings.chaos === 'true' : modelConfig.chaos.enabled) ? 'true' : 'false';
-  process.env.CHAOS_FREQUENCY = customSettings.chaosFrequency || modelConfig.chaos.frequency.toString();
-  process.env.CHAOS_MODE = customSettings.chaosMode || modelConfig.chaos.mode;
-  process.env.CHAOS_STATUS = customSettings.chaosStatus || modelConfig.chaos.status.toString();
-  process.env.CHAOS_KIND = customSettings.chaosKind || modelConfig.chaos.kind;
-  process.env.CHAOS_AFTER_CHUNKS = customSettings.chaosAfterChunks || modelConfig.chaos.afterChunks.toString();
-  
-  // Embeddings (with custom overrides)
-  process.env.ENABLE_EMBEDDINGS_MOCK = (customSettings.embeddings !== undefined ? 
-    customSettings.embeddings === 'true' : modelConfig.embeddings.enabled) ? 'true' : 'false';
-  process.env.EMBEDDING_DIMENSION = customSettings.embeddingDimensions || modelConfig.embeddings.dimensions.toString();
-
-  // The embeddings mock owns /v1/embeddings, so the chat endpoint can't use it too
-  const endpoint = process.env.LLM_URL_ENDPOINT.replace(/^\/+/, '');
-  if (endpoint === 'v1/embeddings' && process.env.ENABLE_EMBEDDINGS_MOCK === 'true') {
-    throw new Error(
-      `Model "${modelName}" uses the endpoint "v1/embeddings", which the embeddings mock already serves. Use a different endpoint or set embeddings.enabled to false.`
-    );
-  }
-
-  // The admin API owns everything under /admin
-  if (process.env.ADMIN_API === 'true' && (endpoint === 'admin' || endpoint.startsWith('admin/'))) {
-    throw new Error(
-      `Model "${modelName}" uses the endpoint "${endpoint}", but paths under "admin" belong to the admin API. Use a different endpoint or set server.admin to false.`
-    );
-  }
+  Object.assign(process.env, serverEnv(config, modelName, customSettings, configPath));
 }
 
 // URL the CLI uses to reach the server it started
-function pingUrl(config) {
-  const host = customSettings.host || config.server.host;
-  const port = customSettings.port || config.server.port;
-  const reachable = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
-  return `http://${reachable.includes(':') ? `[${reachable}]` : reachable}:${port}/ping`;
+function pingUrl(port = process.env.SERVER_PORT) {
+  return `${reachableUrl(process.env.SERVER_HOST, port)}/ping`;
+}
+
+// Where the server is, for messages: port 0 means a free port picked at start
+function serverAddress(port = process.env.SERVER_PORT) {
+  return Number(port) === 0
+    ? `http://${process.env.SERVER_HOST} (on a free port)`
+    : `http://${process.env.SERVER_HOST}:${port}`;
+}
+
+// The port the detached server reports once it listens, or null when it exits
+// or does not report within `ms`
+function waitForPort(serverProcess, ms) {
+  return new Promise((done) => {
+    const timer = setTimeout(() => done(null), ms);
+    const finish = (port) => {
+      clearTimeout(timer);
+      done(port);
+    };
+    serverProcess.on('message', (message) => {
+      if (message?.type === 'llmock:listening') finish(message.port);
+    });
+    serverProcess.on('exit', () => finish(null));
+  });
+}
+
+// Kills a detached server with everything it started. Killing only `pid`
+// would leave the node process tsx runs the server in, which would go on to
+// hold the port. On Windows taskkill /T takes the tree; elsewhere the server
+// was detached, so it leads its own process group.
+async function killTree(pid) {
+  if (!pid) return;
+  if (process.platform === 'win32') {
+    const { execFile } = await import('child_process');
+    await new Promise((done) =>
+      execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, () => done())
+    );
+    return;
+  }
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch {
+    // Already gone
+  }
 }
 
 async function isServerUp(url) {
@@ -410,14 +387,16 @@ async function main() {
       const configPath = resolveConfigPath();
       setEnvironmentVariables(config, selectedModel, configPath);
     
-      // A detached server that can't bind the port would fail unseen
-      if (!foregroundMode && process.env.E2E_MODE !== 'true' && await isServerUp(pingUrl(config))) {
+      // A detached server that can't bind the port would fail unseen. Port 0
+      // picks a free port, so there is nothing to clash with.
+      const freePort = Number(process.env.SERVER_PORT) === 0;
+      if (!foregroundMode && !freePort && process.env.E2E_MODE !== 'true' && await isServerUp(pingUrl())) {
         console.error(`A server is already running on port ${process.env.SERVER_PORT}. Run 'llmock stop --port=${process.env.SERVER_PORT}' first, or start on another port with --port.`);
         process.exit(1);
       }
 
       console.log(`Starting LLM Mock Server with model: ${selectedModel}`);
-      console.log(`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
+      console.log(`Server will be available at: ${serverAddress()}`);
       
       // Import and start the server using spawn for better process control
       const { spawn } = await import('child_process');
@@ -433,7 +412,8 @@ async function main() {
       let serverProcess;
 
       if (foregroundMode) {
-        // Run in foreground mode for Docker - keep process attached
+        // Run in foreground mode for Docker - keep process attached. The
+        // server prints the port it listens on, which matters for port 0.
         serverProcess = spawn(process.execPath, serverArgs, {
           cwd: packageDir,
           stdio: 'inherit',
@@ -441,7 +421,6 @@ async function main() {
         });
         
         console.log(`Starting LLM Mock Server in foreground mode...`);
-        console.log(`Server will be available at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
         
         serverProcess.on('error', (error) => {
           console.error('Failed to start server process:', error.message);
@@ -454,65 +433,79 @@ async function main() {
           process.exit(code);
         });
         
-      } else {
-        // Normal use detaches so the CLI can exit. E2E mode stays attached so
-        // the test runner owns the process tree. windowsHide stops Windows
-        // opening a console window for the detached server.
+      } else if (isE2E) {
+        // E2E mode stays attached so the test runner owns the process tree
         serverProcess = spawn(process.execPath, serverArgs, {
           cwd: packageDir,
-          stdio: isE2E ? 'inherit' : 'ignore',
-          detached: !isE2E,
+          stdio: 'inherit',
+          detached: false,
           windowsHide: true
         });
 
-        if (!isE2E) {
-          serverProcess.unref();
-        }
-        
         serverProcess.on('error', (error) => {
           console.error('Failed to start server process:', error.message);
           process.exit(1);
         });
-        
-        if (isE2E) {
-          // In E2E mode, stay alive and forward signals to maintain process tree
-          serverProcess.on('close', (code) => {
-            process.exit(code ?? 0);
-          });
-          
-          process.on('SIGTERM', () => serverProcess.kill('SIGTERM'));
-          process.on('SIGINT', () => serverProcess.kill('SIGINT'));
-        } else {
-          // Normal detached mode - wait until the server answers, then exit CLI.
-          // Its output is not attached, so a failure can only be reported generally.
-          let exitCode = null;
-          serverProcess.on('exit', (code) => {
-            exitCode = code ?? 1;
-          });
 
-          const url = pingUrl(config);
-          const deadline = Date.now() + 20000;
-          let started = false;
-          while (!started && exitCode === null && Date.now() < deadline) {
-            await new Promise((done) => setTimeout(done, 250));
-            started = await isServerUp(url);
-          }
+        // Stay alive and forward signals to maintain process tree
+        serverProcess.on('close', (code) => {
+          process.exit(code ?? 0);
+        });
 
-          if (!started) {
-            console.error(
-              exitCode === null
-                ? 'Server did not respond within 20 seconds.'
-                : `Server failed to start (exit code ${exitCode}).`
-            );
-            console.error(`Run 'llmock start --foreground' with the same options to see the error.`);
-            process.exit(1);
-          }
+        process.on('SIGTERM', () => serverProcess.kill('SIGTERM'));
+        process.on('SIGINT', () => serverProcess.kill('SIGINT'));
+      } else {
+        // Normal use detaches so the CLI can exit. windowsHide stops Windows
+        // opening a console window for the detached server. Its output is not
+        // attached; the IPC channel only carries the port it listens on.
+        serverProcess = spawn(process.execPath, serverArgs, {
+          cwd: packageDir,
+          stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+          detached: true,
+          windowsHide: true
+        });
 
-          console.log(`Server started successfully!`);
-          console.log(`Server is running at: http://${customSettings.host || config.server.host}:${customSettings.port || config.server.port}`);
-          console.log(`Use 'llmock stop' to stop the server.`);
-          process.exit(0);
+        let exitCode = null;
+        serverProcess.on('exit', (code) => {
+          exitCode = code ?? 1;
+        });
+        serverProcess.on('error', (error) => {
+          console.error('Failed to start server process:', error.message);
+          process.exit(1);
+        });
+
+        // Wait until the server reports its port, then until it answers on it,
+        // and exit the CLI. Each step has its own time limit, so a server that
+        // reports its port late still gets time to answer. A failure can only
+        // be reported generally.
+        const port = await waitForPort(serverProcess, 20000);
+        const deadline = Date.now() + 10000;
+        let started = false;
+        while (port !== null && !started && exitCode === null && Date.now() < deadline) {
+          started = await isServerUp(pingUrl(port));
+          if (!started) await new Promise((done) => setTimeout(done, 250));
         }
+
+        if (!started) {
+          console.error(
+            exitCode !== null
+              ? `Server failed to start (exit code ${exitCode}).`
+              : port === null
+                ? 'Server did not start within 20 seconds.'
+                : 'Server did not respond within 10 seconds of starting.'
+          );
+          console.error(`Run 'llmock start --foreground' with the same options to see the error.`);
+          if (exitCode === null) await killTree(serverProcess.pid);
+          process.exit(1);
+        }
+
+        serverProcess.disconnect();
+        serverProcess.unref();
+
+        console.log(`Server started successfully!`);
+        console.log(`Server is running at: ${serverAddress(port)}`);
+        console.log(`Use 'llmock stop${Number(port) === DEFAULT_STOP_PORT ? '' : ` --port=${port}`}' to stop the server.`);
+        process.exit(0);
       }
     }
     

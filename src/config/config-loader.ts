@@ -81,7 +81,7 @@ let configDir = process.cwd();
 let currentModelCache: string | null = null;
 
 // Default configuration for global installation
-function getDefaultConfig(): LlmMockConfig {
+export function getDefaultConfig(): LlmMockConfig {
 	return {
 		defaultModel: 'chatgpt',
 		models: {
@@ -172,15 +172,39 @@ export function loadConfig(configPath?: string): LlmMockConfig {
 		return getDefaultConfig();
 	}
 
+	configCache = readConfigFile(path);
+	return configCache;
+}
+
+/**
+ * Reads and parses the config file at `path`, which must exist. Throws an
+ * Error naming the file when it can't be read or isn't valid JSON.
+ */
+export function readConfigFile(path: string): LlmMockConfig {
 	try {
-		const configData = readFileSync(path, 'utf8');
-		configCache = JSON.parse(configData) as LlmMockConfig;
-		return configCache;
+		return JSON.parse(readFileSync(path, 'utf8')) as LlmMockConfig;
 	} catch (error) {
 		throw new Error(
-			`Failed to parse configuration file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+			`Failed to parse llmock config file ${path}: ${error instanceof Error ? error.message : 'Unknown error'}`,
 		);
 	}
+}
+
+/**
+ * Makes `config` the configuration in use, with `dir` the folder its files
+ * resolve against, in place of whatever was loaded before. Used when a server
+ * is started from code rather than the CLI. Returns a function that puts back
+ * the configuration that was in use before.
+ */
+export function useConfig(config: LlmMockConfig, dir: string): () => void {
+	const previous = { configCache, configDir, currentModelCache };
+	configCache = config;
+	configDir = dir;
+	currentModelCache = null;
+
+	return () => {
+		({ configCache, configDir, currentModelCache } = previous);
+	};
 }
 
 export function getModelConfig(modelName?: string): ModelConfig {

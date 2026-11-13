@@ -2,11 +2,30 @@ import { existsSync } from 'fs';
 import { describe, expect, test } from 'vitest';
 import {
 	applyConfigDefaults,
+	DEFAULT_STOP_PORT,
 	parseCliArgs,
 	parseListeningPids,
+	reachableUrl,
 	resolveModelName,
+	serverEnv,
 	tsxCliPath,
 } from '../../../bin/process-utils.js';
+
+describe('reachableUrl', () => {
+	test.each([
+		['0.0.0.0', 'http://127.0.0.1:8001'],
+		['::', 'http://127.0.0.1:8001'],
+		['127.0.0.1', 'http://127.0.0.1:8001'],
+		['localhost', 'http://localhost:8001'],
+		['::1', 'http://[::1]:8001'],
+	])('%s is reached at %s', (host, url) => {
+		expect(reachableUrl(host, 8001)).toBe(url);
+	});
+});
+
+test('stop with no --port stops DEFAULT_STOP_PORT', () => {
+	expect(parseCliArgs(['stop']).stopPort).toBe(DEFAULT_STOP_PORT);
+});
 
 describe('tsxCliPath', () => {
 	test('points at an existing tsx cli script', () => {
@@ -277,5 +296,84 @@ describe('parseListeningPids', () => {
 	test('returns nothing for empty output or an unused port', () => {
 		expect(parseListeningPids('', 8001)).toEqual([]);
 		expect(parseListeningPids(netstat, 9999)).toEqual([]);
+	});
+});
+
+describe('serverEnv', () => {
+	const config = applyConfigDefaults(
+		{
+			models: {
+				claude: {
+					name: 'claude',
+					endpoint: 'v1/messages',
+					stream: false,
+					chaos: { enabled: true },
+				},
+			},
+			server: { port: 8001, host: '0.0.0.0' },
+		},
+		'claude',
+	);
+
+	test('takes the preset and server settings from the config', () => {
+		const env = serverEnv(config, 'claude');
+
+		expect(env).toMatchObject({
+			LLM_MODEL_NAME: 'claude',
+			SERVER_PORT: '8001',
+			SERVER_HOST: '0.0.0.0',
+			ADMIN_API: 'true',
+			LLM_NAME: 'claude',
+			LLM_URL_ENDPOINT: 'v1/messages',
+			STREAM: 'false',
+			CHAOS_ENABLED: 'true',
+		});
+		expect(env).not.toHaveProperty('CONFIG_PATH');
+	});
+
+	test('settings win over the config, numbers and booleans included', () => {
+		const env = serverEnv(
+			config,
+			'claude',
+			{ port: 0, stream: true, chaos: false, admin: 'off', delayMin: 5 },
+			'/x/.llmockrc.json',
+		);
+
+		expect(env).toMatchObject({
+			SERVER_PORT: '0',
+			STREAM: 'true',
+			CHAOS_ENABLED: 'false',
+			ADMIN_API: 'false',
+			RESPONSE_DELAY_MIN: '5',
+			CONFIG_PATH: '/x/.llmockrc.json',
+		});
+	});
+
+	test.each([
+		[1, 'true'],
+		['1', 'true'],
+		['on', 'true'],
+		['YES', 'true'],
+		[' True ', 'true'],
+		[0, 'false'],
+		['off', 'false'],
+		['no', 'false'],
+		['nonsense', 'false'],
+	])('an on/off setting of %j reads as %s', (value, expected) => {
+		const env = serverEnv(config, 'claude', {
+			stream: value,
+			chaos: value,
+			embeddings: value,
+		});
+
+		expect(env.STREAM).toBe(expected);
+		expect(env.CHAOS_ENABLED).toBe(expected);
+		expect(env.ENABLE_EMBEDDINGS_MOCK).toBe(expected);
+	});
+
+	test('an endpoint under /admin is refused while the admin API is on', () => {
+		expect(() =>
+			serverEnv(config, 'claude', { endpoint: 'admin/chat' }),
+		).toThrow(/belong to the admin API/);
 	});
 });

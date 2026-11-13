@@ -149,6 +149,7 @@ const post = (
 		quietMs = 400,
 		targetPort = port,
 		content = 'WANT_TEXT',
+		extra = {} as Record<string, unknown>,
 	} = {},
 ): Promise<Outcome> => {
 	process.env.LLM_NAME = format;
@@ -162,6 +163,7 @@ const post = (
 		stream,
 		input: content,
 		messages: [{ role: 'user', content }],
+		...extra,
 	});
 
 	return new Promise((resolve) => {
@@ -510,6 +512,33 @@ describe.each(['openai', 'gemini'] as const)(
 		);
 	},
 );
+
+describe('an openai stream with include_usage', () => {
+	test.each(['stream-error', 'stream-drop'])(
+		'%s with afterChunks above the delta count fails after the last delta, before the usage chunk',
+		async (kind) => {
+			process.env.CHAOS_KIND = kind;
+			process.env.CHAOS_AFTER_CHUNKS = '99';
+
+			const outcome = await post('openai', true, {
+				extra: { stream_options: { include_usage: true } },
+			});
+			const events = sseEvents(outcome.text);
+			const chunks = events.filter(
+				(e) => typeof e.data === 'object' && e.data?.object,
+			);
+
+			// The role chunk and every delta, no finish_reason or usage chunk
+			expect(chunks).toHaveLength(1 + deltaCount);
+			expect(openaiText(events).join('')).toBe(fixture);
+			expect(chunks.every((c) => c.data.usage === null)).toBe(true);
+			expect(
+				chunks.every((c) => c.data.choices[0].finish_reason === null),
+			).toBe(true);
+			outcome.disconnect();
+		},
+	);
+});
 
 describe('a call that did not ask for a stream', () => {
 	test.each([

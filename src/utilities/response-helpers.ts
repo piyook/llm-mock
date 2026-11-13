@@ -2,7 +2,7 @@ import { faker } from '@faker-js/faker';
 import { db } from '../models/db.js';
 import { buildResponse } from './build-response.js';
 import {
-	generateStreamingChunks,
+	buildStreamingChunks,
 	setStreamingHeaders,
 	streamWithDelay,
 } from './build-streaming-response.js';
@@ -17,6 +17,10 @@ import {
 import { findRequestRule } from './runtime-rules.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { applyStopReason } from './stop-reason.js';
+import {
+	applyOpenAiRequestFields,
+	isOpenAiFormat,
+} from './build-openai-response.js';
 import {
 	failStream,
 	streamedCount,
@@ -126,12 +130,29 @@ export const generateResponseContent = async (
  * Replaces DYNAMIC_CONTENT_HERE with the reply's text, then writes in the
  * reply's stop reason if it has one
  *
+ * reply's stop reason if it has one. The openai format also echoes the
+ * request's model and estimates token usage
+ *
  * @param mockReply - The reply whose text is injected into the template
+ * @param body - Parsed request body (undefined for GET requests)
  * @returns Promise<object> Complete static response object
  */
-export const buildStaticResponse = async (mockReply: MockReply) => {
+export const buildStaticResponse = async (
+	mockReply: MockReply,
+	body?: unknown,
+) => {
+	const response = await buildResponse(mockReply.text);
+
 	return applyStopReason(
-		await buildResponse(mockReply.text),
+		isOpenAiFormat() &&
+			typeof response === 'object' &&
+			!Array.isArray(response)
+			? applyOpenAiRequestFields(
+					response as Record<string, unknown>,
+					body,
+					mockReply.text,
+				)
+			: response,
 		process.env.LLM_NAME ?? 'openai',
 		mockReply.stopReason,
 	);
@@ -144,27 +165,30 @@ export const buildStaticResponse = async (mockReply: MockReply) => {
  * @param mockReply - The reply whose text is streamed
  * @param reply - Fastify reply object
  * @param failure - Chaos: fail the stream part-way through (see chaos.ts)
+ * @param body - Parsed request body (undefined for GET requests)
  * @returns Promise<void>
  */
 export const handleStreamingResponse = async (
 	mockReply: MockReply,
 	reply: FastifyReply,
 	failure?: StreamFailure,
+	body?: unknown,
 ) => {
 	try {
-		const chunks = await generateStreamingChunks(
+		const { chunks, contentChunks } = await buildStreamingChunks(
 			mockReply.text,
 			mockReply.stopReason,
+			body,
 		);
 
 		setStreamingHeaders(reply);
 
 		if (failure) {
 			// The role chunk and some content chunks, then the failure in
-			// place of the finish_reason chunk and [DONE]
+			// place of the finish_reason chunk, any usage chunk and [DONE]
 			const sent = chunks.slice(
 				0,
-				1 + streamedCount(chunks.length - 3, failure),
+				1 + streamedCount(contentChunks, failure),
 			);
 			await streamWithDelay(sent, reply, false);
 			failStream(reply, failure, 'openai');

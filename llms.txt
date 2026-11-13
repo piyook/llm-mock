@@ -2,7 +2,7 @@
 
 > `llmock` is a local HTTP server that imitates LLM APIs (OpenAI chat completions, Anthropic Messages, Gemini generateContent, OpenAI embeddings) with generated or canned replies. Use it so an app or test suite can run without a real provider. This file is the compact reference for agents wiring llmock into a project; README.md is the human tutorial.
 
-Describes the llmock version this file ships with (read it from `node_modules/llmock/llms.txt`). Node >= 20 (tested on 24 LTS). Nothing here needs an API key or network access.
+Describes the llmock version this file ships with (read it from `node_modules/llmock/llms.txt`). Node >= 24 (tested on 26 LTS). Nothing here needs an API key or network access.
 
 ## Mental model
 
@@ -18,14 +18,17 @@ npm install --save-dev llmock
 npx llmock start --model=claude        # detached; returns once the server answers
 npx llmock start --model=claude --foreground   # attached; use in Docker/CI or to see errors
 npx llmock stop                        # add --port=<n> if not 8001
+npx llmock start --model=claude --port=0   # any free port: prints it, and the stop command
 ```
 
 - Detached `start` waits until the server answers, then exits 0. It exits 1 if the server fails to start (the server's output is not attached: rerun with `--foreground` to see the error) or if a server already answers on that port.
 - With `--foreground` the command never returns; poll for readiness yourself: `GET /ping` → `200 {"response":"server is running"}`.
 - Confirm what is live: `GET /ui-meta` → JSON with `version` (llmock version), `llmName`, `llmUrlEndpoint`, `serverPort`, `streamingStatus`, `validateRequests`, delays.
+- `--port=0`: the system picks a free port. Detached `start` prints `Server is running at: http://<host>:<port>` and `Use 'llmock stop --port=<port>'`; `--foreground` prints `SERVER UP AND RUNNING ON LOCALHOST:<port>`. `GET /ui-meta` → `serverPort` is the real port.
+- In-process (TypeScript runners such as Vitest or tsx; plain `node` will not load llmock's `.ts` source from `node_modules`): `import { startServer } from 'llmock'`; `startServer({ config?, model?, port?, host?, settings? })` → `{ port, host, url, close() }`. `config` is a file path (relative to the cwd; rule files resolve against its folder) or the config object; default `./.llmockrc.json`, else the built-in presets. `port` defaults to the config's; `host` defaults to `127.0.0.1` (not the config's). `settings` takes any CLI flag by name (`{ stream: true, delayMin: 0 }`). One server per process at a time (a second call before `close()` throws; Vitest's per-file processes can each run one); `close()` restores the env vars it set. The request log file is shared by every llmock server on the machine.
 - `stop` kills whatever process is listening on the port (default 8001, it does not read the config). Do not point it at a port another service uses.
 - Run the CLI from the folder containing `.llmockrc.json`, or set `CONFIG_PATH=<path>` (relative to the cwd).
-- Scaffold alternative: `npm create llmock@latest <dir>` creates a standalone folder (config, Docker files, npm scripts). It prompts interactively if `<dir>` is omitted or already exists. Its scripts: `npm run llmock:start`, `llmock:stop`, `llmock:<preset>`. Its Docker setup mounts only `.llmockrc.json`; templates, fixtures and a stored responses file are copied into the image, so changing them needs `npm run docker:rebuild` (or an added volume).
+- Scaffold alternative: `npm create llmock@latest <dir>` creates a standalone folder (config, Docker files, npm scripts). It prompts interactively if `<dir>` is omitted or already exists. Its scripts: `npm run llmock:start`, `llmock:stop`, `llmock:<preset>`. Its Docker setup mounts only `.llmockrc.json`; templates, fixtures and a stored responses file are copied into the image, so changing them needs `npm run docker:rebuild` (or an added volume). Its `gemini` preset already uses the endpoint `v1beta/models/gemini-pro:generateContent`, so Google's SDK works there without the change described below.
 
 ## Point a client at it (default port 8001)
 
@@ -34,10 +37,13 @@ npx llmock stop                        # add --port=<n> if not 8001
 | Anthropic SDK | `claude` | `baseURL: "http://localhost:8001"`, `apiKey: "mock"` (or env `ANTHROPIC_BASE_URL`). SDK calls `POST /v1/messages`. |
 | OpenAI SDK / LangChain `ChatOpenAI` | `chatgpt` | `baseURL: "http://localhost:8001/chatgpt"`, `apiKey: "mock"`. SDK calls `POST /chatgpt/chat/completions`. |
 | OpenAI SDK, chat + embeddings on one base URL | custom | Set the preset `endpoint` to `"v1/chat/completions"` and use `baseURL: "http://localhost:8001/v1"`. |
+| Google Gen AI SDK (`@google/genai`) | `gemini`, endpoint changed | Set the preset `endpoint` to `"v1beta/models/gemini-pro:generateContent"`, then `new GoogleGenAI({ apiKey: "mock", httpOptions: { baseUrl: "http://localhost:8001" } })` and call `generateContent` with `model: "gemini-pro"`. SDK calls `POST /v1beta/models/<model>:generateContent`. |
 | Gemini-style REST | `gemini` | `POST http://localhost:8001/models/gemini-pro:generateContent` |
 | Raw HTTP | any | `POST http://localhost:8001/<endpoint>` with `Content-Type: application/json` |
 
 Embeddings are always at `/v1/embeddings`, not under the chat prefix: with the stock `chatgpt` preset an OpenAI client using base `…/chatgpt` will 404 on embeddings.
+
+Gemini SDKs need the endpoint change above: the stock `gemini` endpoint has no `/v1beta` prefix, so a Google SDK pointed at the mock gets a 404. The model is part of the path, so the `model` the client sends must match the one in `endpoint` (one model per preset; `gemini-2.5-flash` against a `gemini-pro` endpoint is a 404). `generateContentStream` is not mocked: it calls `:streamGenerateContent?alt=sse`, which has no route, and `stream: true` sends OpenAI-style chunks that the Google SDK cannot read. Use `generateContent` in tests.
 
 ## `.llmockrc.json`
 
@@ -82,7 +88,7 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `logRequests` | boolean | false | Record the most recent validated requests (shown at `GET /ui-request-log`). |
 | `maxLoggedRequests` | number | 10 | How many requests the log keeps. Capped at 100; a value below 1 or not a number falls back to 10. |
 | `debug` | boolean | false | Verbose console output. |
-| `stream` | boolean | false | SSE for `openai`/`gemini` formats. Ignored by `claude`. |
+| `stream` | boolean | false | SSE for `openai`/`gemini` formats. On `openai`, only for requests without a boolean `stream` of their own. Ignored by `claude`. |
 | `responseDelay.min/max` | ms | 0 / 0 | Random wait before each reply. `0`/`0` disables. |
 | `embeddings.enabled` | boolean | false | Registers `/v1/embeddings`. When false the route 404s. |
 | `embeddings.dimensions` | number | 128 | Default vector length. |
@@ -99,7 +105,7 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `server.admin` | boolean | true | `false` leaves the `/admin/*` routes out (see Admin API). |
 | `server.uiTheme` | `"dark"` \| `"light"` | `dark` | Dashboard colours only; no effect on the API. A viewer can swap themes with the switch in the dashboard's sidebar (kept in that browser, wins over this). Also set by the `UI_THEME` environment variable (wins over the config; `--uiTheme` wins over both). Any other value means `dark`. Reported as `uiTheme` by `GET /ui-meta`. |
 
-CLI flags override the selected preset for one run: `--model --port --host --admin --uiTheme --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --chaosKind --chaosAfterChunks --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. Booleans must be the literal `true`/`false`; every flag except `--foreground` needs a value.
+CLI flags override the selected preset for one run: `--model --port --host --admin --uiTheme --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --chaosKind --chaosAfterChunks --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. A boolean flag is on for `true`, `1`, `on` or `yes` (any case) and off for anything else; every flag except `--foreground` needs a value.
 
 ## Fixture replies (`responseRules`)
 
@@ -210,16 +216,16 @@ Nothing inside the keys is checked, so every request of a claude tool loop passe
 ## Responses
 
 **OpenAI format** (`name: "openai"`), non-streaming:
-`{"id","object":"chat.completion","created","model","usage":{…},"choices":[{"message":{"role":"assistant","content":"<text>"},"finish_reason":"stop","index":0}]}`. `id`, `created`, `model` (`gpt-3.5-turbo-0301`) and `usage` (12/99/111) are constants; the request's `model` is not echoed.
+`{"id","object":"chat.completion","created","model","usage":{…},"choices":[{"message":{"role":"assistant","content":"<text>"},"finish_reason":"stop","index":0}]}`. `id` and `created` are constants. `model` echoes the request's `model` (the preset's `model` when absent, e.g. a `GET`). `usage` is estimated at ~4 characters per token: `prompt_tokens` from the request's `messages`, `completion_tokens` from the reply text, `total_tokens` their sum. (Up to 3.13.0 `model` was always `gpt-3.5-turbo-0301` and `usage` 12/99/111.) Only the `openai` format does this; other templates (gemini, custom) are sent as written.
 
-Streaming is decided by the preset's `stream` setting only; the request's `stream` field is ignored. So a client that sends `stream: true` to a non-streaming preset receives plain JSON, and vice versa: keep the two in agreement. Stream shape: `data: {chat.completion.chunk}` lines — one role delta, then content deltas (which concatenate to the exact text), then an empty delta with `finish_reason: "stop"`, then `data: [DONE]`.
+Streaming is decided per request, as by the real API: `"stream": true` in the body gets SSE and `"stream": false` gets JSON, whatever the preset says. A request with no boolean `stream` (or a `GET`) goes by the preset's `stream` setting. Stream shape: `data: {chat.completion.chunk}` lines — one role delta, then content deltas (which concatenate to the exact text), then an empty delta with `finish_reason: "stop"`, then `data: [DONE]`. Every chunk has the echoed `model`. With `"stream_options": {"include_usage": true}` (openai format only) every chunk also has `"usage": null`, and a last chunk with `"choices": []` and the estimated `usage` comes before `data: [DONE]`; a chaos-failed stream stops before it.
 
 **Claude format** (`name: "claude"`), non-streaming:
 `{"id":"msg_<random>","type":"message","role":"assistant","model":"<request model>","content":[{"type":"text","text":"<text>"}],"stop_reason":"end_turn","stop_sequence":null,"usage":{"input_tokens","output_tokens","cache_creation_input_tokens":0,"cache_read_input_tokens":0}}`. Token counts are estimates (~4 chars per token).
 
 Streaming is per request: SSE if and only if the body has `"stream": true`. Events, in order: `message_start`, `content_block_start`, `content_block_delta` × n (`text_delta`, concatenating to the exact text), `content_block_stop`, `message_delta` (`stop_reason: "end_turn"`), `message_stop`. One text block, except for a tool-call reply (see Tool calls).
 
-**Gemini format** (`name: "gemini"`): `{"candidates":[{"content":{"parts":[{"text":"<text>"}],"role":"model"},"finishReason":"STOP","index":0,"safetyRatings":[…]}]}`. With `stream: true` the output is OpenAI-style chunks, not Gemini's stream format.
+**Gemini format** (`name: "gemini"`): `{"candidates":[{"content":{"parts":[{"text":"<text>"}],"role":"model"},"finishReason":"STOP","index":0,"safetyRatings":[…]}]}`. With the preset's `stream: true` the output is OpenAI-style chunks, not Gemini's stream format. Only the preset setting decides; a `stream` field in the body is ignored.
 
 **Stop reasons**: a reply produced by a response rule with `stopReason` ends with the value below, streamed or not. Every other reply ends as shown above.
 
@@ -267,7 +273,7 @@ The way to test retries, backoff and error handling: some calls fail. By default
 - The in-stream error of `stream-error`:
   - `claude`: the SSE event `event: error` with `data: {"type":"error","error":{"type","message"}}`. `type` follows `chaos.status` as in the HTTP error (429 `rate_limit_error`, 529 `overloaded_error`, else `api_error`); `message` is `llmock chaos: simulated <status> error`.
   - OpenAI-style stream (`openai`, `gemini` and custom names): a `data:` line holding the `openai` error body above (also for `gemini`).
-- Whether a call "asked for a stream" follows the usual rule: the request's `stream: true` for `claude`, the preset's `stream` setting for the others. `/v1/embeddings` never streams, so it takes the right-hand column.
+- Whether a call "asked for a stream" follows the usual rule: the request's `stream: true` for `claude`; for `openai`, the request's boolean `stream` if it has one, else the preset's `stream` setting; the preset's setting for the others. `/v1/embeddings` never streams, so it takes the right-hand column.
 - `stream-stall` sends no keep-alive and never times out on the server side: set a timeout in the client under test. Stalled connections are dropped when the server stops, so `stop` and a `SIGTERM` still work.
 - In the config file, a `frequency` that is not an integer ≥ 1, a `mode` other than `every`/`random`, a `status` outside 400–599, an unknown `kind`, or an `afterChunks` that is not an integer ≥ 0 → server refuses to start. An invalid CLI flag value falls back to the default instead.
 - `GET /ui-meta` → `chaosStatus` (`ENABLED`/`DISABLED`), `chaosFrequency`, `chaosMode`, `chaosErrorStatus`, `chaosKind`, `chaosAfterChunks`, and `chaosInjected` (failures of any kind since startup).
@@ -360,9 +366,22 @@ To change a response envelope or the required request keys, or to mock a provide
 ## Limits to design around
 
 - CORS: only streamed replies carry `Access-Control-Allow-Origin`, and there is no `OPTIONS` handler. Browser code calling the mock cross-origin will fail preflight; call it from a server/test process or through your dev-server proxy.
-- Not mocked: tool/function calls in the `openai`, `gemini` and custom formats (and their `tool_calls`/`functionCall` stop reasons), server tools (`web_search` and the like), images, multiple choices (`n`), the stop reasons `stop_sequence` and `pause_turn` (and their equivalents in the other formats), `/v1/models`, `/v1/messages/count_tokens`. Claude tool calls come only from rules: the mock never picks a tool itself, and it does not check `tool_use_id`s against earlier turns.
+- Not mocked: tool/function calls in the `openai`, `gemini` and custom formats (and their `tool_calls`/`functionCall` stop reasons), server tools (`web_search` and the like), images, multiple choices (`n`), the stop reasons `stop_sequence` and `pause_turn` (and their equivalents in the other formats), Gemini's `streamGenerateContent`, `/v1/models`, `/v1/messages/count_tokens`. Claude tool calls come only from rules: the mock never picks a tool itself, and it does not check `tool_use_id`s against earlier turns.
 
 ## Recipes
+
+Test setup (Vitest or another TypeScript runner), a server per test file on a free port:
+
+```ts
+import { startServer, type RunningServer } from 'llmock';
+
+let server: RunningServer;
+beforeAll(async () => {
+  server = await startServer({ config: '.llmockrc.json', model: 'claude', port: 0, settings: { delayMin: 0, delayMax: 0 } });
+});
+afterAll(() => server.close());
+// client baseURL: server.url
+```
 
 Test setup (any runner):
 
@@ -400,7 +419,7 @@ Varied replies: `"responseType": "stored"` with `"storedResponsesFile": "fixture
 Docker (config and fixtures mounted, no rebuild on change):
 
 ```dockerfile
-FROM node:24-alpine
+FROM node:26-alpine
 WORKDIR /app
 RUN npm install --omit=dev llmock
 EXPOSE 8001
