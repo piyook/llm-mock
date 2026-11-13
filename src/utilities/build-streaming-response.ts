@@ -144,11 +144,15 @@ export const generateStreamingChunks = async (
  * @param reply - Fastify reply object
  */
 export const setStreamingHeaders = (reply: any) => {
-	reply.header('Content-Type', 'text/event-stream');
-	reply.header('Cache-Control', 'no-cache');
-	reply.header('Connection', 'keep-alive');
-	reply.header('Access-Control-Allow-Origin', '*');
-	reply.header('Access-Control-Allow-Headers', 'Cache-Control');
+	// Set on the raw response: the stream is written to reply.raw, so headers
+	// set with reply.header() would never be sent (Fastify only sends them
+	// with reply.send()). setHeader keeps any header already set there, such
+	// as chaos's x-llmock-chaos.
+	reply.raw.setHeader('Content-Type', 'text/event-stream');
+	reply.raw.setHeader('Cache-Control', 'no-cache');
+	reply.raw.setHeader('Connection', 'keep-alive');
+	reply.raw.setHeader('Access-Control-Allow-Origin', '*');
+	reply.raw.setHeader('Access-Control-Allow-Headers', 'Cache-Control');
 };
 
 /**

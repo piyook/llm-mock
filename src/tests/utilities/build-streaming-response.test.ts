@@ -109,30 +109,34 @@ describe('build streaming response function works as expected', async () => {
 		expect(chunks[chunks.length - 1]).to.eq('data: [DONE]');
 	});
 
-	test('sets correct streaming headers', () => {
+	test('sets the streaming headers on the raw response', () => {
 		const mockReply = {
 			header: vi.fn(),
+			raw: { setHeader: vi.fn() },
 		};
 
 		setStreamingHeaders(mockReply);
 
-		expect(mockReply.header).toHaveBeenCalledWith(
+		// The stream is written to reply.raw, so Fastify's reply.header()
+		// would never send them
+		expect(mockReply.header).not.toHaveBeenCalled();
+		expect(mockReply.raw.setHeader).toHaveBeenCalledWith(
 			'Content-Type',
 			'text/event-stream',
 		);
-		expect(mockReply.header).toHaveBeenCalledWith(
+		expect(mockReply.raw.setHeader).toHaveBeenCalledWith(
 			'Cache-Control',
 			'no-cache',
 		);
-		expect(mockReply.header).toHaveBeenCalledWith(
+		expect(mockReply.raw.setHeader).toHaveBeenCalledWith(
 			'Connection',
 			'keep-alive',
 		);
-		expect(mockReply.header).toHaveBeenCalledWith(
+		expect(mockReply.raw.setHeader).toHaveBeenCalledWith(
 			'Access-Control-Allow-Origin',
 			'*',
 		);
-		expect(mockReply.header).toHaveBeenCalledWith(
+		expect(mockReply.raw.setHeader).toHaveBeenCalledWith(
 			'Access-Control-Allow-Headers',
 			'Cache-Control',
 		);
