@@ -125,6 +125,11 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 	const app = fastify({ logger: false, genReqId: () => randomUUID() });
 	app.addHook('onRequest', (request, reply, done) => {
 		reply.raw.setHeader('x-llmock-request-id', request.id);
+		// Lets browser code read llmock's own headers on a cross-origin reply
+		reply.raw.setHeader(
+			'access-control-expose-headers',
+			'x-llmock-request-id, x-llmock-chaos',
+		);
 		done();
 	});
 	const host = process.env?.SERVER_HOST || '0.0.0.0';
