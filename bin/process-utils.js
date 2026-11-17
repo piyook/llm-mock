@@ -65,6 +65,13 @@ export function parseCliArgs(args) {
       continue;
     }
 
+    // --llmspy alone turns it on; `--llmspy <url>` names LLMSpy's address
+    if (arg === '--llmspy') {
+      const next = options[i + 1];
+      parsed.customSettings.llmspy = next !== undefined && !next.startsWith('--') ? options[++i] : 'true';
+      continue;
+    }
+
     let key;
     let value;
     const equalIndex = arg.indexOf('=');
@@ -186,6 +193,8 @@ export function serverEnv(config, modelName, settings = {}, configPath) {
       : 'true',
     // The flag wins, then a UI_THEME already in the environment, then the config
     UI_THEME: custom.uiTheme || process.env.UI_THEME || serverConfig.uiTheme || 'dark',
+    // LLMSpy's address, empty when the LLMSpy hint is off
+    LLMSPY_URL: llmspyAddress(custom.llmspy !== undefined ? custom.llmspy : serverConfig.llmspy) ?? '',
     LLM_URL_ENDPOINT: custom.endpoint || modelConfig.endpoint,
 
     // LLM settings
@@ -244,6 +253,79 @@ export function serverEnv(config, modelName, settings = {}, configPath) {
 export function reachableUrl(host, port) {
   const reachable = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
   return `http://${reachable.includes(':') ? `[${reachable}]` : reachable}:${port}`;
+}
+
+/** Where LLMSpy listens unless --llmspy or server.llmspy names another address */
+export const LLMSPY_DEFAULT_URL = 'http://127.0.0.1:8080';
+
+/**
+ * LLMSpy's address from the llmspy setting, or null when it is off (not set,
+ * or false, 0, off or no). An on value (true, 1, on, yes) means LLMSpy's
+ * default address; anything else must be an http(s) URL, of which only the
+ * origin is kept. Throws an Error for a value that is neither.
+ */
+export function llmspyAddress(value) {
+  if (value === undefined || value === null || value === false) return null;
+  const text = String(value).trim();
+  if (text === '' || readsAsOff(text)) return null;
+  if (readsAsOn(text)) return LLMSPY_DEFAULT_URL;
+
+  let url;
+  try {
+    url = new URL(text);
+  } catch {
+    url = null;
+  }
+  if (!url || (url.protocol !== 'http:' && url.protocol !== 'https:')) {
+    throw new Error(
+      `llmspy must be true, false or LLMSpy's address (such as ${LLMSPY_DEFAULT_URL}), not "${text}"`
+    );
+  }
+  return url.origin;
+}
+
+// The part of each format's endpoint that its SDKs add to the base URL
+const SDK_PATHS = { claude: 'v1/messages', openai: 'chat/completions' };
+
+/**
+ * How to put this server behind LLMSpy at `llmspy` (an address from
+ * llmspyAddress): the LLMSPY_UPSTREAMS entry that makes it an upstream, the
+ * base URL an SDK client is given, and the full URL of the endpoint through
+ * LLMSpy. `baseUrl` is null for a format with no known SDK path (gemini,
+ * custom templates): those clients call `endpointUrl`.
+ */
+export function llmspyRoute({ llmspy, modelName, llmName, endpoint, host, port }) {
+  // LLMSpy names are lowercase letters, digits and dashes
+  const slug = String(modelName).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+  const name = slug ? `llmock-${slug}` : 'llmock';
+  const upstream = reachableUrl(host, port);
+  const path = String(endpoint).replace(/^\/+/, '');
+  const prefix = `${llmspy}/${name}`;
+
+  const sdkPath = SDK_PATHS[llmName];
+  let baseUrl = null;
+  if (sdkPath && (path === sdkPath || path.endsWith(`/${sdkPath}`))) {
+    const rest = path.slice(0, path.length - sdkPath.length).replace(/\/+$/, '');
+    baseUrl = rest ? `${prefix}/${rest}` : prefix;
+  }
+
+  return {
+    name,
+    upstream,
+    entry: `${name}=${upstream}`,
+    baseUrl,
+    endpointUrl: `${prefix}/${path}`,
+  };
+}
+
+/** The lines that tell someone how to use a server through LLMSpy */
+export function llmspyLines(route) {
+  return [
+    'To see its calls in LLMSpy, start LLMSpy with this upstream:',
+    `  LLMSPY_UPSTREAMS=${route.entry}`,
+    ...(route.baseUrl ? [`and give your app the base URL ${route.baseUrl}`] : []),
+    `(the endpoint through LLMSpy is ${route.endpointUrl})`,
+  ];
 }
 
 // Whether a setting reads as "off" (see readsAsOff in src/config/config-loader.ts)

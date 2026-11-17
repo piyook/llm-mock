@@ -3,6 +3,9 @@ import { describe, expect, test } from 'vitest';
 import {
 	applyConfigDefaults,
 	DEFAULT_STOP_PORT,
+	LLMSPY_DEFAULT_URL,
+	llmspyAddress,
+	llmspyRoute,
 	parseCliArgs,
 	parseListeningPids,
 	reachableUrl,
@@ -375,5 +378,103 @@ describe('serverEnv', () => {
 		expect(() =>
 			serverEnv(config, 'claude', { endpoint: 'admin/chat' }),
 		).toThrow(/belong to the admin API/);
+	});
+});
+
+describe('llmspy', () => {
+	test('--llmspy alone turns it on, and takes a following address', () => {
+		expect(parseCliArgs(['start', '--llmspy']).customSettings.llmspy).toBe(
+			'true',
+		);
+		expect(
+			parseCliArgs(['start', '--llmspy', '--port=3000']).customSettings,
+		).toEqual({ llmspy: 'true', port: '3000' });
+		expect(
+			parseCliArgs(['--llmspy', 'http://127.0.0.1:9090']).customSettings
+				.llmspy,
+		).toBe('http://127.0.0.1:9090');
+		expect(parseCliArgs(['--llmspy=false']).customSettings.llmspy).toBe(
+			'false',
+		);
+	});
+
+	test.each([
+		[undefined, null],
+		[false, null],
+		['off', null],
+		['', null],
+		[true, LLMSPY_DEFAULT_URL],
+		['yes', LLMSPY_DEFAULT_URL],
+		['http://localhost:9090/', 'http://localhost:9090'],
+		['https://spy.example:8443/some/path', 'https://spy.example:8443'],
+	])('llmspyAddress(%s) is %s', (value, address) => {
+		expect(llmspyAddress(value)).toBe(address);
+	});
+
+	test('llmspyAddress rejects a value that is neither on/off nor a URL', () => {
+		expect(() => llmspyAddress('8080')).toThrow(/llmspy must be/);
+		expect(() => llmspyAddress('ftp://host')).toThrow(/llmspy must be/);
+	});
+
+	const route = (llmName: string, endpoint: string, modelName = 'claude') =>
+		llmspyRoute({
+			llmspy: LLMSPY_DEFAULT_URL,
+			modelName,
+			llmName,
+			endpoint,
+			host: '0.0.0.0',
+			port: 8001,
+		});
+
+	test('claude: the SDK base URL is the upstream prefix', () => {
+		expect(route('claude', 'v1/messages')).toEqual({
+			name: 'llmock-claude',
+			upstream: 'http://127.0.0.1:8001',
+			entry: 'llmock-claude=http://127.0.0.1:8001',
+			baseUrl: 'http://127.0.0.1:8080/llmock-claude',
+			endpointUrl: 'http://127.0.0.1:8080/llmock-claude/v1/messages',
+		});
+	});
+
+	test('openai: the base URL keeps the path before chat/completions', () => {
+		const r = route('openai', 'chatgpt/chat/completions', 'chatgpt');
+		expect(r.entry).toBe('llmock-chatgpt=http://127.0.0.1:8001');
+		expect(r.baseUrl).toBe('http://127.0.0.1:8080/llmock-chatgpt/chatgpt');
+	});
+
+	test('a format with no known SDK path has only the endpoint URL', () => {
+		const r = route(
+			'gemini',
+			'v1beta/models/gemini-pro:generateContent',
+			'gemini',
+		);
+		expect(r.baseUrl).toBeNull();
+		expect(r.endpointUrl).toBe(
+			'http://127.0.0.1:8080/llmock-gemini/v1beta/models/gemini-pro:generateContent',
+		);
+	});
+
+	test('a preset name is made into a name LLMSpy accepts', () => {
+		expect(route('claude', 'v1/messages', 'My_Claude Preset').name).toBe(
+			'llmock-my-claude-preset',
+		);
+	});
+
+	test('serverEnv: the flag wins over server.llmspy, empty when off', () => {
+		const config = applyConfigDefaults(
+			{
+				models: { claude: { name: 'claude', endpoint: 'v1/messages' } },
+				server: { port: 8001, host: '0.0.0.0', llmspy: true },
+			},
+			'claude',
+		);
+		expect(serverEnv(config, 'claude').LLMSPY_URL).toBe(LLMSPY_DEFAULT_URL);
+		expect(
+			serverEnv(config, 'claude', { llmspy: 'false' }).LLMSPY_URL,
+		).toBe('');
+		expect(
+			serverEnv(config, 'claude', { llmspy: 'http://127.0.0.1:9090' })
+				.LLMSPY_URL,
+		).toBe('http://127.0.0.1:9090');
 	});
 });

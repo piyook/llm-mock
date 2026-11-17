@@ -56,6 +56,15 @@ export type UiMeta = {
 	embeddingDimension: number;
 	adminApi: 'ENABLED' | 'DISABLED';
 	uiTheme: 'dark' | 'light';
+	// How to put this server behind LLMSpy; null when the llmspy setting is off
+	// (missing from an older llmock)
+	llmspy?: {
+		name: string;
+		upstream: string;
+		entry: string;
+		baseUrl: string | null;
+		endpointUrl: string;
+	} | null;
 	apiLinks: Array<{ href: string; label: string }>;
 };
 

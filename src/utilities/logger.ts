@@ -47,11 +47,14 @@ export default function logger(
 	state = '',
 	reason = '',
 	information = '',
+	// The x-llmock-request-id header sent back with the reply
+	requestId?: string,
 ) {
 	if (process.env?.LOG_REQUESTS?.toUpperCase() !== 'ON') return;
 
 	const logEntry = {
 		request_validation: {
+			...(requestId ? { request_id: requestId } : {}),
 			validation_status: state,
 			reason,
 			information,

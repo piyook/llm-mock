@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import type { AddressInfo } from 'node:net';
 import { dirname, resolve } from 'node:path';
@@ -32,6 +33,7 @@ import {
 	resolveModelName,
 	serverEnv,
 } from '../bin/process-utils.js';
+import { currentLlmspyRoute, llmspyLines } from './utilities/llmspy.js';
 
 export type { LlmMockConfig } from './config/config-loader.js';
 
@@ -116,7 +118,15 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 	clearRuntimeRules();
 	resetChaos();
 
-	const app = fastify({ logger: false });
+	// Each request gets an id, sent back as x-llmock-request-id and written to
+	// the request log, so a call seen in a client or a proxy such as LLMSpy can
+	// be matched to the log. It is set on the raw response because streamed
+	// replies write their headers there directly.
+	const app = fastify({ logger: false, genReqId: () => randomUUID() });
+	app.addHook('onRequest', (request, reply, done) => {
+		reply.raw.setHeader('x-llmock-request-id', request.id);
+		done();
+	});
 	const host = process.env?.SERVER_HOST || '0.0.0.0';
 
 	// A server that fails part-way (e.g. the port is taken) is closed, so
@@ -167,6 +177,8 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 			`USING MODEL: ${getCurrentModel()?.toUpperCase() || 'CHATGPT'}`,
 		);
 		console.log('*****************************************************');
+		const llmspy = currentLlmspyRoute();
+		if (llmspy) console.log(`\n${llmspyLines(llmspy).join('\n')}\n`);
 	}
 
 	return { app, port, host };
