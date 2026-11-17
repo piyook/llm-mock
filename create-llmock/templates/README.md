@@ -28,6 +28,8 @@ This project uses LLMock to provide mock LLM API responses for testing and devel
 - `npm run llmock:claude` - Run with Claude (Anthropic Messages API) model
 - `npm run llmock:streaming` - Run with streaming responses
 - `npm run llmock:embeddings` - Run with embeddings model
+- `npm run llmock:llmspy` - Run Claude (port 8001) and ChatGPT (port 8002) servers with [LLMSpy](https://github.com/piyook/llmspy) in front, to see every call in its web UI (needs Node.js 26 or later)
+- `npm run llmock:llmspy:stop` - Stop them and LLMSpy
 
 ## Configuration
 

@@ -6,9 +6,12 @@ import { existsSync } from 'fs';
 import {
   applyConfigDefaults,
   DEFAULT_STOP_PORT,
+  LLMSPY_DEFAULT_URL,
   llmspyAddress,
   llmspyLines,
   llmspyRoute,
+  llmspyServers,
+  mergeUpstreams,
   parseCliArgs,
   parseListeningPids,
   reachableUrl,
@@ -16,6 +19,7 @@ import {
   resolveModelName,
   serverEnv,
   tsxCliPath,
+  upstreamsFromEnvFile,
 } from './process-utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +34,7 @@ const {
   customSettings,
   stopPort,
   foregroundMode,
+  llmspyStop,
 } = parseCliArgs(process.argv.slice(2));
 
 // Show help information
@@ -45,6 +50,10 @@ COMMANDS:
   stop                    Stop running mock server
   help                    Show this help message
   config                  Show current configuration settings
+  llmspy                  Start claude and chatgpt servers (8001, 8002) and LLMSpy
+                          in front of them; --models=<a,b> and --port=<first>
+                          pick others, and other options go to every server
+  llmspy stop             Stop them (give the same --models and --port)
 
 OPTIONS:
   --model=<name>          Model preset to use (chatgpt, gemini, streaming, embeddings, claude)
@@ -84,6 +93,9 @@ EXAMPLES:
   llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429 # Every 3rd call fails with a 429
   llmock start --chaos=true --chaosKind=stream-drop --chaosAfterChunks=1 # Streams are cut after 1 delta
   llmock start --model=claude --llmspy     # Also print the LLMSpy upstream and base URL
+  llmock llmspy                             # claude on 8001, chatgpt on 8002, LLMSpy on 8080
+  llmock llmspy --models=claude --chaos=true # One server, with chaos, behind LLMSpy
+  llmock llmspy stop                        # Stop the servers and LLMSpy
   llmock stop                               # Stop running server on default port
   llmock stop --port=3000                   # Stop server on port 3000
   llmock config                              # Show current configuration
@@ -263,11 +275,11 @@ function resolveConfigPath() {
   return resolve(process.cwd(), process.env.CONFIG_PATH || '.llmockrc.json');
 }
 
-// Load configuration
-async function loadConfig() {
+// Load configuration, for preset `name` (default: --model, then the config's)
+async function loadConfig(name = modelName, { quiet = false } = {}) {
   let config;
   let configPath = resolveConfigPath();
-  
+
   // Try to load local config file first
   if (existsSync(configPath)) {
     try {
@@ -280,11 +292,11 @@ async function loadConfig() {
   } else {
     // Use default configuration for global installation
     config = getDefaultConfig();
-    console.log('Using default configuration (no .llmockrc.json found)');
+    if (!quiet) console.log('Using default configuration (no .llmockrc.json found)');
   }
-  
+
   // --model wins, then the config's defaultModel, then chatgpt
-  const selectedModel = resolveModelName(modelName, config);
+  const selectedModel = resolveModelName(name, config);
 
   // Validate model exists
   if (!config.models[selectedModel]) {
@@ -357,6 +369,103 @@ async function killTree(pid) {
   }
 }
 
+// `llmock llmspy`: a server per preset on its own port, then LLMSpy in the
+// background with them as upstreams. `llmock llmspy stop` stops them all.
+// LLMSpy is run with npx, so it need not be installed (npx asks first).
+async function runLlmspy() {
+  const { models, port, llmspy, ...passOn } = customSettings;
+  const servers = llmspyServers(models, port ?? DEFAULT_STOP_PORT);
+  const { spawnSync } = await import('child_process');
+  const npx = (args, env) =>
+    spawnSync(`npx ${args}`, { stdio: 'inherit', shell: true, env: env ?? process.env });
+
+  if (llmspyStop) {
+    for (const server of servers) await stopServer(server.port);
+    npx('llmspy stop');
+    return;
+  }
+
+  const nodeMajor = Number(process.versions.node.split('.')[0]);
+  if (nodeMajor < 26) {
+    throw new Error(`LLMSpy needs Node.js 26 or later; this is ${process.versions.node}. Use 'llmock start --llmspy' to run LLMock alone and print the LLMSpy setup.`);
+  }
+
+  // Every preset is checked before anything starts
+  const presets = [];
+  for (const server of servers) {
+    const { config } = await loadConfig(server.model, { quiet: true });
+    presets.push({ ...server, preset: config.models[server.model], config });
+  }
+  const serverConfig = presets[0].config.server;
+  const address = llmspyAddress(llmspy !== undefined ? llmspy : serverConfig.llmspy) ?? LLMSPY_DEFAULT_URL;
+  const host = passOn.host ?? serverConfig.host;
+
+  // Started through this CLI, so each gets the same checks as `llmock start`
+  const flags = Object.entries(passOn).map(([key, value]) => `--${key}=${value}`);
+  const started = [];
+  for (const { model, port: serverPort } of presets) {
+    const result = spawnSync(
+      process.execPath,
+      [__filename, 'start', `--model=${model}`, `--port=${serverPort}`, ...flags],
+      { encoding: 'utf8', windowsHide: true },
+    );
+    if (result.status !== 0) {
+      console.error(`Could not start "${model}" on port ${serverPort}:\n${result.stdout}${result.stderr}`);
+      for (const done of started) await stopServer(done.port);
+      process.exit(1);
+    }
+    started.push({ model, port: serverPort });
+    console.log(`✓ ${model} on port ${serverPort}`);
+  }
+
+  const routes = presets.map(({ model, port: serverPort, preset }) => ({
+    model,
+    ...llmspyRoute({
+      llmspy: address,
+      modelName: model,
+      llmName: preset.name,
+      endpoint: passOn.endpoint ?? preset.endpoint,
+      host,
+      port: serverPort,
+    }),
+  }));
+
+  // LLMSpy reads its upstreams from the shell, then from ~/.llmspy/.env. The
+  // shell's value set here replaces the file's, so the file's entries are kept in it.
+  let existing = process.env.LLMSPY_UPSTREAMS;
+  if (existing === undefined) {
+    try {
+      const { readFileSync } = await import('fs');
+      const { homedir } = await import('os');
+      existing = upstreamsFromEnvFile(readFileSync(resolve(homedir(), '.llmspy', '.env'), 'utf8'));
+    } catch {
+      // No ~/.llmspy/.env
+    }
+  }
+  const upstreams = mergeUpstreams(existing, routes.map((route) => route.entry));
+
+  console.log(`\nStarting LLMSpy at ${address} with LLMSPY_UPSTREAMS=${upstreams}`);
+  const spy = npx('llmspy --background', {
+    ...process.env,
+    LLMSPY_UPSTREAMS: upstreams,
+    PROXY_PORT: new URL(address).port || '80',
+  });
+  if (spy.status !== 0) {
+    console.error(`\nLLMSpy did not start. If it is already running, its upstreams can not change: run 'npx llmspy stop' and try again. The LLMock servers are still running ('llmock llmspy stop' stops them).`);
+    process.exit(1);
+  }
+
+  console.log(`\nOpen ${address} to see the calls. Give your app:`);
+  for (const route of routes) {
+    console.log(`  ${route.model.padEnd(12)} ${route.baseUrl ? `base URL ${route.baseUrl}` : `endpoint ${route.endpointUrl}`}`);
+  }
+  const again = [
+    models !== undefined ? `--models=${models}` : '',
+    port !== undefined ? `--port=${port}` : '',
+  ].filter(Boolean).join(' ');
+  console.log(`\nStop everything with: llmock llmspy stop${again ? ` ${again}` : ''}`);
+}
+
 async function isServerUp(url) {
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(1000) });
@@ -378,6 +487,11 @@ async function main() {
     // Handle stop command
     if (command === 'stop') {
       await stopServer(stopPort);
+      return;
+    }
+
+    if (command === 'llmspy') {
+      await runLlmspy();
       return;
     }
     
@@ -528,7 +642,9 @@ async function main() {
     }
     
   } catch (error) {
-    console.error('Failed to start server:', error.message);
+    // `llmock config` and `llmock llmspy` start nothing themselves
+    const starting = command === 'start' && !showConfig;
+    console.error(`${starting ? 'Failed to start server' : 'Error'}:`, error.message);
     process.exit(1);
   }
 }

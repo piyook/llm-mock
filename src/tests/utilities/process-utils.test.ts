@@ -6,7 +6,10 @@ import {
 	LLMSPY_DEFAULT_URL,
 	llmspyAddress,
 	llmspyRoute,
+	llmspyServers,
+	mergeUpstreams,
 	parseCliArgs,
+	upstreamsFromEnvFile,
 	parseListeningPids,
 	reachableUrl,
 	resolveModelName,
@@ -491,5 +494,70 @@ describe('llmspy', () => {
 			serverEnv(config, 'claude', { llmspy: 'http://127.0.0.1:9090' })
 				.LLMSPY_URL,
 		).toBe('http://127.0.0.1:9090');
+	});
+});
+
+describe('llmock llmspy', () => {
+	test('parses the command, with or without stop, and its options', () => {
+		const start = parseCliArgs([
+			'llmspy',
+			'--models=claude',
+			'--chaos=true',
+		]);
+		expect(start.command).toBe('llmspy');
+		expect(start.llmspyStop).toBe(false);
+		expect(start.customSettings).toEqual({
+			models: 'claude',
+			chaos: 'true',
+		});
+
+		const stop = parseCliArgs(['llmspy', 'stop', '--port=9001']);
+		expect(stop.command).toBe('llmspy');
+		expect(stop.llmspyStop).toBe(true);
+		expect(stop.customSettings).toEqual({ port: '9001' });
+	});
+
+	test('llmspyServers: claude and chatgpt from 8001 by default', () => {
+		expect(llmspyServers(undefined)).toEqual([
+			{ model: 'claude', port: 8001 },
+			{ model: 'chatgpt', port: 8002 },
+		]);
+		expect(llmspyServers(' gemini , claude ', '9000')).toEqual([
+			{ model: 'gemini', port: 9000 },
+			{ model: 'claude', port: 9001 },
+		]);
+	});
+
+	test.each([
+		[',', 8001, /at least one/],
+		['claude,claude', 8001, /twice/],
+		['claude', 'abc', /port/],
+		['claude,chatgpt', 65535, /port/],
+	])('llmspyServers(%s, %s) throws', (models, port, message) => {
+		expect(() => llmspyServers(models, port)).toThrow(message);
+	});
+
+	test('mergeUpstreams keeps other entries and replaces ones of the same name', () => {
+		expect(
+			mergeUpstreams(
+				'ollama=http://localhost:11434, llmock-claude=http://old',
+				['llmock-claude=http://127.0.0.1:8001'],
+			),
+		).toBe(
+			'ollama=http://localhost:11434,llmock-claude=http://127.0.0.1:8001',
+		);
+		expect(mergeUpstreams(undefined, ['a=http://x'])).toBe('a=http://x');
+	});
+
+	test('upstreamsFromEnvFile reads the line, quoted or not', () => {
+		expect(upstreamsFromEnvFile('# c\nLLMSPY_UPSTREAMS=a=http://x\n')).toBe(
+			'a=http://x',
+		);
+		expect(
+			upstreamsFromEnvFile(
+				'export LLMSPY_UPSTREAMS="a=http://x,b=http://y"',
+			),
+		).toBe('a=http://x,b=http://y');
+		expect(upstreamsFromEnvFile('PROXY_PORT=8080')).toBeUndefined();
 	});
 });

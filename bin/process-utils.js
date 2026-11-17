@@ -22,8 +22,11 @@ export function resolveModelName(flagValue, config) {
 export const DEFAULT_STOP_PORT = 8001;
 
 const COMMAND_ARGS = new Set([
-  'start', 'stop', 'help', '--help', '-h', 'config', '--config', '-c',
+  'start', 'stop', 'help', '--help', '-h', 'config', '--config', '-c', 'llmspy',
 ]);
+
+/** The presets `llmock llmspy` starts when it is given no --models */
+export const LLMSPY_DEFAULT_MODELS = ['claude', 'chatgpt'];
 
 /**
  * Parses the CLI arguments. The command is optional: `llmock --model=claude`
@@ -39,6 +42,8 @@ export function parseCliArgs(args) {
     customSettings: {},
     stopPort: DEFAULT_STOP_PORT,
     foregroundMode: false,
+    // `llmock llmspy stop`: stop what `llmock llmspy` started
+    llmspyStop: false,
   };
 
   const firstArg = args[0];
@@ -51,10 +56,15 @@ export function parseCliArgs(args) {
     parsed.showConfig = true;
   } else if (firstArg === 'stop') {
     parsed.command = 'stop';
+  } else if (firstArg === 'llmspy') {
+    parsed.command = 'llmspy';
+    parsed.llmspyStop = args[1] === 'stop';
   }
 
   // Only drop the first argument when it is a command, not an option
-  const options = COMMAND_ARGS.has(firstArg) ? args.slice(1) : args;
+  const options = COMMAND_ARGS.has(firstArg)
+    ? args.slice(parsed.llmspyStop ? 2 : 1)
+    : args;
 
   for (let i = 0; i < options.length; i++) {
     const arg = options[i];
@@ -319,6 +329,53 @@ export function llmspyRoute({ llmspy, modelName, llmName, endpoint, host, port }
     baseUrl,
     endpointUrl: `${prefix}/${path}`,
   };
+}
+
+/**
+ * The servers `llmock llmspy` runs: each preset of the comma-separated
+ * `models` (default claude and chatgpt) on its own port, counting up from
+ * `basePort`. Throws an Error for an empty list, a preset named twice, or a
+ * port that is not a whole number from 1 to 65535.
+ */
+export function llmspyServers(models, basePort = DEFAULT_STOP_PORT) {
+  const names = models === undefined
+    ? LLMSPY_DEFAULT_MODELS
+    : String(models).split(',').map((name) => name.trim()).filter(Boolean);
+  if (names.length === 0) throw new Error('--models needs at least one preset name');
+  const twice = names.find((name, i) => names.indexOf(name) !== i);
+  if (twice) throw new Error(`--models names "${twice}" twice`);
+
+  const first = Number(basePort);
+  if (!Number.isInteger(first) || first < 1 || first + names.length - 1 > 65535) {
+    throw new Error(`--port must be a port number (1 to 65535), not "${basePort}"`);
+  }
+  return names.map((model, i) => ({ model, port: first + i }));
+}
+
+/**
+ * A LLMSPY_UPSTREAMS value with `entries` added to the one already set
+ * (`existing`, possibly empty). An existing entry whose name is in
+ * `entries` is dropped: LLMSpy would replace it anyway.
+ */
+export function mergeUpstreams(existing, entries) {
+  const names = new Set(entries.map((entry) => entry.split('=')[0]));
+  const kept = String(existing ?? '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry && !names.has(entry.split('=')[0]));
+  return [...kept, ...entries].join(',');
+}
+
+/**
+ * The LLMSPY_UPSTREAMS line of the text of a .env file, or undefined. Only
+ * plain `NAME=value` lines are read, with optional quotes around the value.
+ */
+export function upstreamsFromEnvFile(text) {
+  for (const line of String(text).split(/\r?\n/)) {
+    const match = /^\s*(?:export\s+)?LLMSPY_UPSTREAMS\s*=\s*(.*?)\s*$/.exec(line);
+    if (match) return match[1].replace(/^(['"])(.*)\1$/, '$2');
+  }
+  return undefined;
 }
 
 /** The lines that tell someone how to use a server through LLMSpy */

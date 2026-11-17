@@ -12,6 +12,8 @@
     "llmock:claude": "llmock start --model=claude",
     "llmock:streaming": "llmock start --model=streaming",
     "llmock:embeddings": "llmock start --model=embeddings",
+    "llmock:llmspy": "llmock llmspy",
+    "llmock:llmspy:stop": "llmock llmspy stop",
     "docker-start": "llmock start --foreground",
     "docker:start": "docker compose up -d --force-recreate",
     "docker:stop": "docker compose down --volumes",

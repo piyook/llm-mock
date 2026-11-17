@@ -370,6 +370,8 @@ Every reply, streamed ones included, carries `x-llmock-request-id: <uuid>`, the 
 
 LLMSpy (npm `llmspy`, Node >= 26) is a local proxy at `http://127.0.0.1:8080` that records LLM calls and shows them in a web UI; agents can read them from its `GET /api/requests` (see its own llms.txt). Put it between the client and llmock:
 
+One command: `npx llmock llmspy` starts `claude` on 8001 and `chatgpt` on 8002, then LLMSpy in the background (via npx) with both as upstreams (keeping any in `LLMSPY_UPSTREAMS` or `~/.llmspy/.env`), and prints each base URL. `--models=<a,b>` and `--port=<first>` choose others; every other flag goes to each server. Exits 1 if a server or LLMSpy cannot start (LLMSpy already running cannot take new upstreams: `npx llmspy stop` first). `npx llmock llmspy stop` (same `--models`/`--port`) stops all of it. Scaffolded projects: `npm run llmock:llmspy` / `llmock:llmspy:stop`. Step by step instead:
+
 1. `npx llmock start --model=claude --llmspy` (one server per preset, each on its own port). `--llmspy` (or `server.llmspy: true` in the config; `--llmspy=<url>` when LLMSpy is not on 127.0.0.1:8080) changes nothing about the server. It prints the upstream entry and the client base URL, e.g. `LLMSPY_UPSTREAMS=llmock-claude=http://127.0.0.1:8001` and `http://127.0.0.1:8080/llmock-claude`. `GET /ui-meta` → `llmspy` has them as `{ name, upstream, entry, baseUrl, endpointUrl }` (`null` when off; `baseUrl` is `null` for gemini and custom formats: call `endpointUrl`).
 2. Start LLMSpy with the entries joined by commas: `LLMSPY_UPSTREAMS=llmock-claude=http://127.0.0.1:8001,llmock-chatgpt-8002=http://127.0.0.1:8002 npx llmspy` (`npx llmspy --background` returns once it is ready; `npx llmspy stop` stops it).
 3. Point the client at the printed base URL: `http://127.0.0.1:8080/llmock-claude` for `claude`, `http://127.0.0.1:8080/llmock-chatgpt-8002/chatgpt` for `chatgpt`. The upstream is the whole server, so `/v1/embeddings` etc. work under the same prefix.
@@ -378,7 +380,7 @@ The upstream name is `llmock-<preset name>`, plus `-<port>` when the port is not
 
 ## Limits to design around
 
-- CORS: only streamed replies carry `Access-Control-Allow-Origin`, and there is no `OPTIONS` handler. Browser code calling the mock cross-origin will fail preflight; call it from a server/test process or through your dev-server proxy.
+- CORS: only streamed replies carry `Access-Control-Allow-Origin`, and there is no `OPTIONS` handler. Every reply exposes `x-llmock-request-id` and `x-llmock-chaos` (`Access-Control-Expose-Headers`), so browser code that gets a reply can read them. Browser code calling the mock cross-origin will fail preflight; call it from a server/test process or through your dev-server proxy.
 - Not mocked: tool/function calls in the `openai`, `gemini` and custom formats (and their `tool_calls`/`functionCall` stop reasons), server tools (`web_search` and the like), images, multiple choices (`n`), the stop reasons `stop_sequence` and `pause_turn` (and their equivalents in the other formats), Gemini's `streamGenerateContent`, `/v1/models`, `/v1/messages/count_tokens`. Claude tool calls come only from rules: the mock never picks a tool itself, and it does not check `tool_use_id`s against earlier turns.
 
 ## Recipes

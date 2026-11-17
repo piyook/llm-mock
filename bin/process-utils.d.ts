@@ -2,7 +2,8 @@ export const DEFAULT_STOP_PORT: number;
 export function tsxCliPath(): string;
 export function resolveModelName(flagValue: string | undefined, config: { defaultModel?: string }): string;
 export function parseCliArgs(args: string[]): {
-  command: 'start' | 'stop';
+  command: 'start' | 'stop' | 'llmspy';
+  llmspyStop: boolean;
   showHelp: boolean;
   showConfig: boolean;
   modelName: string | undefined;
@@ -40,5 +41,9 @@ export function llmspyRoute(options: {
   port: number | string;
 }): LlmspyRoute;
 export function llmspyLines(route: LlmspyRoute): string[];
+export const LLMSPY_DEFAULT_MODELS: string[];
+export function llmspyServers(models: string | undefined, basePort?: number | string): Array<{ model: string; port: number }>;
+export function mergeUpstreams(existing: string | undefined, entries: string[]): string;
+export function upstreamsFromEnvFile(text: string): string | undefined;
 export function reachableUrl(host: string, port: number | string): string;
 export function parseListeningPids(netstatOutput: string, port: number | string): string[];

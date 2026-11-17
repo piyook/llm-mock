@@ -159,6 +159,7 @@ llmock start --port=3000 --stream=true
 llmock start --port=0               # any free port; the port is printed
 llmock stop                         # add --port=3000 if not on 8001
 llmock config                       # show current settings (accepts --model)
+llmock llmspy                       # claude + chatgpt servers with LLMSpy in front (see Using with LLMSpy)
 llmock help
 ```
 
@@ -1018,6 +1019,28 @@ LLMSpy reads conversations in the Anthropic Messages and OpenAI Chat Completions
 ### Setting it up
 
 You need Node.js 26 or later for LLMSpy (`node --version`).
+
+**In one command:**
+
+```bash
+llmock llmspy          # in a scaffolded project: npm run llmock:llmspy
+```
+
+This starts a `claude` server on port 8001 and a `chatgpt` server on 8002, then LLMSpy in the background with both as upstreams, and prints the base URL to give your app for each:
+
+```
+Open http://127.0.0.1:8080 to see the calls. Give your app:
+  claude       base URL http://127.0.0.1:8080/llmock-claude
+  chatgpt      base URL http://127.0.0.1:8080/llmock-chatgpt-8002/chatgpt
+```
+
+- `--models=<a,b,...>` picks other presets, and `--port=<n>` the first port (the next preset gets the next port).
+- Any other [CLI option](#cli-options) goes to every server: `llmock llmspy --models=claude --chaos=true --chaosStatus=429`.
+- LLMSpy is run with `npx`, so it need not be installed; npx asks before downloading it. Upstreams you already set in `LLMSPY_UPSTREAMS` or `~/.llmspy/.env` are kept.
+- `llmock llmspy stop` (`npm run llmock:llmspy:stop`) stops the servers and LLMSpy. Give it the same `--models` and `--port`.
+- If LLMSpy is already running, it can not take new upstreams: the command says so, and `npx llmspy stop` first fixes it.
+
+**Step by step**, to run each part yourself:
 
 1. Start LLMock with `--llmspy`. Run one server per format you want, each on its own port:
 
