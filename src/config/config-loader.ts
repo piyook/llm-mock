@@ -5,6 +5,7 @@ import {
 	type ResponseRule,
 } from '../utilities/response-rules.js';
 import { validateStoredResponsesFile } from '../utilities/stored-responses.js';
+import { llmspyAddress } from '../../bin/process-utils.js';
 
 export interface ResponseDelay {
 	min: number;
@@ -66,6 +67,9 @@ export interface ServerConfig {
 	admin?: boolean;
 	// Optional: the dashboard's colours (default dark)
 	uiTheme?: 'dark' | 'light';
+	// Optional: true (or LLMSpy's address) prints how to put this server
+	// behind LLMSpy, and shows it on the dashboard
+	llmspy?: boolean | string;
 }
 
 export interface LlmMockConfig {
@@ -296,6 +300,8 @@ export function setEnvironmentFromConfig(modelName?: string): void {
 		(readsAsOff(config.server.admin) ? 'false' : 'true');
 	process.env.UI_THEME =
 		process.env.UI_THEME || config.server.uiTheme || 'dark';
+	// Empty from the CLI means off, so only a missing value reads the config
+	process.env.LLMSPY_URL ??= llmspyAddress(config.server.llmspy) ?? '';
 	process.env.LLM_URL_ENDPOINT =
 		process.env.LLM_URL_ENDPOINT || modelConfig.endpoint;
 

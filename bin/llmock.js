@@ -6,6 +6,9 @@ import { existsSync } from 'fs';
 import {
   applyConfigDefaults,
   DEFAULT_STOP_PORT,
+  llmspyAddress,
+  llmspyLines,
+  llmspyRoute,
   parseCliArgs,
   parseListeningPids,
   reachableUrl,
@@ -67,6 +70,8 @@ OPTIONS:
   --chaosAfterChunks=<num> Content deltas a stream sends before it fails (default: 2)
   --embeddings=<bool>      Enable embeddings mock (true/false)
   --embeddingDimensions=<num> Embedding vector dimensions
+  --llmspy[=<url>]        Print how to see this server's calls in LLMSpy
+                          (LLMSpy's address, default http://127.0.0.1:8080)
   --foreground            Run server in foreground (for Docker use)
 
 EXAMPLES:
@@ -78,6 +83,7 @@ EXAMPLES:
   llmock start --delayMin=1000 --delayMax=2000 # Custom response delays
   llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429 # Every 3rd call fails with a 429
   llmock start --chaos=true --chaosKind=stream-drop --chaosAfterChunks=1 # Streams are cut after 1 delta
+  llmock start --model=claude --llmspy     # Also print the LLMSpy upstream and base URL
   llmock stop                               # Stop running server on default port
   llmock stop --port=3000                   # Stop server on port 3000
   llmock config                              # Show current configuration
@@ -99,6 +105,7 @@ SERVER:
   Port: ${serverConfig.port}
   Admin API: ${!readsAsOff(serverConfig.admin)}
   Dashboard Theme: ${serverConfig.uiTheme || 'dark'}
+  LLMSpy: ${llmspyAddress(customSettings.llmspy !== undefined ? customSettings.llmspy : serverConfig.llmspy) ?? 'off'}
 
 MODEL: ${selectedModel}
   LLM Name: ${modelConfig.name}
@@ -505,12 +512,25 @@ async function main() {
         console.log(`Server started successfully!`);
         console.log(`Server is running at: ${serverAddress(port)}`);
         console.log(`Use 'llmock stop${Number(port) === DEFAULT_STOP_PORT ? '' : ` --port=${port}`}' to stop the server.`);
+        if (process.env.LLMSPY_URL) {
+          const route = llmspyRoute({
+            llmspy: process.env.LLMSPY_URL,
+            modelName: selectedModel,
+            llmName: process.env.LLM_NAME,
+            endpoint: process.env.LLM_URL_ENDPOINT,
+            host: process.env.SERVER_HOST,
+            port,
+          });
+          console.log(`\n${llmspyLines(route).join('\n')}`);
+        }
         process.exit(0);
       }
     }
     
   } catch (error) {
-    console.error('Failed to start server:', error.message);
+    // `llmock config` starts nothing itself
+    const starting = command === 'start' && !showConfig;
+    console.error(`${starting ? 'Failed to start server' : 'Error'}:`, error.message);
     process.exit(1);
   }
 }

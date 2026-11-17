@@ -14,6 +14,7 @@ import { describeActiveRules } from './runtime-rules.js';
 import { getDelay } from './runtime-settings.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
 import { adminApiEnabled } from './admin-api.js';
+import { currentLlmspyRoute } from './llmspy.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -266,6 +267,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			embeddingDimension,
 			adminApi: adminApiEnabled() ? 'ENABLED' : 'DISABLED',
 			uiTheme: getUiTheme(),
+			// How to put this server behind LLMSpy, null when llmspy is off
+			llmspy: currentLlmspyRoute(),
 			apiLinks,
 		});
 	});

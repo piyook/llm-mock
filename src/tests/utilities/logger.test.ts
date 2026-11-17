@@ -50,4 +50,23 @@ describe('logging works as expected', async () => {
 
 		expect(validationResult).toBe(false);
 	});
+
+	test("the request's id is passed on, to go in the log entry", async () => {
+		process.env.VALIDATE_REQUESTS = 'ON';
+		process.env.LOG_REQUESTS = 'ON';
+
+		const logger = await import('../../utilities/logger.js');
+		await validateRequest({
+			id: 'abc-123',
+			body: { temperature: 1 },
+		} as any);
+
+		expect(logger.default).toHaveBeenCalledWith(
+			{ temperature: 1 },
+			'FAILED',
+			'INVALID / MISSING KEY(S)',
+			'missing keys: MODEL , MESSAGES',
+			'abc-123',
+		);
+	});
 });

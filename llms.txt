@@ -104,8 +104,9 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `server.host` | string | `0.0.0.0` | Bind address. Use `127.0.0.1` to keep the mock off the network; keep `0.0.0.0` in Docker and publish the port on loopback instead (`127.0.0.1:8001:8001`). |
 | `server.admin` | boolean | true | `false` leaves the `/admin/*` routes out (see Admin API). |
 | `server.uiTheme` | `"dark"` \| `"light"` | `dark` | Dashboard colours only; no effect on the API. A viewer can swap themes with the switch in the dashboard's sidebar (kept in that browser, wins over this). Also set by the `UI_THEME` environment variable (wins over the config; `--uiTheme` wins over both). Any other value means `dark`. Reported as `uiTheme` by `GET /ui-meta`. |
+| `server.llmspy` | `true` \| `false` \| URL | off | Print how to use the server through LLMSpy at start, and report it as `llmspy` in `GET /ui-meta` (see Seeing the calls in LLMSpy). `true` means `http://127.0.0.1:8080`; a URL is LLMSpy's address. `--llmspy[=<value>]` wins. Any other value stops the server at startup. |
 
-CLI flags override the selected preset for one run: `--model --port --host --admin --uiTheme --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --chaosKind --chaosAfterChunks --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. A boolean flag is on for `true`, `1`, `on` or `yes` (any case) and off for anything else; every flag except `--foreground` needs a value.
+CLI flags override the selected preset for one run: `--model --port --host --admin --uiTheme --llmspy --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --chaosKind --chaosAfterChunks --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. A boolean flag is on for `true`, `1`, `on` or `yes` (any case) and off for anything else; every flag except `--foreground` needs a value.
 
 ## Fixture replies (`responseRules`)
 
@@ -357,11 +358,23 @@ To change a response envelope or the required request keys, or to mock a provide
 | `GET /ui-meta` | Active settings as JSON |
 | `GET /ui-stored-responses` | The stored responses pool in use, as JSON |
 | `GET /ui-rule-file?rule=<i>&file=<j>` | Contents of one response rule file, as JSON |
-| `GET /ui-request-log` | `{"file", "log"}`: `log` is an array of the most recent validated requests (the last `maxLoggedRequests`, 10 by default), newest first, each with why it passed/failed (older ones are dropped; `log` is `null` if none logged) |
+| `GET /ui-request-log` | `{"file", "log"}`: `log` is an array of the most recent validated requests (the last `maxLoggedRequests`, 10 by default), newest first, each with why it passed/failed and its `request_validation.request_id` (older ones are dropped; `log` is `null` if none logged) |
 | `DELETE /ui-request-log` | Empties the request log; returns `{"file", "log": null}` |
 | `/admin/rules`, `/admin/chaos`, `/admin/delay`, `/admin/settings`, `/admin/reset` | Change response rules, chaos, delay and reply settings while running (see Admin API) |
 | `GET /` | HTML dashboard |
 | `GET /<endpoint>` | A generated reply with no validation and no rules (quick smoke test) |
+
+Every reply, streamed ones included, carries `x-llmock-request-id: <uuid>`, the same id as that request's `request_id` in the request log.
+
+## Seeing the calls in LLMSpy
+
+LLMSpy (npm `llmspy`, tested with 0.6.0, Node >= 26) is a local proxy at `http://127.0.0.1:8080` that records LLM calls and shows them in a web UI; agents can read them from its `GET /api/requests` (see its own llms.txt). Put it between the client and llmock:
+
+1. `npx llmock start --model=claude --llmspy` (one server per preset, each on its own port). `--llmspy` (or `server.llmspy: true` in the config; `--llmspy=<url>` when LLMSpy is not on 127.0.0.1:8080) changes nothing about the server. It prints the upstream entry and the client base URL, e.g. `LLMSPY_UPSTREAMS=llmock-claude=http://127.0.0.1:8001` and `http://127.0.0.1:8080/llmock-claude`. `GET /ui-meta` → `llmspy` has them as `{ name, upstream, entry, baseUrl, endpointUrl }` (`null` when off; `baseUrl` is `null` for gemini and custom formats: call `endpointUrl`).
+2. Start LLMSpy with the entries joined by commas: `LLMSPY_UPSTREAMS=llmock-claude=http://127.0.0.1:8001,llmock-chatgpt-8002=http://127.0.0.1:8002 npx llmspy` (`npx llmspy --background` returns once it is ready; `npx llmspy stop` stops it).
+3. Point the client at the printed base URL: `http://127.0.0.1:8080/llmock-claude` for `claude`, `http://127.0.0.1:8080/llmock-chatgpt-8002/chatgpt` for `chatgpt`. The upstream is the whole server, so `/v1/embeddings` etc. work under the same prefix.
+
+The upstream name is `llmock-<preset name>`, plus `-<port>` when the port is not 8001 (so two servers of one preset do not share a name: LLMSpy keeps only the last entry of a name). To match a call LLMSpy recorded to llmock's request log, use its `x-llmock-request-id` response header. LLMSpy in Docker reaches llmock at `host.docker.internal:<port>`, not `127.0.0.1`.
 
 ## Limits to design around
 
