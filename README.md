@@ -1037,18 +1037,18 @@ You need Node.js 26 or later for LLMSpy (`node --version`).
    (the endpoint through LLMSpy is http://127.0.0.1:8080/llmock-claude/v1/messages)
    ```
 
-   The dashboard's **Connect** card shows the same two values. If LLMSpy runs somewhere other than `http://127.0.0.1:8080`, give its address: `--llmspy=http://127.0.0.1:9090`. To have it on every start, set `"llmspy": true` (or the address) in the config file's `server` block.
+   The upstream's name is `llmock-` and the preset's name, with the port added when it is not 8001 (`llmock-chatgpt-8002`), so each server gets its own. The dashboard's **Connect** card shows the same two values. If LLMSpy runs somewhere other than `http://127.0.0.1:8080`, give its address: `--llmspy=http://127.0.0.1:9090`. To have it on every start, set `"llmspy": true` (or the address) in the config file's `server` block.
 
 2. Start LLMSpy with the LLMock servers as upstreams. `LLMSPY_UPSTREAMS` is a comma-separated list of `name=url`, so join the entries the servers printed. Each name becomes a path prefix on LLMSpy, and the rest of the request path is added to the URL:
 
    ```bash
-   LLMSPY_UPSTREAMS=llmock-claude=http://127.0.0.1:8001,llmock-chatgpt=http://127.0.0.1:8002 npx llmspy
+   LLMSPY_UPSTREAMS=llmock-claude=http://127.0.0.1:8001,llmock-chatgpt-8002=http://127.0.0.1:8002 npx llmspy
    ```
 
    In PowerShell:
 
    ```powershell
-   $env:LLMSPY_UPSTREAMS = "llmock-claude=http://127.0.0.1:8001,llmock-chatgpt=http://127.0.0.1:8002"
+   $env:LLMSPY_UPSTREAMS = "llmock-claude=http://127.0.0.1:8001,llmock-chatgpt-8002=http://127.0.0.1:8002"
    npx llmspy
    ```
 
@@ -1065,15 +1065,15 @@ Set your app's base URL to the one `--llmspy` printed: LLMSpy, the upstream's na
 | LLMock preset | Upstream entry | Your app's base URL |
 |---|---|---|
 | `claude` | `llmock-claude=http://127.0.0.1:8001` | `http://127.0.0.1:8080/llmock-claude` |
-| `chatgpt` / `streaming` | `llmock-chatgpt=http://127.0.0.1:8002` | `http://127.0.0.1:8080/llmock-chatgpt/chatgpt` |
+| `chatgpt` / `streaming` | `llmock-chatgpt-8002=http://127.0.0.1:8002` | `http://127.0.0.1:8080/llmock-chatgpt-8002/chatgpt` |
 
-The upstream is the whole server, so its other routes work through LLMSpy too, such as `http://127.0.0.1:8080/llmock-chatgpt/v1/embeddings`. A preset in a format with no SDK path to leave off (`gemini`, custom templates) is called at the full endpoint URL `--llmspy` prints.
+The upstream is the whole server, so its other routes work through LLMSpy too, such as `http://127.0.0.1:8080/llmock-chatgpt-8002/v1/embeddings`. A preset in a format with no SDK path to leave off (`gemini`, custom templates) is called at the full endpoint URL `--llmspy` prints.
 
 Many SDKs and tools read the base URL from an environment variable:
 
 ```bash
 ANTHROPIC_BASE_URL=http://127.0.0.1:8080/llmock-claude ANTHROPIC_API_KEY=mock node my-agent.js
-OPENAI_BASE_URL=http://127.0.0.1:8080/llmock-chatgpt/chatgpt OPENAI_API_KEY=mock node my-app.js
+OPENAI_BASE_URL=http://127.0.0.1:8080/llmock-chatgpt-8002/chatgpt OPENAI_API_KEY=mock node my-app.js
 ```
 
 Or in code:
@@ -1129,7 +1129,7 @@ To change these while both are running, use LLMock's [admin API](#admin-api-chan
 If LLMSpy runs in Docker (`npm run start:docker` in a clone of LLMSpy), `localhost` inside its container is the container itself. Point the upstreams at your machine instead, in LLMSpy's `.env`:
 
 ```
-LLMSPY_UPSTREAMS=llmock-claude=http://host.docker.internal:8001,llmock-chatgpt=http://host.docker.internal:8002
+LLMSPY_UPSTREAMS=llmock-claude=http://host.docker.internal:8001,llmock-chatgpt-8002=http://host.docker.internal:8002
 ```
 
 The app's base URLs stay as above. `--llmspy` prints `127.0.0.1` in the upstream, which is right for an LLMSpy running directly on your machine, so change it to `host.docker.internal` here.

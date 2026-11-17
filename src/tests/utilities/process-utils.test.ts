@@ -442,6 +442,21 @@ describe('llmspy', () => {
 		expect(r.baseUrl).toBe('http://127.0.0.1:8080/llmock-chatgpt/chatgpt');
 	});
 
+	test('a port other than 8001 is part of the name', () => {
+		const r = llmspyRoute({
+			llmspy: LLMSPY_DEFAULT_URL,
+			modelName: 'chatgpt',
+			llmName: 'openai',
+			endpoint: 'chatgpt/chat/completions',
+			host: '0.0.0.0',
+			port: '8002',
+		});
+		expect(r.entry).toBe('llmock-chatgpt-8002=http://127.0.0.1:8002');
+		expect(r.baseUrl).toBe(
+			'http://127.0.0.1:8080/llmock-chatgpt-8002/chatgpt',
+		);
+	});
+
 	test('a format with no known SDK path has only the endpoint URL', () => {
 		const r = route(
 			'gemini',

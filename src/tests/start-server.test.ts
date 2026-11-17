@@ -135,10 +135,10 @@ describe('startServer', () => {
 		const on = (await (await fetch(`${server.url}/ui-meta`)).json()) as {
 			llmspy: { entry: string; baseUrl: string };
 		};
-		expect(on.llmspy.entry).toBe(
-			`llmock-claude=http://127.0.0.1:${server.port}`,
-		);
-		expect(on.llmspy.baseUrl).toBe('http://127.0.0.1:8080/llmock-claude');
+		// Not on 8001, so the port is part of the upstream's name
+		const name = `llmock-claude-${server.port}`;
+		expect(on.llmspy.entry).toBe(`${name}=http://127.0.0.1:${server.port}`);
+		expect(on.llmspy.baseUrl).toBe(`http://127.0.0.1:8080/${name}`);
 	});
 
 	test('serves the preset of the config it is given', async () => {

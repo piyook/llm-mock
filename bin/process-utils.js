@@ -295,9 +295,12 @@ const SDK_PATHS = { claude: 'v1/messages', openai: 'chat/completions' };
  * custom templates): those clients call `endpointUrl`.
  */
 export function llmspyRoute({ llmspy, modelName, llmName, endpoint, host, port }) {
-  // LLMSpy names are lowercase letters, digits and dashes
+  // LLMSpy names are lowercase letters, digits and dashes. A port other than
+  // the default is part of the name, so two servers of one preset get two
+  // upstreams (LLMSpy keeps only the last of two entries with one name).
   const slug = String(modelName).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
-  const name = slug ? `llmock-${slug}` : 'llmock';
+  const portPart = Number(port) === DEFAULT_STOP_PORT ? '' : `-${port}`;
+  const name = `${slug ? `llmock-${slug}` : 'llmock'}${portPart}`;
   const upstream = reachableUrl(host, port);
   const path = String(endpoint).replace(/^\/+/, '');
   const prefix = `${llmspy}/${name}`;
