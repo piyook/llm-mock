@@ -99,6 +99,10 @@ describe('startServer', () => {
 		const firstId = first.headers.get('x-llmock-request-id');
 		expect(firstId).toMatch(/^[0-9a-f-]{36}$/);
 		expect(second.headers.get('x-llmock-request-id')).not.toBe(firstId);
+		// Browser code may read it, and the chaos header, cross-origin
+		expect(first.headers.get('access-control-expose-headers')).toBe(
+			'x-llmock-request-id, x-llmock-chaos',
+		);
 
 		const stream = await fetch(`${server.url}/v1/messages`, {
 			method: 'POST',

@@ -528,7 +528,9 @@ async function main() {
     }
     
   } catch (error) {
-    console.error('Failed to start server:', error.message);
+    // `llmock config` starts nothing itself
+    const starting = command === 'start' && !showConfig;
+    console.error(`${starting ? 'Failed to start server' : 'Error'}:`, error.message);
     process.exit(1);
   }
 }
