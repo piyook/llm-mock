@@ -45,6 +45,11 @@ A lightweight local server that simulates LLM APIs for development and testing. 
   - [Chat completions](#chat-completions)
   - [Embeddings API](#embeddings-api)
   - [Using with LangChain](#using-with-langchain)
+- [Using with LLMSpy](#using-with-llmspy)
+  - [Setting it up](#setting-it-up)
+  - [Pointing your app at it](#pointing-your-app-at-it)
+  - [Things to try](#things-to-try)
+  - [With Docker](#with-docker)
 - [Supporting Different LLM Providers](#supporting-different-llm-providers)
   - [Anthropic (Claude Messages API)](#anthropic-claude-messages-api)
   - [Template locations](#template-locations)
@@ -69,6 +74,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - **Anthropic Messages API** — built-in `claude` preset with the SDK's streaming event format
 - **Fixture replies** — return canned text or JSON for requests that contain a chosen string
 - **Your own reply pools** — pick at random from a set of your own texts, per rule or as the default reply
+- **Works with [LLMSpy](https://github.com/piyook/llmspy)** — put LLMSpy in front of LLMock to see every mocked call as a conversation, with no API key (see [Using with LLMSpy](#using-with-llmspy))
 
 Built on [Fastify](https://www.fastify.io/) for high performance and reliability.
 
@@ -983,6 +989,130 @@ const embeddings =
     ? new MockEmbeddingsAPI()
     : new OpenAIEmbeddings({ openAIApiKey: process.env.OPENAI_API_KEY });
 ```
+
+---
+
+## Using with LLMSpy
+
+[LLMSpy](https://github.com/piyook/llmspy) ([npm](https://www.npmjs.com/package/llmspy)) is a small local proxy that shows LLM API traffic live in a web UI. You point an app's base URL at LLMSpy, and it forwards each call to the real API while keeping a copy. You can read each call as a conversation (system prompt, tools, messages, tool calls with their results, the reply, its stop reason and tokens), as the raw headers and bodies, or next to an earlier call to see what changed.
+
+LLMock and LLMSpy work together. Use LLMock as LLMSpy's upstream in place of the real provider, and the whole loop runs on your machine, with no API key, no network and no cost:
+
+```
+your app ──► LLMSpy (127.0.0.1:8080) ──► LLMock (localhost:8001)
+              shows each call             sends the reply
+```
+
+This lets you:
+
+- **see what your app really sends**: the prompts, system messages, tool schemas and parameters your SDK, framework or agent builds, without spending tokens to find out
+- **watch your error handling work**: [chaos mode](#chaos-mode-error-simulation) 429s, broken streams and dropped connections show up in LLMSpy as failed calls, next to your app's retries
+- **check an agent loop turn by turn**: with [tool-call rules](#tool-calls-claude-content), each turn of a Claude tool loop is a call in LLMSpy, and its Compare tab shows what your agent added between turns
+- **try LLMSpy itself** with realistic traffic before you point it at a paid API
+
+LLMSpy reads conversations in the Anthropic Messages and OpenAI Chat Completions formats, so it suits the `claude`, `chatgpt` and `streaming` presets. Calls to the `gemini` preset or a custom template are still captured, and shown in LLMSpy's Raw view.
+
+### Setting it up
+
+You need Node.js 26 or later for LLMSpy (`node --version`).
+
+1. Start LLMock. Run one server per format you want, each on its own port:
+
+   ```bash
+   llmock start --model=claude                 # Anthropic Messages API on port 8001
+   llmock start --model=chatgpt --port=8002    # OpenAI Chat Completions on port 8002
+   ```
+
+   In a [scaffolded project](#option-1-scaffolded-project-recommended), use `npx llmock` in place of `llmock`.
+
+2. Start LLMSpy with the LLMock servers as upstreams. `LLMSPY_UPSTREAMS` is a comma-separated list of `name=url`. Each name becomes a path prefix on LLMSpy, and the rest of the request path is added to the URL:
+
+   ```bash
+   LLMSPY_UPSTREAMS=llmock=http://127.0.0.1:8001,llmock-openai=http://127.0.0.1:8002/chatgpt npx llmspy
+   ```
+
+   In PowerShell:
+
+   ```powershell
+   $env:LLMSPY_UPSTREAMS = "llmock=http://127.0.0.1:8001,llmock-openai=http://127.0.0.1:8002/chatgpt"
+   npx llmspy
+   ```
+
+   LLMSpy prints each upstream and its base URL when it starts. To keep the setting, put the same line in `~/.llmspy/.env`.
+
+3. Open LLMSpy at `http://127.0.0.1:8080`, and LLMock's own dashboard at `http://localhost:8001` (and `:8002`). Both show each call: LLMSpy shows what your app sent and got back, and LLMock's dashboard shows how the mock chose its reply.
+
+Stop them with `npx llmspy stop`, then `llmock stop` and `llmock stop --port=8002`.
+
+### Pointing your app at it
+
+Set your app's base URL to LLMSpy plus the upstream's name. Mocked calls need no real key, but most SDKs want one set, so use any non-empty value:
+
+| LLMock preset | Upstream entry | Your app's base URL |
+|---|---|---|
+| `claude` | `llmock=http://127.0.0.1:8001` | `http://127.0.0.1:8080/llmock` |
+| `chatgpt` / `streaming` | `llmock-openai=http://127.0.0.1:8002/chatgpt` | `http://127.0.0.1:8080/llmock-openai` |
+
+Many SDKs and tools read the base URL from an environment variable:
+
+```bash
+ANTHROPIC_BASE_URL=http://127.0.0.1:8080/llmock ANTHROPIC_API_KEY=mock node my-agent.js
+OPENAI_BASE_URL=http://127.0.0.1:8080/llmock-openai OPENAI_API_KEY=mock node my-app.js
+```
+
+Or in code:
+
+```ts
+import Anthropic from '@anthropic-ai/sdk';
+
+const client = new Anthropic({ apiKey: 'mock', baseURL: 'http://127.0.0.1:8080/llmock' });
+const reply = await client.messages.create({
+  model: 'claude-opus-5-5',
+  max_tokens: 256,
+  messages: [{ role: 'user', content: 'Hello' }],
+});
+```
+
+Or with curl:
+
+```bash
+curl http://127.0.0.1:8080/llmock/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: mock" \
+  -d '{"model": "claude-opus-5-5", "max_tokens": 256, "messages": [{"role": "user", "content": "Hello"}]}'
+```
+
+To switch the app to the real API, change only the base URL: to LLMSpy's built-in `http://127.0.0.1:8080/anthropic` or `http://127.0.0.1:8080/openai` to keep watching the calls, or back to the provider's own URL.
+
+If you run several apps, LLMSpy can give each its own tab: put `@<project>/` before the upstream name, as in `http://127.0.0.1:8080/@my-agent/llmock`. See LLMSpy's README for more.
+
+### Things to try
+
+Each of these is a normal LLMock setting. LLMSpy shows the result:
+
+| To see in LLMSpy | LLMock setting |
+|---|---|
+| A streamed reply, put back together | Send `"stream": true` |
+| A reply cut off at the token limit, or a refusal | A response rule with `stopReason` (see [Truncated and refused replies](#truncated-and-refused-replies-stopreason)) |
+| A Claude tool call and its result in the next turn | A response rule with `content` (see [Tool calls](#tool-calls-claude-content)) |
+| A 429 with `retry-after`, under LLMSpy's **Failed** chip | `llmock start --model=claude --chaos=true --chaosFrequency=3 --chaosStatus=429` |
+| A stream that breaks part-way through | `--chaos=true --chaosKind=stream-error` (or `stream-drop`), and send `"stream": true` |
+| Slow calls, in LLMSpy's latency cards | `--delayMin=500 --delayMax=3000` |
+| One failing prompt among working ones | A response rule with `fail` (see [Failing one prompt](#failing-one-prompt-fail)) |
+
+Chaos errors carry the `x-llmock-chaos: true` header, which LLMSpy shows in the Raw view, so a mocked failure is easy to tell from a real one.
+
+To change these while both are running, use LLMock's [admin API](#admin-api-changing-rules-and-settings-while-running). There is no need to restart either server.
+
+### With Docker
+
+If LLMSpy runs in Docker (`npm run start:docker` in a clone of LLMSpy), `localhost` inside its container is the container itself. Point the upstreams at your machine instead, in LLMSpy's `.env`:
+
+```
+LLMSPY_UPSTREAMS=llmock=http://host.docker.internal:8001,llmock-openai=http://host.docker.internal:8002/chatgpt
+```
+
+This works as it is with Docker Desktop. On Linux, `host.docker.internal` does not reach a port bound only to `127.0.0.1`. LLMock listens on every interface by default, so it can be reached there, unless you have [set `host`](#network-exposure) to `127.0.0.1`. If LLMock runs in Docker too, either publish its port and use `host.docker.internal:<port>`, or put both containers on one Docker network and use the LLMock container's name.
 
 ---
 
