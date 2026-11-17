@@ -529,6 +529,16 @@
 								<span class="muted">Base URL</span>
 								<span class="badge">http://localhost:{meta?.serverPort ?? ''}</span>
 							</div>
+							{#if meta?.llmspy}
+								<div class="kv kvWide">
+									<span class="muted">LLMSpy upstream</span>
+									<span class="badge" cy-data="llmspy_entry">LLMSPY_UPSTREAMS={meta.llmspy.entry}</span>
+								</div>
+								<div class="kv kvWide">
+									<span class="muted">{meta.llmspy.baseUrl ? 'Base URL through LLMSpy' : 'Endpoint through LLMSpy'}</span>
+									<span class="badge" cy-data="llmspy_base_url">{meta.llmspy.baseUrl ?? meta.llmspy.endpointUrl}</span>
+								</div>
+							{/if}
 						</div>
 						<p class="muted groupLabel">Endpoints (GET &amp; POST)</p>
 						<div class="endpoints">

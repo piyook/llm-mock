@@ -81,6 +81,7 @@
 		"llmock:start:chaos": "node scripts/llmock.mjs start --model=chaos",
 		"llmock:start:chaos-stream": "node scripts/llmock.mjs start --model=chaos-stream",
 		"llmock:start:admin-off": "node scripts/llmock.mjs start --model=claude --admin=off",
+		"llmock:start:llmspy": "node scripts/llmock.mjs start --model=chatgpt --llmspy",
 		"llmock:stop": "node bin/llmock.js stop"
 	},
 	"dependencies": {

@@ -91,6 +91,56 @@ describe('startServer', () => {
 		expect(meta.serverPort).toBe(server.port);
 	});
 
+	test('every reply carries its own x-llmock-request-id, streams too', async () => {
+		server = await startServer({ config, port: 0 });
+
+		const first = await ask(server, 'hello');
+		const second = await ask(server, 'hello');
+		const firstId = first.headers.get('x-llmock-request-id');
+		expect(firstId).toMatch(/^[0-9a-f-]{36}$/);
+		expect(second.headers.get('x-llmock-request-id')).not.toBe(firstId);
+
+		const stream = await fetch(`${server.url}/v1/messages`, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({
+				model: 'claude-opus-5-5',
+				max_tokens: 100,
+				stream: true,
+				messages: [{ role: 'user', content: 'hello' }],
+			}),
+		});
+		expect(stream.headers.get('content-type')).toContain(
+			'text/event-stream',
+		);
+		expect(stream.headers.get('x-llmock-request-id')).toMatch(
+			/^[0-9a-f-]{36}$/,
+		);
+		await stream.text();
+	});
+
+	test('the dashboard shows the LLMSpy route only when llmspy is on', async () => {
+		server = await startServer({ config, port: 0 });
+		const off = (await (await fetch(`${server.url}/ui-meta`)).json()) as {
+			llmspy: unknown;
+		};
+		expect(off.llmspy).toBeNull();
+		await server.close();
+
+		server = await startServer({
+			config,
+			port: 0,
+			settings: { llmspy: true },
+		});
+		const on = (await (await fetch(`${server.url}/ui-meta`)).json()) as {
+			llmspy: { entry: string; baseUrl: string };
+		};
+		// Not on 8001, so the port is part of the upstream's name
+		const name = `llmock-claude-${server.port}`;
+		expect(on.llmspy.entry).toBe(`${name}=http://127.0.0.1:${server.port}`);
+		expect(on.llmspy.baseUrl).toBe(`http://127.0.0.1:8080/${name}`);
+	});
+
 	test('serves the preset of the config it is given', async () => {
 		server = await startServer({ config, port: 0 });
 

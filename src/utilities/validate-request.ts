@@ -15,14 +15,23 @@ type LogData = {
 	information: string;
 };
 
-const logRequestBody = ({ data, state, reason, information }: LogData) => {
-	console.log(
-		`New API Request:${new Date().toLocaleString()}. View it with 'View request log' on the dashboard at 'localhost:${process.env?.SERVER_PORT ?? '8000'}'`,
-	);
-	logger(data, state, reason, information);
-};
-
 export const validateRequest = async (request: any) => {
+	// Every entry for this request carries the id sent back with its reply
+	const requestId: string | undefined =
+		typeof request?.id === 'string' ? request.id : undefined;
+	const logRequestBody = ({ data, state, reason, information }: LogData) => {
+		console.log(
+			`New API Request:${new Date().toLocaleString()}${requestId ? ` (${requestId})` : ''}. View it with 'View request log' on the dashboard at 'localhost:${process.env?.SERVER_PORT ?? '8000'}'`,
+		);
+		logger(
+			data,
+			state,
+			reason,
+			information,
+			...(requestId ? [requestId] : []),
+		);
+	};
+
 	// Check if validation is disabled
 	if (process.env.VALIDATE_REQUESTS !== 'ON') {
 		return true;
