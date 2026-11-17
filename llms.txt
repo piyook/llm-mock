@@ -368,7 +368,7 @@ Every reply, streamed ones included, carries `x-llmock-request-id: <uuid>`, the 
 
 ## Seeing the calls in LLMSpy
 
-LLMSpy (npm `llmspy`, Node >= 26) is a local proxy at `http://127.0.0.1:8080` that records LLM calls and shows them in a web UI; agents can read them from its `GET /api/requests` (see its own llms.txt). Put it between the client and llmock:
+LLMSpy (npm `llmspy`, tested with 0.6.0, Node >= 26) is a local proxy at `http://127.0.0.1:8080` that records LLM calls and shows them in a web UI; agents can read them from its `GET /api/requests` (see its own llms.txt). Put it between the client and llmock:
 
 1. `npx llmock start --model=claude --llmspy` (one server per preset, each on its own port). `--llmspy` (or `server.llmspy: true` in the config; `--llmspy=<url>` when LLMSpy is not on 127.0.0.1:8080) changes nothing about the server. It prints the upstream entry and the client base URL, e.g. `LLMSPY_UPSTREAMS=llmock-claude=http://127.0.0.1:8001` and `http://127.0.0.1:8080/llmock-claude`. `GET /ui-meta` → `llmspy` has them as `{ name, upstream, entry, baseUrl, endpointUrl }` (`null` when off; `baseUrl` is `null` for gemini and custom formats: call `endpointUrl`).
 2. Start LLMSpy with the entries joined by commas: `LLMSPY_UPSTREAMS=llmock-claude=http://127.0.0.1:8001,llmock-chatgpt-8002=http://127.0.0.1:8002 npx llmspy` (`npx llmspy --background` returns once it is ready; `npx llmspy stop` stops it).
