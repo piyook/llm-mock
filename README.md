@@ -1017,7 +1017,7 @@ LLMSpy reads conversations in the Anthropic Messages and OpenAI Chat Completions
 
 ### Setting it up
 
-You need Node.js 26 or later for LLMSpy (`node --version`).
+You need Node.js 26 or later for LLMSpy (`node --version`). These steps were tested with LLMSpy 0.6.0.
 
 1. Start LLMock with `--llmspy`. Run one server per format you want, each on its own port:
 
