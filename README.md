@@ -80,9 +80,9 @@ With the `claude` preset, the Anthropic SDK takes `baseURL: 'http://localhost:80
 
 > **Note:** LLMock has no authentication and by default listens on every network interface. For a local mock server this is not usually a problem, but if you want to take extra precautions you can keep it to your own machine. See [Network exposure](https://llmock.piyook.com/guide/installation#network-exposure).
 
-## Working on LLMock
+## Contributing
 
-The docs site lives in [`docs/`](docs/) (VitePress). Run it locally with `npm run docs:dev`; `npm run docs:build` also checks every link to a heading. The dashboard's source is in [`ui/`](ui/), see [UI-Dev.md](UI-Dev.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
