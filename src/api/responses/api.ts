@@ -1,16 +1,19 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { validateRequest } from '../../utilities/validate-request.js';
-import {
-	applyResponseDelay,
-	generateResponseContent,
-} from '../../utilities/response-helpers.js';
+import { applyResponseDelay } from '../../utilities/response-helpers.js';
+
 import {
 	buildResponsesResponse,
 	handleResponsesStreamingResponse,
 	responsesPaths,
 } from '../../utilities/build-responses-response.js';
 import { shouldStream } from '../../utilities/stream-mode.js';
-import { decideCall } from '../../utilities/call-outcome.js';
+import {
+	decideCall,
+	getReply,
+	isPassthrough,
+	sendPassthrough,
+} from '../../utilities/call-outcome.js';
 import {
 	recordRequest,
 	type RecordedRequest,
@@ -25,10 +28,12 @@ import {
  * no `stream`, the preset's setting decides, as on the chat route).
  */
 const handleRequest = async (
+	request: FastifyRequest,
 	reply: FastifyReply,
-	body: unknown,
 	record: RecordedRequest,
 ) => {
+	// A GET has no body: it gets a generated reply (a quick smoke test)
+	const body = request.method === 'POST' ? request.body : undefined;
 	await applyResponseDelay();
 
 	const streaming = shouldStream('openai', body, process.env?.STREAM);
@@ -41,7 +46,11 @@ const handleRequest = async (
 	);
 	if (failure === true) return reply;
 
-	const mockReply = await generateResponseContent(body, matched);
+	const mockReply = await getReply(request, matched, record, 'responses');
+	if (isPassthrough(mockReply)) {
+		record.streamed = false;
+		return sendPassthrough(reply, mockReply);
+	}
 
 	if (!streaming) return reply.send(buildResponsesResponse(mockReply, body));
 
@@ -56,12 +65,12 @@ function register(app: FastifyInstance, route: string) {
 	// A generated reply with no validation and no rules (a quick smoke test),
 	// as on the chat route
 	app.get(`/${route}`, async (request, reply) => {
-		return handleRequest(reply, undefined, recordRequest(request));
+		return handleRequest(request, reply, recordRequest(request));
 	});
 
 	app.post(`/${route}`, async (request, reply) => {
 		if (await validateRequest(request, 'openai_responses')) {
-			return handleRequest(reply, request.body, recordRequest(request));
+			return handleRequest(request, reply, recordRequest(request));
 		}
 
 		recordRequest(request, false);

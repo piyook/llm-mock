@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { validateRequest } from '../../utilities/validate-request.js';
 import {
-	generateResponseContent,
 	buildStaticResponse,
 	handleStreamingResponse,
 	applyResponseDelay,
@@ -10,7 +9,12 @@ import {
 import { buildClaudeStaticResponse } from '../../utilities/build-claude-response.js';
 import { handleClaudeStreamingResponse } from '../../utilities/build-claude-streaming-response.js';
 import { shouldStream } from '../../utilities/stream-mode.js';
-import { decideCall } from '../../utilities/call-outcome.js';
+import {
+	decideCall,
+	getReply,
+	isPassthrough,
+	sendPassthrough,
+} from '../../utilities/call-outcome.js';
 import {
 	recordRequest,
 	type RecordedRequest,
@@ -30,10 +34,13 @@ import {
  * @returns Promise<void>
  */
 const handleRequest = async (
+	request: FastifyRequest,
 	reply: any,
-	body: unknown,
 	record: RecordedRequest,
 ) => {
+	// A GET has no body: it gets a generated reply (a quick smoke test)
+	const body = request.method === 'POST' ? request.body : undefined;
+
 	// Apply configured response delay for realistic API simulation
 	await applyResponseDelay();
 
@@ -56,8 +63,17 @@ const handleRequest = async (
 	if (failure === true) return reply;
 	const streamFailure = failure;
 
-	// Generate the mock reply (rule fixture, lorem or stored based on configuration)
-	const mockReply = await generateResponseContent(body, matched);
+	// The reply: a rule's, a generated one, or when recording the provider's
+	const mockReply = await getReply(
+		request,
+		matched,
+		record,
+		process.env?.LLM_NAME,
+	);
+	if (isPassthrough(mockReply)) {
+		record.streamed = false;
+		return sendPassthrough(reply, mockReply);
+	}
 
 	// Route to appropriate response handler
 	if (!streaming) {
@@ -97,7 +113,7 @@ function handler(app: FastifyInstance, pathName: string) {
 	// GET route - handles chat completion requests via HTTP GET
 	// Supports both static and streaming modes based on STREAM env variable
 	app.get(`/${fullPath}`, async (request, reply) => {
-		return await handleRequest(reply, undefined, recordRequest(request));
+		return await handleRequest(request, reply, recordRequest(request));
 	});
 
 	// POST route - handles chat completion requests via HTTP POST
@@ -106,11 +122,7 @@ function handler(app: FastifyInstance, pathName: string) {
 	app.post(`/${fullPath}`, async (request, reply) => {
 		// Validate incoming request against template to ensure API compatibility
 		if (await validateRequest(request)) {
-			return await handleRequest(
-				reply,
-				request.body,
-				recordRequest(request),
-			);
+			return await handleRequest(request, reply, recordRequest(request));
 		}
 
 		recordRequest(request, false);

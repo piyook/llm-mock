@@ -11,7 +11,7 @@ export type UiMeta = {
 	responseRules: Array<{
 		// Set for a rule added through the admin API, which can be removed
 		id: string | null;
-		source: 'runtime' | 'config';
+		source: 'runtime' | 'config' | 'recorded';
 		match: string;
 		// Where match is looked for: the whole request, or the last message only
 		in: 'any' | 'last';

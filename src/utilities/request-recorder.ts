@@ -33,6 +33,11 @@ export interface RecordedRequest {
 	rule: { id: string | null; match: string } | null;
 	/** How llmock failed the call on purpose, or null if it did not */
 	failed: (CallFailure & { by: 'rule' | 'chaos' }) | null;
+	/**
+	 * When recording: the upstream's status for a call that was sent on to
+	 * it, and whether its reply was saved. null for a call that wasn't.
+	 */
+	forwarded: { status: number; saved: boolean } | null;
 }
 
 export interface RequestFilter {
@@ -87,6 +92,7 @@ export const recordRequest = (
 		streamed: null,
 		rule: null,
 		failed: null,
+		forwarded: null,
 	};
 	recorded.push(entry);
 	if (recorded.length > maxRecordedRequests) {

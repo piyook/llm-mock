@@ -95,6 +95,7 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `embeddings.dimensions` | number | 128 | Default vector length. |
 | `responseRules` | `{match, file, stopReason?}[]`, `{match, files, stopReason?}[]`, `{match, text, stopReason?}[]`, `{match, content}[]` / `{match, contentFile}[]` (claude only) or `{match, fail}[]`; any rule may add `in` | none | See Fixture replies and Tool calls. A rule with `fail` fails the calls that match it. |
 | `storedResponsesFile` | string | none | JSON file of texts for `responseType: "stored"`. See Stored replies. |
+| `recordings` | `{dir?, upstream?}` | none | Replay recorded replies from `dir` (default `recordings`, relative to the config); with `upstream` also record new ones. See Recording. |
 | `chaos.enabled` | boolean | false | Fail some calls. See Chaos. |
 | `chaos.frequency` | integer ≥ 1 | 1 | Fail 1 in this many calls. `1` fails every call. |
 | `chaos.mode` | `"every"` \| `"random"` | `every` | `every`: calls X, 2X, 3X… fail (deterministic). `random`: each call fails with probability 1/X. |
@@ -107,7 +108,7 @@ Only `name` and `endpoint` are required in a preset. The Default column applies 
 | `server.uiTheme` | `"dark"` \| `"light"` | `dark` | Dashboard colours only; no effect on the API. A viewer can swap themes with the switch in the dashboard's sidebar (kept in that browser, wins over this). Also set by the `UI_THEME` environment variable (wins over the config; `--uiTheme` wins over both). Any other value means `dark`. Reported as `uiTheme` by `GET /ui-meta`. |
 | `server.llmspy` | `true` \| `false` \| URL | off | Print how to use the server through LLMSpy at start, and report it as `llmspy` in `GET /ui-meta` (see Seeing the calls in LLMSpy). `true` means `http://127.0.0.1:8080`; a URL is LLMSpy's address. `--llmspy[=<value>]` wins. Any other value stops the server at startup. |
 
-CLI flags override the selected preset for one run: `--model --port --host --admin --uiTheme --llmspy --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --chaosKind --chaosAfterChunks --embeddings --embeddingDimensions --foreground`. Both `--key=value` and `--key value` work. A boolean flag is on for `true`, `1`, `on` or `yes` (any case) and off for anything else; every flag except `--foreground` needs a value.
+CLI flags override the selected preset for one run: `--model --port --host --admin --uiTheme --llmspy --endpoint --responseType --maxLoremParas --validateRequests --logRequests --maxLoggedRequests --debug --stream --delayMin --delayMax --chaos --chaosFrequency --chaosMode --chaosStatus --chaosKind --chaosAfterChunks --embeddings --embeddingDimensions --record --recordings --foreground`. `--record=<url>` = `recordings.upstream` (`--record=` empty turns recording off for the run, replay only); `--recordings=<dir>` = `recordings.dir`. Both `--key=value` and `--key value` work. A boolean flag is on for `true`, `1`, `on` or `yes` (any case) and off for anything else; every flag except `--foreground` needs a value.
 
 ## Fixture replies (`responseRules`)
 
@@ -192,7 +193,7 @@ test('high priority tickets are escalated', async () => {
 ## Recorded requests (asserting what the app sent)
 
 - Every call to the chat route (GET or POST) and to `/v1/embeddings` is kept in memory, oldest first, last 500 only. Always on (independent of `logRequests`), calls that fail validation included, never written to disk. Per server process; cleared by `DELETE /admin/requests`, `POST /admin/reset`, `clearRequests()`, a restart, and a new `startServer`.
-- Entry: `{"id", "time", "method", "path", "query", "headers", "body", "valid", "streamed", "rule", "failed"}`. `id` = the reply's `x-llmock-request-id`. `time` ISO 8601. `path` has no query string. `headers` lower-case names; `authorization`, `proxy-authorization`, `x-api-key`, `api-key`, `x-goog-api-key`, `cookie` are `"[redacted]"`. `body` the parsed JSON (`null` for none). `valid` false = failed validation (400). `streamed` true/false, `null` when nothing was sent (failed validation, or a `stream-drop`/`stream-stall` of a call that asked for no stream). `rule` `{"id", "match"}` of the rule that answered or failed it (`id` null for a config rule), `null` if none, or if chaos failed the call before the rule answered. `failed` `{"by": "rule"|"chaos", "kind", "status", "afterChunks"}` (the settings in force) or `null`.
+- Entry: `{"id", "time", "method", "path", "query", "headers", "body", "valid", "streamed", "rule", "failed", "forwarded"}` (`forwarded`: see Recording). `id` = the reply's `x-llmock-request-id`. `time` ISO 8601. `path` has no query string. `headers` lower-case names; `authorization`, `proxy-authorization`, `x-api-key`, `api-key`, `x-goog-api-key`, `cookie` are `"[redacted]"`. `body` the parsed JSON (`null` for none). `valid` false = failed validation (400). `streamed` true/false, `null` when nothing was sent (failed validation, or a `stream-drop`/`stream-stall` of a call that asked for no stream). `rule` `{"id", "match"}` of the rule that answered or failed it (`id` null for a config rule), `null` if none, or if chaos failed the call before the rule answered. `failed` `{"by": "rule"|"chaos", "kind", "status", "afterChunks"}` (the settings in force) or `null`.
 - Filter: `match` (non-empty, case-sensitive substring of the body's string values, as a rule's `match`), `in` `any`/`last` (as a rule's `in`), `path` (exact route; a missing leading `/` is added). Unknown keys or bad values → `400` (HTTP) or a thrown TypeError (`requests()`).
 - `requests()` and `lastRequest()` return copies.
 
@@ -361,6 +362,19 @@ await addRule({ match: 'sunny', in: 'last', times: 1, text: 'Take the picnic to 
 // run the agent; it makes two calls and ends with that text. A third call
 // gets the normal responseType reply, since both rules removed themselves.
 ```
+
+## Recording (`recordings`, `--record`)
+
+Record real replies once, replay them offline after.
+
+- With `recordings.upstream` (or `--record=<url>`): a POST to the chat route or the Responses route that no rule matches (runtime, config or recorded) and that chaos does not fail is sent on to `<upstream><path and query of the call>` with the call's headers (credentials included; `host`, `content-length`, `connection`, `accept-encoding`, `transfer-encoding` dropped) and body, with `stream: true` changed to `false` and `stream_options` removed. The provider is never asked to stream.
+- So the preset's path must be the provider's real one: claude `v1/messages`; openai `v1/chat/completions` (the stock `chatgpt/chat/completions` would hit `<upstream>/chatgpt/chat/completions`); gemini `v1beta/models/<model>:generateContent`; Responses `/v1/responses`.
+- 2xx with a readable reply → saved, then answered in llmock's own format (streamed if the call asked), the same as every later replay. Saved: `<dir>/NNNN-<slug>.txt` (reply text, verbatim) or `<dir>/NNNN-<slug>.json` (claude tool-call blocks as a `contentFile`: one leading text block made of all text blocks, then `tool_use` blocks with `name` and `input`, no `id`; thinking blocks dropped), and a rule appended to `<dir>/rules.json`: `{"match": <last-message text>, "in": "last", "file"|"contentFile": <path relative to the config folder>, "stopReason"?}`. `stopReason` from claude `stop_reason` `max_tokens`/`refusal`, openai `finish_reason` `length` → `max_tokens`, `content_filter` or `message.refusal` → `refusal`, Responses `status: "incomplete"` → `max_tokens` and a `refusal` part → `refusal`, gemini `MAX_TOKENS`/`SAFETY`.
+- Not saved, sent back as the provider sent it (status, content-type, body), with a `RECORDING: not saved (<why>)` warning: non-2xx, not JSON, a format with nothing to read (custom templates), openai `tool_calls`, Responses `function_call` items, or a call whose last message has no text. Upstream unreachable → `502 {"error":{"type":"llmock_upstream","message"}}`.
+- Match key: the last message's strings joined by `\n` (`input` itself for a string Responses `input`), as `in: "last"` sees them. Substring semantics apply: a recording of `Hi` also answers a later `Hi there`.
+- `<dir>/rules.json` is read on every request and matched after the config's `responseRules`; with `recordings.dir` set and no `upstream` the server only replays. Invalid JSON or an invalid rule in it → server refuses to start (`500` if it turns invalid while running). A missing fixture → startup warning. An `upstream` that is not an http(s) URL → refuses to start.
+- `GET /admin/rules` / `GET /ui-meta` list recorded rules after the config ones with `source: "recorded"` and `id: null`; `/ui-rule-file?rule=<i>` counts config rules then recorded ones. Recorded requests have `forwarded: {"status", "saved"}` for a call that was sent on (`null` otherwise).
+- Headers are never written to disk. The fixtures hold real prompts and replies.
 
 ## Custom formats (templates)
 

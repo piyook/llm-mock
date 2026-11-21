@@ -27,6 +27,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
     - [Truncated and refused replies](#truncated-and-refused-replies-stopreason)
     - [Failing one prompt](#failing-one-prompt-fail)
     - [Tool calls (Claude)](#tool-calls-claude-content)
+  - [Recording real replies](#recording-real-replies)
   - [Streaming responses](#streaming-responses)
   - [Response delay simulation](#response-delay-simulation)
   - [Chaos mode (error simulation)](#chaos-mode-error-simulation)
@@ -77,6 +78,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - **Anthropic Messages API** — built-in `claude` preset with the SDK's streaming event format
 - **OpenAI Responses API** — `/v1/responses` beside chat completions, streamed or not, for `client.responses.create()`
 - **Fixture replies** — return canned text or JSON for requests that contain a chosen string
+- **Record and replay** — send unknown calls to the real provider once, save the replies as fixtures, replay them offline after
 - **Your own reply pools** — pick at random from a set of your own texts, per rule or as the default reply
 - **Works with [LLMSpy](https://github.com/piyook/llmspy)** — put LLMSpy in front of LLMock to see every mocked call as a conversation, with no API key (see [Using with LLMSpy](#using-with-llmspy))
 
@@ -199,6 +201,8 @@ Each option overrides the matching setting of the selected preset for that run:
 | `--chaosAfterChunks` | `chaos.afterChunks` | Whole number, `0` or more |
 | `--embeddings` | `embeddings.enabled` | `true` or `false` |
 | `--embeddingDimensions` | `embeddings.dimensions` | Number |
+| `--record` | `recordings.upstream` | The provider's URL, e.g. `https://api.anthropic.com` (empty: replay only). See [Recording real replies](#recording-real-replies) |
+| `--recordings` | `recordings.dir` | Folder, relative to the config file (default `recordings`) |
 | `--foreground` | | No value; keeps the server attached (see below) |
 
 An on/off option is on for `true`, `1`, `on` or `yes` (in any case) and off for anything else.
@@ -324,6 +328,7 @@ The config file is read once at startup, so restart the server after changing it
 | `endpoint` | **Required.** API endpoint path (not `v1/embeddings` while embeddings are enabled) |
 | `responseType` | `"lorem"` (random text) or `"stored"` (predefined responses) |
 | `storedResponsesFile` | Optional JSON file of your own texts for `"stored"` (see [Response types](#response-types)) |
+| `recordings` | Optional `{ "dir", "upstream" }`: replay recorded replies from `dir`, and with `upstream` record new ones (see [Recording real replies](#recording-real-replies)) |
 | `maxLoremParas` | Max sentences in lorem ipsum responses |
 | `validateRequests` | Validate incoming requests against templates |
 | `logRequests` | Save the most recent requests to the log file |
@@ -555,6 +560,40 @@ test('the agent looks up the order, then the refund', async () => {
 ```
 
 Out of scope for now: tool calls in the OpenAI and Gemini formats, server tools (`web_search` and the like), and `/v1/messages/count_tokens`.
+
+### Recording real replies
+
+Instead of writing fixtures by hand, let LLMock record them: calls that no rule answers go to the real provider once, and its reply is saved as a fixture file and a response rule. From then on the same call is answered from the recording, with no network, no API key and no cost.
+
+```bash
+# Record: send the calls no rule answers to Anthropic, and save the replies
+llmock start --model=claude --record=https://api.anthropic.com
+
+# Later, or in CI: replay only (the recordings folder is read without --record)
+llmock start --model=claude
+```
+
+Or in the preset:
+
+```json
+"claude": {
+  "name": "claude",
+  "endpoint": "v1/messages",
+  "recordings": { "dir": "recordings", "upstream": "https://api.anthropic.com" }
+}
+```
+
+While recording, give your client a real API key: the call is sent on with its headers, so the provider gets the key your client sent. Headers are never saved. For replaying, any key will do.
+
+- `upstream` is the provider's base URL, and the call's own path is added to it: `/v1/messages` goes to `https://api.anthropic.com/v1/messages`. So give the preset the provider's real path: `v1/messages` (Claude), `v1/chat/completions` (OpenAI, not the stock `chatgpt/chat/completions`), `v1beta/models/<model>:generateContent` (Gemini). The [Responses API](#responses-api-openai) route `/v1/responses` is recorded too.
+- `dir` (default `recordings`, relative to the config file) gets `rules.json` and one fixture per recording: `0001-what-is-the-capital-of-france.txt`, or a `.json` [`contentFile`](#tool-calls-claude-content) for a Claude tool-call reply. The rules are read on every request, after the config file's own `responseRules`, so you can edit, reorder or delete them, or move them into the config file. With `dir` set and no `upstream`, LLMock only replays.
+- A recorded rule matches the call's last message with `"in": "last"` (see [Response rules](#response-rules-fixture-replies)). Like every rule it matches text that *contains* it: a recording of `Hi` also answers `Hi there`, so record the longer prompts first, or edit `match`.
+- A cut-off reply is saved with `"stopReason": "max_tokens"` and a refused one with `"stopReason": "refusal"`, so they replay the same way. A Claude tool-call reply is saved without its ids, so each replay gets new ones. Thinking blocks are left out.
+- LLMock always asks the provider for a whole reply, then answers in its own format, streamed if the call asked for a stream. The first call and every replay look the same to your app.
+- An error status from the provider, or a reply LLMock can not read, is sent back as it came and not saved (the server prints why). OpenAI tool calls are not recorded. A provider that can not be reached gives a `502`.
+- Rules from the config file and the [admin API](#admin-api-changing-rules-and-settings-while-running) still win, and [chaos](#chaos-mode-error-simulation) still fails calls before anything is sent on.
+- [`GET /admin/requests`](#checking-what-your-app-sent) shows which calls were sent on, as `forwarded: { "status", "saved" }`. The dashboard lists recorded rules with the others.
+- The recordings hold your real prompts and the provider's replies. Look at them before you commit them to a shared repository.
 
 ### Streaming responses
 
@@ -822,6 +861,7 @@ Each entry has:
 | `streamed` | Whether the reply was a stream; `null` when no reply was sent (a failed validation, or a drop or stall with no stream) |
 | `rule` | `{ "id", "match" }` of the [response rule](#response-rules-fixture-replies) that answered or failed the call (`id` is `null` for a config rule), or `null` |
 | `failed` | How LLMock failed the call on purpose, `{ "by": "rule" or "chaos", "kind", "status", "afterChunks" }`, or `null` |
+| `forwarded` | When [recording](#recording-real-replies): `{ "status", "saved" }` for a call sent on to the provider, else `null` |
 
 - Filter with `?match=` (text the body must contain, case-sensitive, as a rule's `match`), `?in=last` (look only in the last message, as a rule's `in`) and `?path=/v1/messages`. An unknown or invalid filter gets a `400`.
 - Calls are kept whether or not `logRequests` is on, including calls that fail validation. Unlike the [request log](#request-logging) nothing is written to disk.

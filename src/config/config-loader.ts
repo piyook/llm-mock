@@ -50,6 +50,9 @@ export interface ModelConfig {
 	// Optional: fail some calls, with an HTTP error or part-way through a
 	// stream (off unless enabled)
 	chaos?: Partial<ChaosConfig>;
+	// Optional: replay recorded replies from `dir`, and with `upstream` record
+	// the calls no rule answers (see recordings.ts)
+	recordings?: { dir?: string; upstream?: string };
 }
 
 /**
@@ -351,6 +354,11 @@ export function setEnvironmentFromConfig(modelName?: string): void {
 	process.env.CHAOS_AFTER_CHUNKS =
 		process.env.CHAOS_AFTER_CHUNKS ||
 		(modelConfig.chaos?.afterChunks ?? 2).toString();
+
+	// Recordings - empty from the CLI means none, so only a missing value
+	// reads the config
+	process.env.RECORDINGS_DIR ??= modelConfig.recordings?.dir ?? '';
+	process.env.RECORD_UPSTREAM ??= modelConfig.recordings?.upstream ?? '';
 
 	// Embeddings - only set if not already set by CLI
 	process.env.ENABLE_EMBEDDINGS_MOCK =
