@@ -322,6 +322,9 @@ export const extractReply = (
 			Array.isArray(candidate.content.parts)
 				? candidate.content.parts.filter(isObject)
 				: [];
+		if (parts.some((part) => part.functionCall !== undefined)) {
+			return 'Gemini function calls are not recorded';
+		}
 
 		return withStop(
 			parts.map((part) => String(part.text ?? '')).join(''),
@@ -443,6 +446,8 @@ export interface Passthrough {
 	status: number;
 	contentType: string | undefined;
 	body: string;
+	/** Why it wasn't recorded */
+	reason?: string;
 }
 
 export type RecordOutcome =
@@ -489,6 +494,7 @@ export const forwardAndRecord = async (
 				status: response.status,
 				contentType: response.headers.get('content-type') ?? undefined,
 				body: text,
+				...(reason && { reason }),
 			},
 			status: response.status,
 			saved: false,

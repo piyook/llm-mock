@@ -72,7 +72,7 @@ const handleRequest = async (
 	);
 	if (isPassthrough(mockReply)) {
 		record.streamed = false;
-		return sendPassthrough(reply, mockReply);
+		return sendPassthrough(reply, mockReply, streaming);
 	}
 
 	// Route to appropriate response handler
