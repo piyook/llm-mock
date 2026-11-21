@@ -393,6 +393,51 @@ export const saveRecording = (
 	return rule;
 };
 
+// The provider's own path for each wire format. The mock's route can be any
+// path (the stock chatgpt preset serves /chatgpt/chat/completions), so the
+// call goes to the provider's real one, not to the path it came in on.
+const providerPaths: Record<string, string> = {
+	claude: '/v1/messages',
+	openai: '/v1/chat/completions',
+	responses: '/v1/responses',
+};
+
+/**
+ * The URL a call is sent on to: the upstream plus the provider's own path
+ * for the format (for Gemini, `/v1beta/models/<model>:generateContent` with
+ * the model from the call's path), and the call's query string. A format
+ * with no known path keeps the call's own path. An upstream that already ends
+ * with the path's version (`https://api.openai.com/v1`) isn't given it twice.
+ */
+export const upstreamUrl = (
+	upstream: string,
+	format: string | undefined,
+	callUrl: string,
+): string => {
+	const queryAt = callUrl.indexOf('?');
+	const [callPath, query] =
+		queryAt === -1
+			? [callUrl, '']
+			: [callUrl.slice(0, queryAt), callUrl.slice(queryAt)];
+
+	const geminiModel =
+		format === 'gemini'
+			? /models\/([^/:]+):/.exec(callPath)?.[1]
+			: undefined;
+	const path = geminiModel
+		? `/v1beta/models/${geminiModel}:generateContent`
+		: (providerPaths[format ?? ''] ?? callPath);
+
+	const base = upstream.replace(/\/+$/, '');
+	const version = /^\/(v\d+\w*)\//.exec(path)?.[1];
+	const joined =
+		version && base.endsWith(`/${version}`)
+			? `${base}${path.slice(version.length + 1)}`
+			: `${base}${path}`;
+
+	return `${joined}${query}`;
+};
+
 /** A provider's answer sent back to the client as it came */
 export interface Passthrough {
 	status: number;
@@ -431,7 +476,7 @@ export const forwardAndRecord = async (
 		headers.set(name, Array.isArray(value) ? value.join(', ') : value);
 	}
 
-	const response = await fetch(`${upstream}${request.url}`, {
+	const response = await fetch(upstreamUrl(upstream, format, request.url), {
 		method: 'POST',
 		headers,
 		body: JSON.stringify(body),
