@@ -592,7 +592,8 @@ While recording, give your client a real API key: the call is sent on with its h
 - LLMock always asks the provider for a whole reply, then answers in its own format, streamed if the call asked for a stream. The first call and every replay look the same to your app.
 - An error status from the provider, or a reply LLMock can not read, is sent back as it came and not saved (the server prints why). OpenAI tool calls are not recorded. A provider that can not be reached gives a `502`.
 - Rules from the config file and the [admin API](#admin-api-changing-rules-and-settings-while-running) still win, and [chaos](#chaos-mode-error-simulation) still fails calls before anything is sent on.
-- [`GET /admin/requests`](#checking-what-your-app-sent) shows which calls were sent on, as `forwarded: { "status", "saved" }`. The dashboard lists recorded rules with the others.
+- [`GET /admin/requests`](#checking-what-your-app-sent) shows which calls were sent on, as `forwarded: { "status", "saved" }`. So does the request log (as `request_validation.forwarded`), and the dashboard's log viewer marks those calls.
+- On the dashboard, the **Recording** card (Settings page) shows whether the server is recording, replaying or neither, the upstream, the recordings folder, and how many calls were sent on and saved since it started. Recorded rules are listed last on the Response rules page, marked `recorded`.
 - The recordings hold your real prompts and the provider's replies. Look at them before you commit them to a shared repository.
 
 ### Streaming responses

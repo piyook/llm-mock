@@ -42,6 +42,30 @@ export function clearLog() {
 	fs.rmSync(logPath, { force: true });
 }
 
+/**
+ * Adds what the recording upstream answered to a call's log entry, found by
+ * the x-llmock-request-id it was logged with. The entry is written when the
+ * call is validated, before it is sent on, so this comes afterwards. Does
+ * nothing when logging is off or the entry is no longer in the log.
+ */
+export function noteForwarded(
+	requestId: string,
+	forwarded: { status: number; saved: boolean },
+) {
+	if (process.env?.LOG_REQUESTS?.toUpperCase() !== 'ON') return;
+
+	const entries = readLogEntries();
+	const entry = entries.find(
+		(candidate) =>
+			(candidate as { request_validation?: { request_id?: unknown } })
+				?.request_validation?.request_id === requestId,
+	) as { request_validation: Record<string, unknown> } | undefined;
+	if (!entry) return;
+
+	entry.request_validation.forwarded = forwarded;
+	fs.writeFileSync(logPath, JSON.stringify(entries, null, 2));
+}
+
 export default function logger(
 	logItem: FastifyRequest,
 	state = '',

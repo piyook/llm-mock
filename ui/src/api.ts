@@ -65,6 +65,17 @@ export type UiMeta = {
 		baseUrl: string | null;
 		endpointUrl: string;
 	} | null;
+	// Recording real replies: `record` sends the calls no rule answers to
+	// `upstream` and saves them in `dir`, `replay` answers from `dir` only.
+	// `forwarded` and `saved` count the calls sent on since the server started.
+	// (Missing from an older llmock)
+	recording?: {
+		mode: 'record' | 'replay' | 'off';
+		upstream: string | null;
+		dir: string | null;
+		forwarded: number;
+		saved: number;
+	};
 	apiLinks: Array<{ href: string; label: string }>;
 };
 
