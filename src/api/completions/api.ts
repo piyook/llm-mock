@@ -1,9 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { validateRequest } from '../../utilities/validate-request.js';
 import {
-	generateResponseContent,
-	getRuleFailure,
 	buildStaticResponse,
 	handleStreamingResponse,
 	applyResponseDelay,
@@ -11,11 +9,16 @@ import {
 import { buildClaudeStaticResponse } from '../../utilities/build-claude-response.js';
 import { handleClaudeStreamingResponse } from '../../utilities/build-claude-streaming-response.js';
 import { shouldStream } from '../../utilities/stream-mode.js';
-import { applyChaos, applyRuleFailure } from '../../utilities/chaos.js';
 import {
-	countRuleUse,
-	findRequestRule,
-} from '../../utilities/runtime-rules.js';
+	decideCall,
+	getReply,
+	isPassthrough,
+	sendPassthrough,
+} from '../../utilities/call-outcome.js';
+import {
+	recordRequest,
+	type RecordedRequest,
+} from '../../utilities/request-recorder.js';
 
 // Static JSON vs SSE stream is decided per request by shouldStream():
 // - claude preset: the request body's `stream` field
@@ -30,7 +33,14 @@ import {
  * @param body - Parsed request body (undefined for GET requests)
  * @returns Promise<void>
  */
-const handleRequest = async (reply: any, body?: unknown) => {
+const handleRequest = async (
+	request: FastifyRequest,
+	reply: any,
+	record: RecordedRequest,
+) => {
+	// A GET has no body: it gets a generated reply (a quick smoke test)
+	const body = request.method === 'POST' ? request.body : undefined;
+
 	// Apply configured response delay for realistic API simulation
 	await applyResponseDelay();
 
@@ -41,23 +51,29 @@ const handleRequest = async (reply: any, body?: unknown) => {
 		process.env?.STREAM,
 	);
 
-	// A response rule with `fail` fails every call that matches it. Otherwise
-	// chaos mode decides: this call may get an error in place of a reply, or
-	// a stream that fails part-way through
-	// The rule is found once, so the failure and the reply are the same rule's
-	const matched = findRequestRule(body);
-	const ruleFailure = getRuleFailure(body, matched);
-	const chaos = ruleFailure
-		? applyRuleFailure(reply, ruleFailure, process.env?.LLM_NAME, streaming)
-		: applyChaos(reply, process.env?.LLM_NAME, streaming);
-	// A call that chaos fails is not one of the calls a rule with `times`
-	// answers: the rule is still there for the retry
-	if (ruleFailure || !chaos) countRuleUse(matched?.rule);
-	if (chaos === true) return reply;
-	const streamFailure = chaos || undefined;
+	// A rule with `fail`, or chaos, may fail this call: with an error in
+	// place of a reply, or a stream that fails part-way through
+	const { matched, failure } = decideCall(
+		reply,
+		body,
+		record,
+		streaming,
+		process.env?.LLM_NAME,
+	);
+	if (failure === true) return reply;
+	const streamFailure = failure;
 
-	// Generate the mock reply (rule fixture, lorem or stored based on configuration)
-	const mockReply = await generateResponseContent(body, matched);
+	// The reply: a rule's, a generated one, or when recording the provider's
+	const mockReply = await getReply(
+		request,
+		matched,
+		record,
+		process.env?.LLM_NAME,
+	);
+	if (isPassthrough(mockReply)) {
+		record.streamed = false;
+		return sendPassthrough(reply, mockReply, streaming);
+	}
 
 	// Route to appropriate response handler
 	if (!streaming) {
@@ -97,7 +113,7 @@ function handler(app: FastifyInstance, pathName: string) {
 	// GET route - handles chat completion requests via HTTP GET
 	// Supports both static and streaming modes based on STREAM env variable
 	app.get(`/${fullPath}`, async (request, reply) => {
-		return await handleRequest(reply);
+		return await handleRequest(request, reply, recordRequest(request));
 	});
 
 	// POST route - handles chat completion requests via HTTP POST
@@ -106,8 +122,10 @@ function handler(app: FastifyInstance, pathName: string) {
 	app.post(`/${fullPath}`, async (request, reply) => {
 		// Validate incoming request against template to ensure API compatibility
 		if (await validateRequest(request)) {
-			return await handleRequest(reply, request.body);
+			return await handleRequest(request, reply, recordRequest(request));
 		}
+
+		recordRequest(request, false);
 
 		// Return detailed error message for invalid requests
 		console.log(

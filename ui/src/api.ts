@@ -11,10 +11,12 @@ export type UiMeta = {
 	responseRules: Array<{
 		// Set for a rule added through the admin API, which can be removed
 		id: string | null;
-		source: 'runtime' | 'config';
+		source: 'runtime' | 'config' | 'recorded';
 		match: string;
 		// Where match is looked for: the whole request, or the last message only
 		in: 'any' | 'last';
+		// True when the text must be match exactly (missing from an older llmock)
+		exact?: boolean;
 		// The reply itself, for a rule that holds it in place of a file
 		text: string | null;
 		// The tool-call blocks a rule holds in place of a file (claude format)
@@ -65,6 +67,19 @@ export type UiMeta = {
 		baseUrl: string | null;
 		endpointUrl: string;
 	} | null;
+	// Recording real replies: `record` sends the calls no rule answers to
+	// `upstream` and saves them in `dir`, `replay` answers from `dir` only.
+	// `forwarded` and `saved` count the calls sent on since the server started.
+	// `paused` is true while recording is paused through the admin API.
+	// (Missing from an older llmock)
+	recording?: {
+		mode: 'record' | 'replay' | 'off';
+		paused?: boolean;
+		upstream: string | null;
+		dir: string | null;
+		forwarded: number;
+		saved: number;
+	};
 	apiLinks: Array<{ href: string; label: string }>;
 };
 
@@ -120,7 +135,7 @@ export function resetRuntimeChanges(): Promise<unknown> {
 // Changes settings on the running server through the admin API; a change
 // that can't be made is answered with `{ error }` saying why
 export async function changeRuntimeSettings(
-	route: 'settings' | 'chaos' | 'delay',
+	route: 'settings' | 'chaos' | 'delay' | 'recording',
 	change: object,
 ): Promise<unknown> {
 	const res = await fetch(`/admin/${route}`, {

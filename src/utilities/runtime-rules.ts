@@ -1,4 +1,5 @@
 import { getResponseRules, getRulesFormat } from '../config/config-loader.js';
+import { getRecordedRules } from './recordings.js';
 import {
 	findMatchingRule,
 	ruleFailure,
@@ -33,6 +34,7 @@ const allowedKeys = new Set([
 	'text',
 	'content',
 	'in',
+	'exact',
 	'stopReason',
 	'fail',
 	'times',
@@ -81,6 +83,7 @@ export const addRuntimeRule = (rule: unknown): RuntimeRule => {
 		...(text !== undefined && { text }),
 		...(content !== undefined && { content }),
 		...(scope !== undefined && { in: scope }),
+		...((rule as RuntimeRule).exact === true && { exact: true }),
 		...(stopReason !== undefined && { stopReason }),
 		...(fail !== undefined && { fail }),
 		...(times !== undefined && { times }),
@@ -105,16 +108,35 @@ export const clearRuntimeRules = (): void => {
 
 /**
  * Every rule a request is matched against, in order (first match wins): the
- * runtime rules, then the active preset's own, plus the folder the preset's
- * files resolve against.
+ * runtime rules, the active preset's own, then the recorded ones (see
+ * recordings.ts), plus the folder their files resolve against.
  */
 export const getActiveRules = (): {
 	rules: ResponseRule[];
 	baseDir: string;
 } => {
-	const { rules, baseDir } = getResponseRules();
+	const { rules, baseDir } = getFileRules();
 
 	return { rules: [...runtimeRules, ...rules], baseDir };
+};
+
+/**
+ * The rules from files: the preset's own, then the recorded ones. A rule's
+ * place in this list is what `/ui-rule-file?rule=` goes by.
+ */
+export const getFileRules = (): {
+	rules: ResponseRule[];
+	recorded: Set<ResponseRule>;
+	baseDir: string;
+} => {
+	const { rules, baseDir } = getResponseRules();
+	const recorded = getRecordedRules();
+
+	return {
+		rules: [...rules, ...recorded],
+		recorded: new Set(recorded),
+		baseDir,
+	};
 };
 
 /**
@@ -149,15 +171,22 @@ export const countRuleUse = (rule: ResponseRule | undefined): void => {
  * it fails (null if it replies), and how many more requests it answers (null
  * if it stays until removed).
  */
-export const describeActiveRules = () =>
-	getActiveRules().rules.map((rule) => {
+export const describeActiveRules = () => {
+	const { rules, recorded } = getFileRules();
+
+	return [...runtimeRules, ...rules].map((rule) => {
 		const runtime = runtimeRules.find((entry) => entry === rule);
 
 		return {
 			id: runtime?.id ?? null,
-			source: runtime ? 'runtime' : 'config',
+			source: runtime
+				? 'runtime'
+				: recorded.has(rule)
+					? 'recorded'
+					: 'config',
 			match: rule.match,
 			in: rule.in ?? 'any',
+			exact: rule.exact === true,
 			text: rule.text ?? null,
 			content: rule.content ?? null,
 			files: ruleFiles(rule),
@@ -168,3 +197,4 @@ export const describeActiveRules = () =>
 			times: runtime?.times ?? null,
 		};
 	});
+};

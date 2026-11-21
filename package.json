@@ -82,6 +82,7 @@
 		"llmock:start:chaos-stream": "node scripts/llmock.mjs start --model=chaos-stream",
 		"llmock:start:admin-off": "node scripts/llmock.mjs start --model=claude --admin=off",
 		"llmock:start:llmspy": "node scripts/llmock.mjs start --model=chatgpt --llmspy",
+		"llmock:start:replay": "node scripts/llmock.mjs start --model=claude --recordings=cypress/fixtures/recordings",
 		"llmock:stop": "node bin/llmock.js stop"
 	},
 	"dependencies": {
@@ -101,6 +102,7 @@
 		"cypress": "^16.1.1",
 		"husky": "^9.1.7",
 		"lint-staged": "^17.6.1",
+		"openai": "^7.62.0",
 		"oxlint": "^1.94.0",
 		"prettier": "3.10.1",
 		"torch-it": "^3.0.0",

@@ -26,7 +26,20 @@ import {
 } from './utilities/response-rules.js';
 import { loadStoredResponses } from './utilities/stored-responses.js';
 import { releaseStalledOnClose, resetChaos } from './utilities/chaos.js';
-import { clearRuntimeRules } from './utilities/runtime-rules.js';
+import { clearRuntimeRules, getFileRules } from './utilities/runtime-rules.js';
+import {
+	checkRecordingSettings,
+	recordUpstream,
+	recordingsDir,
+	resetRecording,
+} from './utilities/recordings.js';
+import {
+	clearRecordedRequests,
+	getRecordedRequests,
+	validateRequestFilter,
+	type RecordedRequest,
+	type RequestFilter,
+} from './utilities/request-recorder.js';
 import {
 	applyConfigDefaults,
 	reachableUrl,
@@ -36,6 +49,10 @@ import {
 import { currentLlmspyRoute, llmspyLines } from './utilities/llmspy.js';
 
 export type { LlmMockConfig } from './config/config-loader.js';
+export type {
+	RecordedRequest,
+	RequestFilter,
+} from './utilities/request-recorder.js';
 
 export interface StartServerOptions {
 	/**
@@ -64,6 +81,16 @@ export interface RunningServer {
 	/** Base URL to send requests to, e.g. `http://127.0.0.1:54321` */
 	url: string;
 	/**
+	 * The calls made to the chat and embeddings routes, oldest first, that
+	 * pass the filter (the same as `GET /admin/requests`, also with the admin
+	 * API off). At most the last 500 are kept.
+	 */
+	requests(filter?: RequestFilter): RecordedRequest[];
+	/** The most recent call that passes the filter, or undefined */
+	lastRequest(filter?: RequestFilter): RecordedRequest | undefined;
+	/** Forgets the recorded calls */
+	clearRequests(): void;
+	/**
 	 * Stops the server and puts back the environment variables and the
 	 * configuration it set
 	 */
@@ -83,8 +110,11 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 	const config = loadConfig(process.env.CONFIG_PATH);
 	setEnvironmentFromConfig(process.env.LLM_MODEL_NAME || config.defaultModel);
 
-	// Fail fast on malformed responseRules and warn about fixture files that can't be read
-	const { rules: responseRules, baseDir: rulesDir } = getResponseRules();
+	// Fail fast on malformed responseRules, recording settings or recorded
+	// rules, and warn about fixture files that can't be read
+	getResponseRules();
+	checkRecordingSettings();
+	const { rules: responseRules, baseDir: rulesDir } = getFileRules();
 	for (const rule of responseRules) {
 		let readable = true;
 		for (const file of ruleFiles(rule)) {
@@ -116,7 +146,9 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 
 	// Nothing is left over from a server started earlier in this process
 	clearRuntimeRules();
+	clearRecordedRequests();
 	resetChaos();
+	resetRecording();
 
 	// Each request gets an id, sent back as x-llmock-request-id and written to
 	// the request log, so a call seen in a client or a proxy such as LLMSpy can
@@ -182,6 +214,16 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 			`USING MODEL: ${getCurrentModel()?.toUpperCase() || 'CHATGPT'}`,
 		);
 		console.log('*****************************************************');
+		const upstream = recordUpstream();
+		const recordings = recordingsDir();
+		if (upstream) {
+			console.log(
+				`\nRECORDING: calls no rule answers are sent to ${upstream} and saved in ${recordings}`,
+			);
+		} else if (recordings) {
+			console.log(`\nREPLAYING recordings from ${recordings}`);
+		}
+
 		const llmspy = currentLlmspyRoute();
 		if (llmspy) console.log(`\n${llmspyLines(llmspy).join('\n')}\n`);
 	}
@@ -292,6 +334,11 @@ export async function startServer(
 		port,
 		host,
 		url: reachableUrl(host, port),
+		requests: (filter) =>
+			getRecordedRequests(validateRequestFilter(filter)),
+		lastRequest: (filter) =>
+			getRecordedRequests(validateRequestFilter(filter)).at(-1),
+		clearRequests: clearRecordedRequests,
 		close() {
 			closing ??= app.close().then(restore);
 			return closing;

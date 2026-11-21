@@ -16,6 +16,9 @@ describe('Mock LLM Spec with the admin API off', () => {
         ['GET', '/admin/settings'],
         ['PATCH', '/admin/settings'],
         ['POST', '/admin/reset'],
+        ['GET', '/admin/requests'],
+        ['GET', '/admin/requests/some-id'],
+        ['DELETE', '/admin/requests'],
     ];
 
     for (const [method, url] of routes) {
