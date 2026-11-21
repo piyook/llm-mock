@@ -102,9 +102,14 @@ export const changeRecording = (change: unknown): void => {
 	paused = pause;
 };
 
-/** Back to recording, if the server records: for a reset or a new server */
-export const resumeRecording = (): void => {
+/**
+ * Back to how a server starts: recording not paused, and no calls counted
+ * as sent on. For a reset or a new server.
+ */
+export const resetRecording = (): void => {
 	paused = false;
+	forwardCounts.forwarded = 0;
+	forwardCounts.saved = 0;
 };
 
 /** Counts one call sent on to the upstream */

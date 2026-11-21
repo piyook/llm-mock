@@ -258,15 +258,15 @@ describe('recording and replaying', () => {
 		upstream.answers.set('/v1/messages', {
 			body: claudeMessage([{ type: 'text', text: 'Counted.' }]),
 		});
+		// Earlier tests' servers sent calls on: a new server starts from 0
 		await start('claude');
-		const before = (await recording()) as {
-			forwarded: number;
-			saved: number;
-		};
-		expect(before).toMatchObject({
+		expect(await recording()).toEqual({
 			mode: 'record',
+			paused: false,
 			upstream: upstream.url,
 			dir: 'recordings',
+			forwarded: 0,
+			saved: 0,
 		});
 
 		await askClaude('Count me');
@@ -274,14 +274,11 @@ describe('recording and replaying', () => {
 		upstream.answers.set('/v1/messages', { status: 500, body: {} });
 		await askClaude('Fail me');
 
-		expect(await recording()).toEqual({
-			mode: 'record',
-			paused: false,
-			upstream: upstream.url,
-			dir: 'recordings',
-			forwarded: before.forwarded + 2,
-			saved: before.saved + 1,
-		});
+		expect(await recording()).toMatchObject({ forwarded: 2, saved: 1 });
+
+		// A reset goes back to 0 too
+		await fetch(`${server!.url}/admin/reset`, { method: 'POST' });
+		expect(await recording()).toMatchObject({ forwarded: 0, saved: 0 });
 
 		// The recorded rule is marked as one
 		const meta = (await (await fetch(`${server!.url}/ui-meta`)).json()) as {
