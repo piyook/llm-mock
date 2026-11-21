@@ -102,10 +102,24 @@ export const collectStrings = (value: unknown): string[] => {
 export const collectLastMessageStrings = (body: unknown): string[] => {
 	if (typeof body !== 'object' || body === null) return [];
 
-	const { messages, contents } = body as {
+	const { messages, contents, input } = body as {
 		messages?: unknown;
 		contents?: unknown;
+		input?: unknown;
 	};
+
+	// The OpenAI Responses API: `input` is the text itself, or a list of
+	// items whose last is a message (its content) or a tool's output
+	if (messages === undefined && contents === undefined) {
+		if (typeof input === 'string') return [input];
+		if (!Array.isArray(input) || input.length === 0) return [];
+
+		const last: unknown = input.at(-1);
+		if (typeof last === 'string') return [last];
+		if (typeof last !== 'object' || last === null) return [];
+		const item = last as Record<string, unknown>;
+		return collectStrings(item.content ?? item.output);
+	}
 	const [list, key] = Array.isArray(messages)
 		? [messages, 'content']
 		: [contents, 'parts'];

@@ -44,6 +44,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
   - [Debug mode](#debug-mode)
 - [Integration Guide](#integration-guide)
   - [Chat completions](#chat-completions)
+  - [Responses API (OpenAI)](#responses-api-openai)
   - [Embeddings API](#embeddings-api)
   - [Using with LangChain](#using-with-langchain)
 - [Using with LLMSpy](#using-with-llmspy)
@@ -74,6 +75,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - **Intermittent errors** — chaos mode fails every call or 1 in X calls with a 429, 500 or any other error status, to test retries and error handling
 - **OpenAI-compatible** — works with ChatGPT, Grok, Llama, DeepSeek, Gemini, and any OpenAI-style API
 - **Anthropic Messages API** — built-in `claude` preset with the SDK's streaming event format
+- **OpenAI Responses API** — `/v1/responses` beside chat completions, streamed or not, for `client.responses.create()`
 - **Fixture replies** — return canned text or JSON for requests that contain a chosen string
 - **Your own reply pools** — pick at random from a set of your own texts, per rule or as the default reply
 - **Works with [LLMSpy](https://github.com/piyook/llmspy)** — put LLMSpy in front of LLMock to see every mocked call as a conversation, with no API key (see [Using with LLMSpy](#using-with-llmspy))
@@ -880,6 +882,7 @@ Once running, open `http://localhost:8001` for the live dashboard. A health chec
 |---|---|
 | Configurable (default: `/chatgpt/chat/completions`) | Chat completions |
 | `/v1/messages` (with the `claude` preset) | Anthropic Messages API |
+| `/v1/responses`, and `/<prefix>/responses` beside a `/<prefix>/chat/completions` endpoint (with an `openai` preset) | [OpenAI Responses API](#responses-api-openai) |
 | `/v1/embeddings` | OpenAI-compatible mock embeddings |
 
 ### Request validation
@@ -889,7 +892,7 @@ Validate incoming requests against templates to confirm API compatibility:
 1. Enable validation: `"validateRequests": true`
 2. For a provider that is not built in, add a template to the `request-templates/` folder (see [Template locations](#template-locations))
 
-A request passes when it contains every top-level key of the template. The built-in templates require `model` and `messages` (OpenAI), `contents` (Gemini), and `model`, `max_tokens` and `messages` (Claude). Invalid requests return a `400`; the missing keys are shown under **View request log** on the dashboard.
+A request passes when it contains every top-level key of the template. The built-in templates require `model` and `messages` (OpenAI), `contents` (Gemini), `model`, `max_tokens` and `messages` (Claude), and `model` and `input` (the OpenAI Responses API, template `openai_responses_req.json`). Invalid requests return a `400`; the missing keys are shown under **View request log** on the dashboard.
 
 Only those keys are checked, not what is inside them, so every request of a tool loop passes: a `tools` list, assistant turns of `tool_use` blocks, and user turns of `tool_result` blocks (with string or block content, and `is_error`).
 
@@ -956,6 +959,31 @@ curl -N http://localhost:8001/chatgpt/chat/completions \
     "stream": true
   }'
 ```
+
+### Responses API (OpenAI)
+
+A preset with the `openai` template (such as `chatgpt` or `streaming`) also serves the [Responses API](https://platform.openai.com/docs/api-reference/responses), which `client.responses.create()` in the OpenAI SDKs calls. It is at `/v1/responses`, and also at `/<prefix>/responses` when the chat endpoint is `/<prefix>/chat/completions`, so one base URL works for both:
+
+```ts
+import OpenAI from 'openai';
+
+// The stock chatgpt preset: chat at /chatgpt/chat/completions, responses at /chatgpt/responses
+const client = new OpenAI({ apiKey: 'mock', baseURL: 'http://localhost:8001/chatgpt' });
+
+const response = await client.responses.create({
+  model: 'gpt-5.1',
+  instructions: 'Answer briefly.',
+  input: 'Classify this ticket',
+});
+console.log(response.output_text);
+```
+
+- The reply is one assistant `message` output item with one `output_text` part. `model`, `instructions`, `max_output_tokens`, `metadata`, `tools`, `temperature` and the other request settings are echoed back, and `usage` is estimated at about 4 characters per token (`instructions` and `input` in, the reply out).
+- `"stream": true` streams the API's events: `response.created`, `response.in_progress`, `response.output_item.added`, `response.content_part.added`, `response.output_text.delta` (several), `response.output_text.done`, `response.content_part.done`, `response.output_item.done` and `response.completed` with the whole response. Each has a `sequence_number`. There is no `[DONE]`. A request with no `stream` goes by the preset's `stream` setting, as on the chat route.
+- [Response rules](#response-rules-fixture-replies), [`stopReason`](#truncated-and-refused-replies-stopreason), [`fail`](#failing-one-prompt-fail), [chaos](#chaos-mode-error-simulation), the [delay](#response-delay-simulation), [validation](#request-validation) (`model` and `input`), the [request log](#request-logging) and the [recorded requests](#checking-what-your-app-sent) all work as they do on the chat route. A rule matches text anywhere in the body, `instructions` included. With `"in": "last"` it looks only at the last `input` item (its `content`, or a tool result's `output`), or at `input` itself when it is a string.
+- `stopReason: "max_tokens"` makes the response `incomplete` with `incomplete_details: { "reason": "max_output_tokens" }`, and a stream ends with `response.incomplete`. `stopReason: "refusal"` puts the text in a `refusal` part, streamed as `response.refusal.delta` events.
+- A chaos `stream-error` sends the opening events and `afterChunks` deltas, then an `error` event (`{ "type": "error", "code", "message", "param", "sequence_number" }`), and ends the stream. An HTTP failure has the chat route's OpenAI error body.
+- Not mocked: tool calls (`function_call` output items), reasoning items, conversation state (`previous_response_id` is echoed but not used), and the other Responses routes (`GET /v1/responses/<id>`, cancel, input items).
 
 ### Embeddings API
 

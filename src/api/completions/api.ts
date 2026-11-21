@@ -3,7 +3,6 @@ import type { FastifyInstance } from 'fastify';
 import { validateRequest } from '../../utilities/validate-request.js';
 import {
 	generateResponseContent,
-	getRuleFailure,
 	buildStaticResponse,
 	handleStreamingResponse,
 	applyResponseDelay,
@@ -11,20 +10,11 @@ import {
 import { buildClaudeStaticResponse } from '../../utilities/build-claude-response.js';
 import { handleClaudeStreamingResponse } from '../../utilities/build-claude-streaming-response.js';
 import { shouldStream } from '../../utilities/stream-mode.js';
+import { decideCall } from '../../utilities/call-outcome.js';
 import {
-	applyChaos,
-	applyRuleFailure,
-	getChaosConfig,
-} from '../../utilities/chaos.js';
-import {
-	describeRule,
 	recordRequest,
 	type RecordedRequest,
 } from '../../utilities/request-recorder.js';
-import {
-	countRuleUse,
-	findRequestRule,
-} from '../../utilities/runtime-rules.js';
 
 // Static JSON vs SSE stream is decided per request by shouldStream():
 // - claude preset: the request body's `stream` field
@@ -54,40 +44,17 @@ const handleRequest = async (
 		process.env?.STREAM,
 	);
 
-	// A response rule with `fail` fails every call that matches it. Otherwise
-	// chaos mode decides: this call may get an error in place of a reply, or
-	// a stream that fails part-way through
-	// The rule is found once, so the failure and the reply are the same rule's
-	const matched = findRequestRule(body);
-	const ruleFailure = getRuleFailure(body, matched);
-	const chaos = ruleFailure
-		? applyRuleFailure(reply, ruleFailure, process.env?.LLM_NAME, streaming)
-		: applyChaos(reply, process.env?.LLM_NAME, streaming);
-	// A call that chaos fails is not one of the calls a rule with `times`
-	// answers: the rule is still there for the retry
-	if (ruleFailure || !chaos) countRuleUse(matched?.rule);
-
-	if (matched && (ruleFailure || !chaos)) {
-		record.rule = describeRule(matched.rule);
-	}
-
-	if (ruleFailure) record.failed = { by: 'rule', ...ruleFailure };
-	else if (chaos) {
-		const { kind, status, afterChunks } = getChaosConfig();
-		record.failed = { by: 'chaos', kind, status, afterChunks };
-	}
-
-	if (chaos === true) {
-		// No stream was started: an error reply, or for a drop or a stall
-		// no reply at all
-		const kind = record.failed?.kind;
-		record.streamed =
-			kind === 'stream-drop' || kind === 'stream-stall' ? null : false;
-		return reply;
-	}
-
-	record.streamed = streaming;
-	const streamFailure = chaos || undefined;
+	// A rule with `fail`, or chaos, may fail this call: with an error in
+	// place of a reply, or a stream that fails part-way through
+	const { matched, failure } = decideCall(
+		reply,
+		body,
+		record,
+		streaming,
+		process.env?.LLM_NAME,
+	);
+	if (failure === true) return reply;
+	const streamFailure = failure;
 
 	// Generate the mock reply (rule fixture, lorem or stored based on configuration)
 	const mockReply = await generateResponseContent(body, matched);
