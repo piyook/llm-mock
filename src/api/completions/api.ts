@@ -11,7 +11,16 @@ import {
 import { buildClaudeStaticResponse } from '../../utilities/build-claude-response.js';
 import { handleClaudeStreamingResponse } from '../../utilities/build-claude-streaming-response.js';
 import { shouldStream } from '../../utilities/stream-mode.js';
-import { applyChaos, applyRuleFailure } from '../../utilities/chaos.js';
+import {
+	applyChaos,
+	applyRuleFailure,
+	getChaosConfig,
+} from '../../utilities/chaos.js';
+import {
+	describeRule,
+	recordRequest,
+	type RecordedRequest,
+} from '../../utilities/request-recorder.js';
 import {
 	countRuleUse,
 	findRequestRule,
@@ -30,7 +39,11 @@ import {
  * @param body - Parsed request body (undefined for GET requests)
  * @returns Promise<void>
  */
-const handleRequest = async (reply: any, body?: unknown) => {
+const handleRequest = async (
+	reply: any,
+	body: unknown,
+	record: RecordedRequest,
+) => {
 	// Apply configured response delay for realistic API simulation
 	await applyResponseDelay();
 
@@ -53,7 +66,27 @@ const handleRequest = async (reply: any, body?: unknown) => {
 	// A call that chaos fails is not one of the calls a rule with `times`
 	// answers: the rule is still there for the retry
 	if (ruleFailure || !chaos) countRuleUse(matched?.rule);
-	if (chaos === true) return reply;
+
+	if (matched && (ruleFailure || !chaos)) {
+		record.rule = describeRule(matched.rule);
+	}
+
+	if (ruleFailure) record.failed = { by: 'rule', ...ruleFailure };
+	else if (chaos) {
+		const { kind, status, afterChunks } = getChaosConfig();
+		record.failed = { by: 'chaos', kind, status, afterChunks };
+	}
+
+	if (chaos === true) {
+		// No stream was started: an error reply, or for a drop or a stall
+		// no reply at all
+		const kind = record.failed?.kind;
+		record.streamed =
+			kind === 'stream-drop' || kind === 'stream-stall' ? null : false;
+		return reply;
+	}
+
+	record.streamed = streaming;
 	const streamFailure = chaos || undefined;
 
 	// Generate the mock reply (rule fixture, lorem or stored based on configuration)
@@ -97,7 +130,7 @@ function handler(app: FastifyInstance, pathName: string) {
 	// GET route - handles chat completion requests via HTTP GET
 	// Supports both static and streaming modes based on STREAM env variable
 	app.get(`/${fullPath}`, async (request, reply) => {
-		return await handleRequest(reply);
+		return await handleRequest(reply, undefined, recordRequest(request));
 	});
 
 	// POST route - handles chat completion requests via HTTP POST
@@ -106,8 +139,14 @@ function handler(app: FastifyInstance, pathName: string) {
 	app.post(`/${fullPath}`, async (request, reply) => {
 		// Validate incoming request against template to ensure API compatibility
 		if (await validateRequest(request)) {
-			return await handleRequest(reply, request.body);
+			return await handleRequest(
+				reply,
+				request.body,
+				recordRequest(request),
+			);
 		}
+
+		recordRequest(request, false);
 
 		// Return detailed error message for invalid requests
 		console.log(

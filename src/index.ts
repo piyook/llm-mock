@@ -2,6 +2,8 @@
 export {
 	startServer,
 	type LlmMockConfig,
+	type RecordedRequest,
+	type RequestFilter,
 	type RunningServer,
 	type StartServerOptions,
 } from './start-server.js';

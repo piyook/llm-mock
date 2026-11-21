@@ -25,7 +25,7 @@ npx llmock start --model=claude --port=0   # any free port: prints it, and the s
 - With `--foreground` the command never returns; poll for readiness yourself: `GET /ping` → `200 {"response":"server is running"}`.
 - Confirm what is live: `GET /ui-meta` → JSON with `version` (llmock version), `llmName`, `llmUrlEndpoint`, `serverPort`, `streamingStatus`, `validateRequests`, delays.
 - `--port=0`: the system picks a free port. Detached `start` prints `Server is running at: http://<host>:<port>` and `Use 'llmock stop --port=<port>'`; `--foreground` prints `SERVER UP AND RUNNING ON LOCALHOST:<port>`. `GET /ui-meta` → `serverPort` is the real port.
-- In-process (TypeScript runners such as Vitest or tsx; plain `node` will not load llmock's `.ts` source from `node_modules`): `import { startServer } from 'llmock'`; `startServer({ config?, model?, port?, host?, settings? })` → `{ port, host, url, close() }`. `config` is a file path (relative to the cwd; rule files resolve against its folder) or the config object; default `./.llmockrc.json`, else the built-in presets. `port` defaults to the config's; `host` defaults to `127.0.0.1` (not the config's). `settings` takes any CLI flag by name (`{ stream: true, delayMin: 0 }`). One server per process at a time (a second call before `close()` throws; Vitest's per-file processes can each run one); `close()` restores the env vars it set. The request log file is shared by every llmock server on the machine.
+- In-process (TypeScript runners such as Vitest or tsx; plain `node` will not load llmock's `.ts` source from `node_modules`): `import { startServer } from 'llmock'`; `startServer({ config?, model?, port?, host?, settings? })` → `{ port, host, url, requests(filter?), lastRequest(filter?), clearRequests(), close() }` (`requests`/`lastRequest` are the recorded calls, see Recorded requests; they work with the admin API off). `config` is a file path (relative to the cwd; rule files resolve against its folder) or the config object; default `./.llmockrc.json`, else the built-in presets. `port` defaults to the config's; `host` defaults to `127.0.0.1` (not the config's). `settings` takes any CLI flag by name (`{ stream: true, delayMin: 0 }`). One server per process at a time (a second call before `close()` throws; Vitest's per-file processes can each run one); `close()` restores the env vars it set. The request log file is shared by every llmock server on the machine.
 - `stop` kills whatever process is listening on the port (default 8001, it does not read the config). Do not point it at a port another service uses.
 - Run the CLI from the folder containing `.llmockrc.json`, or set `CONFIG_PATH=<path>` (relative to the cwd).
 - Scaffold alternative: `npm create llmock@latest <dir>` creates a standalone folder (config, Docker files, npm scripts). It prompts interactively if `<dir>` is omitted or already exists. Its scripts: `npm run llmock:start`, `llmock:stop`, `llmock:<preset>`. Its Docker setup mounts only `.llmockrc.json`; templates, fixtures and a stored responses file are copied into the image, so changing them needs `npm run docker:rebuild` (or an added volume). Its `gemini` preset already uses the endpoint `v1beta/models/gemini-pro:generateContent`, so Google's SDK works there without the change described below.
@@ -149,7 +149,10 @@ The way to set up a reply or a failure from inside a test, with no fixture file,
 | `PATCH /admin/delay` | `{"min"?, "max"?}` (ms) | `200 {"delay": {"min", "max"}}`; `400 {"error"}` if not valid (nothing is changed) |
 | `GET /admin/settings` | none | `200 {"settings": {"responseType", "maxLoremParas", "stream", "validateRequests", "logRequests", "maxLoggedRequests"}}` |
 | `PATCH /admin/settings` | any of those six keys | `200` in the `GET /admin/settings` shape; `400 {"error"}` if not valid (nothing is changed) |
-| `POST /admin/reset` | none | `200 {"rules", "chaos", "stats", "delay", "settings"}`: runtime rules removed, chaos, delay and reply settings back to their startup values (config file plus CLI flags), chaos counts back to 0 |
+| `GET /admin/requests` | none; query `match`, `in`, `path` (all optional) | `200 {"requests": [...]}`: the recorded calls, oldest first, that pass the filter; `400 {"error"}` for an unknown or invalid filter. See Recorded requests. |
+| `GET /admin/requests/<id>` | none | `200 {"request": {...}}`; `404 {"error"}` for an id not recorded |
+| `DELETE /admin/requests` | none | `200 {"requests": []}` |
+| `POST /admin/reset` | none | `200 {"rules", "chaos", "stats", "delay", "settings"}`: recorded requests forgotten, runtime rules removed, chaos, delay and reply settings back to their startup values (config file plus CLI flags), chaos counts back to 0 |
 
 - `match`, `in`, `content`, `stopReason` and `fail` mean exactly what they mean in `responseRules` (see Fixture replies and Tool calls). A rule needs `text`, `content` (claude presets only, else `400`) or `fail`; with `fail` too, the reply is what a `stream-*` failure sends before it fails.
 - `file`, `files` and `contentFile` are refused with `400`: the reply must be `text` or `content`. Any other key is refused too.
@@ -162,7 +165,7 @@ The way to set up a reply or a failure from inside a test, with no fixture file,
 - A change applies from the next request. `GET /ui-meta` reports the settings in use.
 - Send `POST /admin/rules` and the `PATCH` routes with `Content-Type: application/json`. Send the routes that take no body without a body.
 - An `id` is never reused, also after a reset. Config rules have `id: null` and can not be removed.
-- `POST /admin/reset` also drops connections a `stream-stall` is holding open. It does not touch the request log.
+- `POST /admin/reset` also drops connections a `stream-stall` is holding open and forgets the recorded requests. It does not touch the request log.
 - The state is per server process and shared by every client: tests that add rules to one server must not run in parallel against it unless their `match` strings differ.
 - Off with `"server": {"admin": false}` or `--admin=false` (the routes then 404); `0`, `off` and `no` are read as `false`, in any case. `GET /ui-meta` → `adminApi` is `ENABLED` or `DISABLED`. While it is on, a preset `endpoint` equal to `admin` or starting with `admin/` → startup error. No auth, like the rest of the server: use `server.host` `127.0.0.1` to keep it off the network (in Docker, publish the port as `127.0.0.1:8001:8001`). Turning the admin API off leaves `GET`/`DELETE /ui-request-log`, which holds the logged prompts, open to anyone who can reach the port.
 
@@ -183,6 +186,19 @@ test('high priority tickets are escalated', async () => {
   await addRule({ match: 'Classify this ticket', text: '{"priority":"high"}' });
   // ...call the code under test, which calls the mock...
 });
+```
+
+## Recorded requests (asserting what the app sent)
+
+- Every call to the chat route (GET or POST) and to `/v1/embeddings` is kept in memory, oldest first, last 500 only. Always on (independent of `logRequests`), calls that fail validation included, never written to disk. Per server process; cleared by `DELETE /admin/requests`, `POST /admin/reset`, `clearRequests()`, a restart, and a new `startServer`.
+- Entry: `{"id", "time", "method", "path", "query", "headers", "body", "valid", "streamed", "rule", "failed"}`. `id` = the reply's `x-llmock-request-id`. `time` ISO 8601. `path` has no query string. `headers` lower-case names; `authorization`, `proxy-authorization`, `x-api-key`, `api-key`, `x-goog-api-key`, `cookie` are `"[redacted]"`. `body` the parsed JSON (`null` for none). `valid` false = failed validation (400). `streamed` true/false, `null` when nothing was sent (failed validation, or a `stream-drop`/`stream-stall` of a call that asked for no stream). `rule` `{"id", "match"}` of the rule that answered or failed it (`id` null for a config rule), `null` if none, or if chaos failed the call before the rule answered. `failed` `{"by": "rule"|"chaos", "kind", "status", "afterChunks"}` (the settings in force) or `null`.
+- Filter: `match` (non-empty, case-sensitive substring of the body's string values, as a rule's `match`), `in` `any`/`last` (as a rule's `in`), `path` (exact route; a missing leading `/` is added). Unknown keys or bad values → `400` (HTTP) or a thrown TypeError (`requests()`).
+- `requests()` and `lastRequest()` return copies.
+
+```ts
+await app.classify('Printer on fire');
+const call = server.lastRequest({ match: 'Printer on fire' });
+expect(call?.body).toMatchObject({ max_tokens: 1024 });
 ```
 
 ## Stored replies (`storedResponsesFile`)
@@ -361,6 +377,7 @@ To change a response envelope or the required request keys, or to mock a provide
 | `GET /ui-request-log` | `{"file", "log"}`: `log` is an array of the most recent validated requests (the last `maxLoggedRequests`, 10 by default), newest first, each with why it passed/failed and its `request_validation.request_id` (older ones are dropped; `log` is `null` if none logged) |
 | `DELETE /ui-request-log` | Empties the request log; returns `{"file", "log": null}` |
 | `/admin/rules`, `/admin/chaos`, `/admin/delay`, `/admin/settings`, `/admin/reset` | Change response rules, chaos, delay and reply settings while running (see Admin API) |
+| `/admin/requests` | The calls received, for asserting what the app sent (see Recorded requests) |
 | `GET /` | HTML dashboard |
 | `GET /<endpoint>` | A generated reply with no validation and no rules (quick smoke test) |
 

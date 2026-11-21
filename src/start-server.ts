@@ -28,6 +28,13 @@ import { loadStoredResponses } from './utilities/stored-responses.js';
 import { releaseStalledOnClose, resetChaos } from './utilities/chaos.js';
 import { clearRuntimeRules } from './utilities/runtime-rules.js';
 import {
+	clearRecordedRequests,
+	getRecordedRequests,
+	validateRequestFilter,
+	type RecordedRequest,
+	type RequestFilter,
+} from './utilities/request-recorder.js';
+import {
 	applyConfigDefaults,
 	reachableUrl,
 	resolveModelName,
@@ -36,6 +43,10 @@ import {
 import { currentLlmspyRoute, llmspyLines } from './utilities/llmspy.js';
 
 export type { LlmMockConfig } from './config/config-loader.js';
+export type {
+	RecordedRequest,
+	RequestFilter,
+} from './utilities/request-recorder.js';
 
 export interface StartServerOptions {
 	/**
@@ -63,6 +74,16 @@ export interface RunningServer {
 	host: string;
 	/** Base URL to send requests to, e.g. `http://127.0.0.1:54321` */
 	url: string;
+	/**
+	 * The calls made to the chat and embeddings routes, oldest first, that
+	 * pass the filter (the same as `GET /admin/requests`, also with the admin
+	 * API off). At most the last 500 are kept.
+	 */
+	requests(filter?: RequestFilter): RecordedRequest[];
+	/** The most recent call that passes the filter, or undefined */
+	lastRequest(filter?: RequestFilter): RecordedRequest | undefined;
+	/** Forgets the recorded calls */
+	clearRequests(): void;
 	/**
 	 * Stops the server and puts back the environment variables and the
 	 * configuration it set
@@ -116,6 +137,7 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 
 	// Nothing is left over from a server started earlier in this process
 	clearRuntimeRules();
+	clearRecordedRequests();
 	resetChaos();
 
 	// Each request gets an id, sent back as x-llmock-request-id and written to
@@ -292,6 +314,11 @@ export async function startServer(
 		port,
 		host,
 		url: reachableUrl(host, port),
+		requests: (filter) =>
+			getRecordedRequests(validateRequestFilter(filter)),
+		lastRequest: (filter) =>
+			getRecordedRequests(validateRequestFilter(filter)).at(-1),
+		clearRequests: clearRecordedRequests,
 		close() {
 			closing ??= app.close().then(restore);
 			return closing;
