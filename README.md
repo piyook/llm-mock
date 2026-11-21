@@ -913,9 +913,9 @@ With `TEST_MODE=false` your app talks to the real LLM service again.
 
 Once running, open `http://localhost:8001` for the live dashboard. A health check is at `http://localhost:8001/ping`.
 
-![LLM Mock Server Page](images/server-page.png)
+![LLM Mock Server Page](docs/public/images/server-page.png)
 
-![LLM Mock Server settings page](images/server-page-settings.png)
+![LLM Mock Server settings page](docs/public/images/server-page-settings.png)
 
 - **Settings** shows the configuration in use. While the [admin API](#admin-api-changing-rules-and-settings-while-running) is on, you can change values here on the running server; changes are not saved, and **Reset** or a restart puts them back.
 - **Response rules** lists the preset's `responseRules`; click a file or text entry to read the reply. Rules added through the admin API are marked **runtime**.

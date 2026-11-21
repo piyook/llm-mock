@@ -45,7 +45,6 @@ tsconfig.json
 
 # Documentation not needed in package
 docs/
-images/
 UI-Dev.md
 
 # Development lock files

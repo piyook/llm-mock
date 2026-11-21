@@ -1,0 +1,60 @@
+name: docs
+
+# Builds the docs site on every pull request that touches it (dead links fail the build),
+# and publishes it to GitHub Pages when main changes, so the site matches the released version.
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - 'docs/**'
+            - 'llms.txt'
+            - '.github/workflows/docs.yaml'
+    pull_request:
+        paths:
+            - 'docs/**'
+            - 'llms.txt'
+            - '.github/workflows/docs.yaml'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: pages-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0 # page "last updated" dates come from git history
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: '26'
+                  cache: 'npm'
+                  cache-dependency-path: docs/package-lock.json
+            - run: npm ci
+              working-directory: docs
+            - run: npm run build
+              working-directory: docs
+            - uses: actions/upload-pages-artifact@v4
+              if: github.event_name != 'pull_request'
+              with:
+                  path: docs/.vitepress/dist
+
+    deploy:
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        needs: build
+        runs-on: ubuntu-latest
+        permissions:
+            pages: write
+            id-token: write
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - id: deployment
+              uses: actions/deploy-pages@v4

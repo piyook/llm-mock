@@ -1,0 +1,56 @@
+/* LLMock colours, taken from the dashboard's icon (ui/public/favicon.svg). */
+:root {
+	--llmock-teal: #4f8a8b;
+	--llmock-green: #2ecc40;
+
+	--vp-c-brand-1: #3d7273;
+	--vp-c-brand-2: #4f8a8b;
+	--vp-c-brand-3: #4f8a8b;
+	--vp-c-brand-soft: rgba(79, 138, 139, 0.14);
+
+	--vp-home-hero-name-color: transparent;
+	--vp-home-hero-name-background: linear-gradient(
+		120deg,
+		var(--llmock-teal) 30%,
+		var(--llmock-green)
+	);
+
+	--vp-home-hero-image-background-image: linear-gradient(
+		-45deg,
+		var(--llmock-teal) 50%,
+		var(--llmock-green) 50%
+	);
+	--vp-home-hero-image-filter: blur(44px);
+}
+
+.dark {
+	--vp-c-brand-1: #6fb3b4;
+	--vp-c-brand-2: #5a9e9f;
+	--vp-c-brand-3: #4f8a8b;
+	--vp-c-brand-soft: rgba(79, 138, 139, 0.2);
+}
+
+@media (min-width: 640px) {
+	:root {
+		--vp-home-hero-image-filter: blur(56px);
+	}
+}
+
+@media (min-width: 960px) {
+	:root {
+		--vp-home-hero-image-filter: blur(68px);
+	}
+}
+
+/* The logo is a small square icon; give it a size in the hero. */
+.VPHero .image-src {
+	width: 180px;
+	height: 180px;
+}
+
+@media (min-width: 960px) {
+	.VPHero .image-src {
+		width: 260px;
+		height: 260px;
+	}
+}
