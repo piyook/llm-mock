@@ -25,7 +25,7 @@ import {
 import {
 	changeRecording,
 	describeRecording,
-	resumeRecording,
+	resetRecording,
 } from './recordings.js';
 
 /**
@@ -187,14 +187,14 @@ function adminApi(app: FastifyInstance) {
 
 	// Back to how the server started: no runtime rules, no recorded calls,
 	// the chaos, delay and reply settings of the config file, recording not
-	// paused, and the chaos count at 0, so a test can rely on which call fails
+	// paused with its counts at 0, and the chaos count at 0, so a test can rely on which call fails
 	// next
 	app.post('/admin/reset', async (_request, reply) => {
 		clearRuntimeRules();
 		clearRecordedRequests();
 		restoreStartupSettings();
 		resetChaos();
-		resumeRecording();
+		resetRecording();
 
 		return reply.send({
 			rules: describeActiveRules(),
