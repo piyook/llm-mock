@@ -1,5 +1,11 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	readFileSync,
+	readdirSync,
+	writeFileSync,
+} from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { FastifyRequest } from 'fastify';
 import { getConfigDir, getRulesFormat } from '../config/config-loader.js';
@@ -165,15 +171,46 @@ export const checkRecordingSettings = (): void => {
 	}
 
 	// A rules file that can't be used stops the server, as a bad config would
-	getRecordedRules();
+	readRecordedRules();
 };
+
+// The last problem warned about in the rules file, so a file that stays
+// broken is warned about once, not on every request
+let lastRulesProblem: string | undefined;
 
 /**
  * The recorded rules, in the order they were recorded. Re-read on every
  * request, like fixture files, so a hand-edited file is picked up. Their
  * files resolve against the config folder, like the config file's rules.
+ *
+ * A file that turns bad while the server runs (a hand-edit with a trailing
+ * comma) is skipped with a warning, so the other rules and the dashboard
+ * keep working; the server refuses to start with one (see
+ * checkRecordingSettings).
  */
 export const getRecordedRules = (): ResponseRule[] => {
+	try {
+		const rules = readRecordedRules();
+		lastRulesProblem = undefined;
+		return rules;
+	} catch (error) {
+		const problem = (error as Error).message;
+		if (problem !== lastRulesProblem) {
+			console.warn(
+				`WARNING: ${problem}. The recorded rules are skipped until it is fixed.`,
+			);
+			lastRulesProblem = problem;
+		}
+
+		return [];
+	}
+};
+
+/**
+ * The recorded rules, throwing an Error that says what is wrong with a
+ * rules file that can't be used
+ */
+const readRecordedRules = (): ResponseRule[] => {
 	const dir = recordingsDir();
 	if (!dir) return [];
 
@@ -350,9 +387,20 @@ const ruleFilePath = (path: string): string => {
 	return (isAbsolute(fromConfig) ? path : fromConfig).split(sep).join('/');
 };
 
+// The number for a new fixture: one more than the rules there are and than
+// any fixture already in the folder, so a rule removed by hand doesn't make a
+// new recording write over a fixture another rule still uses
+const nextFixtureNumber = (dir: string, ruleCount: number): number => {
+	const used = readdirSync(dir).map((name) =>
+		Number(/^(\d+)-/.exec(name)?.[1] ?? 0),
+	);
+	return Math.max(ruleCount, ...used) + 1;
+};
+
 /**
  * Saves a reply as a fixture file and a rule matching `match` in the last
- * message. Returns the rule.
+ * message. Returns the rule. Throws, saving nothing, if the rules file can't
+ * be read: writing it would lose the rules in it.
  */
 export const saveRecording = (
 	match: string,
@@ -362,8 +410,11 @@ export const saveRecording = (
 		recordingsDir() ?? resolve(getConfigDir(), defaultRecordingsDir);
 	mkdirSync(dir, { recursive: true });
 
-	const rules = getRecordedRules();
-	const number = String(rules.length + 1).padStart(4, '0');
+	const rules = readRecordedRules();
+	const number = String(nextFixtureNumber(dir, rules.length)).padStart(
+		4,
+		'0',
+	);
 	const base = `${number}-${slug(match)}`;
 
 	let rule: ResponseRule;
@@ -519,7 +570,13 @@ export const forwardAndRecord = async (
 	if (!match)
 		return passthrough('the call has no last-message text to match');
 
-	const rule = saveRecording(match, extracted);
+	let rule: ResponseRule;
+	try {
+		rule = saveRecording(match, extracted);
+	} catch (error) {
+		return passthrough((error as Error).message);
+	}
+
 	console.log(`RECORDING: saved ${rule.file ?? rule.contentFile}`);
 
 	// As a rule with the same reply would answer
