@@ -101,6 +101,7 @@
 		"cypress": "^16.1.1",
 		"husky": "^9.1.7",
 		"lint-staged": "^17.6.1",
+		"openai": "^7.62.0",
 		"oxlint": "^1.94.0",
 		"prettier": "3.10.1",
 		"torch-it": "^3.0.0",

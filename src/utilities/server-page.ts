@@ -15,6 +15,7 @@ import { getDelay } from './runtime-settings.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
 import { adminApiEnabled } from './admin-api.js';
 import { currentLlmspyRoute } from './llmspy.js';
+import { responsesPaths } from './build-responses-response.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -222,6 +223,9 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		// Add main API endpoint
 		// Read per request: startServer sets it after this module has loaded
 		apiLinksSet.add(`/${process.env?.LLM_URL_ENDPOINT ?? ''}`);
+
+		// The Responses API, served beside the chat route by openai presets
+		for (const route of responsesPaths()) apiLinksSet.add(`/${route}`);
 
 		// Add embeddings endpoint link if enabled
 		if (embeddingsEnabled) {
