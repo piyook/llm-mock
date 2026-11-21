@@ -20,6 +20,7 @@ export interface RecordedRequest {
 	method: string;
 	/** The route, without the query string */
 	path: string;
+	/** Credentials (`key`, `api_key`, `access_token`...) are "[redacted]" */
 	query: Record<string, unknown>;
 	/** Header names in lower case; credentials are replaced by "[redacted]" */
 	headers: Record<string, unknown>;
@@ -62,13 +63,22 @@ const credentialHeaders = new Set([
 	'cookie',
 ]);
 
+// The same for the query string: Gemini clients send their key as ?key=
+const credentialParams = new Set([
+	'key',
+	'api_key',
+	'api-key',
+	'apikey',
+	'access_token',
+]);
+
 let recorded: RecordedRequest[] = [];
 
-const redact = (headers: FastifyRequest['headers']) =>
+const redact = (values: object, credentials: ReadonlySet<string>) =>
 	Object.fromEntries(
-		Object.entries(headers).map(([name, value]) => [
+		Object.entries(values).map(([name, value]) => [
 			name,
-			credentialHeaders.has(name.toLowerCase()) ? '[redacted]' : value,
+			credentials.has(name.toLowerCase()) ? '[redacted]' : value,
 		]),
 	);
 
@@ -85,8 +95,8 @@ export const recordRequest = (
 		time: new Date().toISOString(),
 		method: request.method,
 		path: request.url.split('?')[0],
-		query: { ...(request.query as Record<string, unknown>) },
-		headers: redact(request.headers),
+		query: redact(request.query ?? {}, credentialParams),
+		headers: redact(request.headers, credentialHeaders),
 		body: request.body ?? null,
 		valid,
 		streamed: null,

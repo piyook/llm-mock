@@ -860,7 +860,7 @@ Each entry has:
 | `id` | The same id as the reply's `x-llmock-request-id` header |
 | `time` | When the call came in (ISO 8601) |
 | `method`, `path`, `query` | The route, without the query string, and the query string's values |
-| `headers` | The request headers, names in lower case. `authorization`, `x-api-key`, `api-key`, `x-goog-api-key`, `proxy-authorization` and `cookie` show as `"[redacted]"`, in case a real key is sent to the mock. |
+| `headers` | The request headers, names in lower case. `authorization`, `x-api-key`, `api-key`, `x-goog-api-key`, `proxy-authorization` and `cookie` show as `"[redacted]"`, in case a real key is sent to the mock. So do the query parameters `key` (as Gemini clients send it), `api_key`, `api-key`, `apikey` and `access_token`. |
 | `body` | The JSON body as sent (`null` for none) |
 | `valid` | `false` for a call that failed [request validation](#request-validation) and got a `400` |
 | `streamed` | Whether the reply was a stream; `null` when no reply was sent (a failed validation, or a drop or stall with no stream) |

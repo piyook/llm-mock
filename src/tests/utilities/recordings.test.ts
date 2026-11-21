@@ -491,17 +491,16 @@ describe('recording and replaying', () => {
 		).toBe('One.');
 	});
 
-	test('the dashboard is not shown a user name or password in the upstream URL', async () => {
+	test('an upstream with a user name or password stops the server, without showing them', async () => {
 		const withLogin = upstream.url.replace(
 			'http://',
 			'http://user:secret@',
 		);
-		await start('claude', { record: withLogin });
-
-		const { recording } = (await (
-			await fetch(`${server!.url}/ui-meta`)
-		).json()) as { recording: { upstream: string } };
-		expect(recording.upstream).toBe(upstream.url);
+		const started = start('claude', { record: withLogin });
+		await expect(started).rejects.toThrow(
+			/must not hold a user name or password/,
+		);
+		await expect(started).rejects.not.toThrow(/secret/);
 	});
 
 	test('a streamed call is recorded from a whole reply and streamed by llmock', async () => {

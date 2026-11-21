@@ -69,6 +69,29 @@ describe('recorded requests', () => {
 		server = undefined;
 	});
 
+	test('a key in the query string is redacted, other parameters kept', async () => {
+		server = await startServer({ config, port: 0 });
+		await (
+			await post(
+				server,
+				'/v1/messages?key=AIza-secret&API_KEY=other&beta=true',
+				{
+					model: 'claude-opus-5-5',
+					max_tokens: 50,
+					messages: [{ role: 'user', content: 'hi' }],
+				},
+			)
+		).text();
+
+		expect(server.lastRequest()?.query).toEqual({
+			key: '[redacted]',
+			API_KEY: '[redacted]',
+			beta: 'true',
+		});
+		const { body } = await admin(server, 'requests');
+		expect(JSON.stringify(body)).not.toContain('secret');
+	});
+
 	test('records each call, oldest first, with its id, body and headers', async () => {
 		server = await startServer({ config, port: 0 });
 
@@ -96,6 +119,7 @@ describe('recorded requests', () => {
 		expect(entry.headers['anthropic-version']).toBe('2023-06-01');
 		// A key sent by mistake is never shown
 		expect(entry.headers['x-api-key']).toBe('[redacted]');
+		expect(entry.query).toEqual({});
 		expect(entry).toMatchObject({
 			valid: true,
 			streamed: false,
