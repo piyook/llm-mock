@@ -33,7 +33,7 @@
 	"bugs": {
 		"url": "https://github.com/piyook/llm-mock/issues"
 	},
-	"homepage": "https://github.com/piyook/llm-mock#readme",
+	"homepage": "https://piyook.github.io/llm-mock/",
 	"engines": {
 		"node": ">=24.0.0"
 	},
@@ -54,6 +54,9 @@
 		"postinstall": "node scripts/postinstall.mjs",
 		"ui-dev": "npm --prefix ui run dev",
 		"compile-ui": "npm --prefix ui run build",
+		"docs:dev": "npm --prefix docs run dev",
+		"docs:build": "npm --prefix docs run build",
+		"docs:preview": "npm --prefix docs run preview",
 		"prep": "node scripts/prepare-publish.mjs",
 		"prepare": "husky || true",
 		"lint": "oxlint",

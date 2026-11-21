@@ -67,4 +67,4 @@ Everything else in the project (templates, and any fixture or stored response fi
 
 ---
 
-Part of the [LLMock ecosystem](https://github.com/piyook/llm-mock). See this [README](https://github.com/piyook/llm-mock#readme) for more information.
+Part of the [LLMock ecosystem](https://github.com/piyook/llm-mock). See the [LLMock docs](https://piyook.github.io/llm-mock/) for more information.
