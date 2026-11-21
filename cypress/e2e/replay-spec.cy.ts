@@ -51,7 +51,7 @@ describe('Mock LLM Spec replaying recordings', () => {
                 cy.get('code').should('have.text', 'E2E_RECORDED');
                 cy.get('[cy-data="rule_scope"]').should(
                     'contain',
-                    'Last message contains',
+                    'Last message is',
                 );
                 cy.get('[cy-data="rule_recorded"]').should('have.text', 'recorded');
                 cy.get('[cy-data="rule_file_link"]').click();

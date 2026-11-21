@@ -15,6 +15,8 @@ export type UiMeta = {
 		match: string;
 		// Where match is looked for: the whole request, or the last message only
 		in: 'any' | 'last';
+		// True when the text must be match exactly (missing from an older llmock)
+		exact?: boolean;
 		// The reply itself, for a rule that holds it in place of a file
 		text: string | null;
 		// The tool-call blocks a rule holds in place of a file (claude format)

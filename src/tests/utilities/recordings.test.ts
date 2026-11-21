@@ -190,6 +190,7 @@ describe('recording and replaying', () => {
 			{
 				match: 'What is the capital of France?',
 				in: 'last',
+				exact: true,
 				file: 'recordings/0001-what-is-the-capital-of-france.txt',
 			},
 		]);
@@ -454,6 +455,7 @@ describe('recording and replaying', () => {
 		expect(rule).toEqual({
 			match: 'Weather in Paris?',
 			in: 'last',
+			exact: true,
 			contentFile: 'recordings/0001-weather-in-paris.json',
 		});
 		expect(
@@ -472,6 +474,66 @@ describe('recording and replaying', () => {
 		expect(again.content[1].id).toMatch(/^toolu_/);
 		expect(again.content[1].id).not.toBe('toolu_real');
 		expect(upstream.calls).toHaveLength(1);
+	});
+
+	test('a recorded tool loop replays: the tool_result turn matches whatever its tool_use_id', async () => {
+		const resultTurn = (id: string) => ({
+			model: 'claude-opus-5-5',
+			max_tokens: 100,
+			messages: [
+				{ role: 'user', content: 'Weather in Paris?' },
+				{
+					role: 'assistant',
+					content: [
+						{
+							type: 'tool_use',
+							id,
+							name: 'get_weather',
+							input: {},
+						},
+					],
+				},
+				{
+					role: 'user',
+					content: [
+						{
+							type: 'tool_result',
+							tool_use_id: id,
+							content: '21C',
+						},
+					],
+				},
+			],
+		});
+
+		upstream.answers.set('/v1/messages', {
+			body: claudeMessage([{ type: 'text', text: 'It is 21C.' }]),
+		});
+		await start('claude');
+		await post('/v1/messages', resultTurn('toolu_first'));
+		expect(recordedRules()[0]).toMatchObject({ match: 'tool_result\n21C' });
+
+		// A replay gives the tool call a new id, which the client sends back
+		const replayed = await post('/v1/messages', resultTurn('toolu_second'));
+		expect(JSON.parse(replayed.text).content[0].text).toBe('It is 21C.');
+		expect(upstream.calls).toHaveLength(1);
+		expect(recordedRules()).toHaveLength(1);
+	});
+
+	test('a recording answers only the same last message, not one that contains it', async () => {
+		upstream.answers.set('/v1/messages', {
+			body: claudeMessage([{ type: 'text', text: 'Hello!' }]),
+		});
+		await start('claude');
+		await askClaude('Hi');
+
+		upstream.answers.set('/v1/messages', {
+			body: claudeMessage([{ type: 'text', text: 'Summary.' }]),
+		});
+		const longer = await askClaude('Hi, summarise this');
+		expect(JSON.parse(longer.text).content[0].text).toBe('Summary.');
+		expect(upstream.calls).toHaveLength(2);
+		expect(recordedRules()).toHaveLength(2);
 	});
 
 	test('OpenAI chat: a cut-off reply keeps its stop reason', async () => {

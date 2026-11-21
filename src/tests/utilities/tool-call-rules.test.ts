@@ -430,6 +430,61 @@ describe('a rule with in: "last"', () => {
 		expect(findMatchingRule(rules, gemini)?.text).toBe('step 2');
 	});
 
+	test('leaves ids copied from an earlier reply out of the last message', () => {
+		const claude = body(step1, toolTurn, {
+			role: 'user',
+			content: [
+				{
+					type: 'tool_result',
+					tool_use_id: 'toolu_9',
+					content: 'sunny',
+				},
+			],
+		});
+		expect(collectLastMessageStrings(claude)).toEqual([
+			'tool_result',
+			'sunny',
+		]);
+
+		const responses = {
+			input: [
+				{
+					type: 'function_call_output',
+					call_id: 'call_9',
+					output: 'rain',
+				},
+			],
+		};
+		expect(collectLastMessageStrings(responses)).toEqual(['rain']);
+	});
+
+	test('exact: true matches only the whole text', () => {
+		const exact = [
+			{ match: 'sunny', in: 'last', exact: true, text: 'exact' },
+		] as any;
+		const later = (result: string) =>
+			body(step1, toolTurn, {
+				role: 'user',
+				content: [{ type: 'tool_result', content: result }],
+			});
+		const said = (content: string) => body({ role: 'user', content });
+		expect(findMatchingRule(exact, said('sunny'))?.text).toBe('exact');
+		expect(findMatchingRule(exact, said('sunny, 21C'))).toBeUndefined();
+		expect(findMatchingRule(exact, later('sunny'))).toBeUndefined();
+
+		const whole = [
+			{ match: 'tool_result\nsunny', in: 'last', exact: true, text: 'x' },
+		] as any;
+		expect(findMatchingRule(whole, later('sunny'))?.text).toBe('x');
+	});
+
+	test('exact must be true or false', () => {
+		expect(check(rule({ text: 'x', exact: true }))).not.toThrow();
+		expect(check(rule({ text: 'x', exact: 'yes' }))).toThrow(
+			'rule.exact must be true or false',
+		);
+	});
+
 	test('in must be "any" or "last"', () => {
 		expect(check(rule({ text: 'x', in: 'last' }))).not.toThrow();
 		expect(check(rule({ text: 'x', in: 'any' }))).not.toThrow();

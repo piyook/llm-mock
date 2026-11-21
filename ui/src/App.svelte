@@ -1083,7 +1083,7 @@
 						<div class="rule">
 							<div class="ruleMatch">
 								<span class="muted" cy-data="rule_scope">
-									{rule.in === 'last' ? 'Last message contains' : 'Request contains'}
+									{`${rule.in === 'last' ? 'Last message' : 'Request'} ${rule.exact ? 'is' : 'contains'}`}
 								</span>
 								<code>{rule.match}</code>
 								{#if rule.source === 'runtime'}
