@@ -32,6 +32,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
   - [Chaos mode (error simulation)](#chaos-mode-error-simulation)
     - [Stream failures](#stream-failures)
   - [Admin API](#admin-api-changing-rules-and-settings-while-running)
+    - [Checking what your app sent](#checking-what-your-app-sent)
     - [Network exposure](#network-exposure)
   - [Custom API paths](#custom-api-paths)
   - [Environment variables](#environment-variables)
@@ -238,7 +239,16 @@ In Vitest, start it in `beforeAll` and close it in `afterAll`. Options, all opti
 | `host` | `127.0.0.1` | Address to listen on. Not taken from the config, so a test server stays off the network unless you ask. |
 | `settings` | | Any [CLI option](#cli-options) by name, e.g. `{ stream: true, delayMin: 0, chaos: true }` |
 
-It returns `{ port, host, url, close() }`; `close()` stops the server and puts back the environment variables it set.
+It returns `{ port, host, url, requests(), lastRequest(), clearRequests(), close() }`; `close()` stops the server and puts back the environment variables it set.
+
+`requests(filter?)` gives the calls the server received, oldest first, as [`GET /admin/requests`](#checking-what-your-app-sent) does (it also works with the admin API off). `lastRequest(filter?)` gives the most recent one. The filter is `{ match?, in?, path? }`:
+
+```ts
+await myApp.classify('Printer on fire');
+const call = server.lastRequest({ match: 'Printer on fire' });
+expect(call?.body).toMatchObject({ model: 'claude-opus-5-5', max_tokens: 1024 });
+expect(call?.headers['anthropic-version']).toBe('2023-06-01');
+```
 
 - One server per process at a time: settings live in environment variables and module state, so a second `startServer` before `close()` throws. Vitest runs each test file in its own process by default, so files can each run their own server in parallel. A server started after an earlier one is closed starts clean (no runtime rules, chaos count at 0).
 - LLMock ships TypeScript source, so import it from a runner that loads TypeScript (Vitest, tsx). Plain `node` will not load it from `node_modules`; use the CLI with `--port=0` there.
@@ -722,7 +732,10 @@ await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
 | `PATCH /admin/delay` | Changes the response delay: `{ "min", "max" }` in milliseconds |
 | `GET /admin/settings` | Shows the reply settings in use |
 | `PATCH /admin/settings` | Changes the reply settings it is given: `responseType`, `maxLoremParas`, `stream`, `validateRequests`, `logRequests`, `maxLoggedRequests` |
-| `POST /admin/reset` | Goes back to how the server started: no rules added this way, the config file's chaos, delay and reply settings, and the chaos call count at 0 |
+| `GET /admin/requests` | The calls your app made, oldest first (see [Checking what your app sent](#checking-what-your-app-sent)) |
+| `GET /admin/requests/<id>` | One recorded call, by its `x-llmock-request-id` |
+| `DELETE /admin/requests` | Forgets the recorded calls |
+| `POST /admin/reset` | Goes back to how the server started: no rules added this way, no recorded calls, the config file's chaos, delay and reply settings, and the chaos call count at 0 |
 
 - A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional `in`, [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text`, `content` ([tool calls](#tool-calls-claude-content), `claude` only) or `fail`.
 - The reply is given as `text` or `content`, never as `file`, `files` or `contentFile`. The server has no login, so a path sent over HTTP would let anyone who can reach it read files from your machine.
@@ -782,9 +795,40 @@ await fetch('http://localhost:8001/admin/chaos', {
 - The dashboard shows the settings in use, so a change appears there within 2 seconds. The **Admin API** box on its **Settings** page has a **Reset** button that does the same as `POST /admin/reset`.
 - To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 
+#### Checking what your app sent
+
+Every call to the chat route and to `/v1/embeddings` is kept in memory, so a test can check what its app sent: the prompt, the system text, the tools, the model or a header.
+
+```js
+const { requests } = await (
+  await fetch('http://localhost:8001/admin/requests?match=Classify')
+).json();
+expect(requests).toHaveLength(1);
+expect(requests[0].body.system).toContain('You are a triage bot');
+```
+
+Each entry has:
+
+| Field | |
+|---|---|
+| `id` | The same id as the reply's `x-llmock-request-id` header |
+| `time` | When the call came in (ISO 8601) |
+| `method`, `path`, `query` | The route, without the query string, and the query string's values |
+| `headers` | The request headers, names in lower case. `authorization`, `x-api-key`, `api-key`, `x-goog-api-key`, `proxy-authorization` and `cookie` show as `"[redacted]"`, in case a real key is sent to the mock. |
+| `body` | The JSON body as sent (`null` for none) |
+| `valid` | `false` for a call that failed [request validation](#request-validation) and got a `400` |
+| `streamed` | Whether the reply was a stream; `null` when no reply was sent (a failed validation, or a drop or stall with no stream) |
+| `rule` | `{ "id", "match" }` of the [response rule](#response-rules-fixture-replies) that answered or failed the call (`id` is `null` for a config rule), or `null` |
+| `failed` | How LLMock failed the call on purpose, `{ "by": "rule" or "chaos", "kind", "status", "afterChunks" }`, or `null` |
+
+- Filter with `?match=` (text the body must contain, case-sensitive, as a rule's `match`), `?in=last` (look only in the last message, as a rule's `in`) and `?path=/v1/messages`. An unknown or invalid filter gets a `400`.
+- Calls are kept whether or not `logRequests` is on, including calls that fail validation. Unlike the [request log](#request-logging) nothing is written to disk.
+- The last 500 calls are kept; older ones are dropped. `DELETE /admin/requests` or `POST /admin/reset` forgets them, as does a restart.
+- Like the rules, this is shared by every client of one server. Tests running in parallel against one server should filter by a `match` of their own, or each [start their own server](#starting-a-server-from-code-tests).
+
 #### Network exposure
 
-LLMock has no authentication, and by default it listens on every network interface (`"host": "0.0.0.0"`). Anyone who can reach the port can change the replies through the admin API, and can read or clear the [request log](#request-logging), which holds the prompts your app sent. Turning the admin API off does not cover the request log.
+LLMock has no authentication, and by default it listens on every network interface (`"host": "0.0.0.0"`). Anyone who can reach the port can change the replies through the admin API, read the calls it recorded (`GET /admin/requests`), and read or clear the [request log](#request-logging). Both hold the prompts your app sent. Turning the admin API off does not cover the request log.
 
 For a mock server running locally with test data this is not usually a problem. If you want to take extra precautions, you can keep the mock to your own machine:
 
