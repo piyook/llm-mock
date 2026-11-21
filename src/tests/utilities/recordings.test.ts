@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, test } from 'vitest';
 import { startServer, type RunningServer } from '../../index.js';
-import { extractReply } from '../../utilities/recordings.js';
+import { extractReply, upstreamUrl } from '../../utilities/recordings.js';
 
 // A stand-in for the real provider: answers each path with what the test
 // set, and remembers what it was sent
@@ -99,7 +99,7 @@ describe('recording and replaying', () => {
 
 	// A fresh project folder with a config file, for each test
 	const start = async (
-		model: 'claude' | 'chatgpt',
+		model: 'claude' | 'chatgpt' | 'stockgpt' | 'gemini',
 		settings: Record<string, string | number | boolean> = {},
 	) => {
 		dir ??= '';
@@ -113,6 +113,11 @@ describe('recording and replaying', () => {
 					models: {
 						claude: preset('claude', 'v1/messages'),
 						chatgpt: preset('openai', 'v1/chat/completions'),
+						stockgpt: preset('openai', 'chatgpt/chat/completions'),
+						gemini: preset(
+							'gemini',
+							'models/gemini-pro:generateContent',
+						),
 					},
 					server: { port: 8001, host: '127.0.0.1' },
 				}),
@@ -375,6 +380,59 @@ describe('recording and replaying', () => {
 		expect(((await response.json()) as any).error).toContain(
 			'not recording',
 		);
+	});
+
+	test('the stock chatgpt and gemini presets record from the provider paths', async () => {
+		upstream.answers.set('/v1/chat/completions', {
+			body: {
+				choices: [
+					{
+						index: 0,
+						message: { role: 'assistant', content: 'From OpenAI.' },
+						finish_reason: 'stop',
+					},
+				],
+			},
+		});
+		await start('stockgpt');
+		const openai = await post('/chatgpt/chat/completions', {
+			model: 'gpt-4o',
+			messages: [{ role: 'user', content: 'Stock path' }],
+		});
+		expect(JSON.parse(openai.text).choices[0].message.content).toBe(
+			'From OpenAI.',
+		);
+		expect(upstream.calls.map((call) => call.path)).toEqual([
+			'/v1/chat/completions',
+		]);
+		await server!.close();
+
+		upstream.answers.set(
+			'/v1beta/models/gemini-pro:generateContent?key=k',
+			{
+				body: {
+					candidates: [
+						{
+							content: {
+								role: 'model',
+								parts: [{ text: 'From Gemini.' }],
+							},
+							finishReason: 'STOP',
+						},
+					],
+				},
+			},
+		);
+		await start('gemini');
+		const gemini = await post('/models/gemini-pro:generateContent?key=k', {
+			contents: [
+				{ role: 'user', parts: [{ text: 'Stock Gemini path' }] },
+			],
+		});
+		expect(gemini.status).toBe(200);
+		expect(upstream.calls.map((call) => call.path)).toEqual([
+			'/v1beta/models/gemini-pro:generateContent?key=k',
+		]);
 	});
 
 	test('the dashboard is not shown a user name or password in the upstream URL', async () => {
@@ -719,5 +777,59 @@ describe('extractReply', () => {
 		).toEqual({ text: 'gh' });
 		expect(extractReply('custom', {})).toMatch(/not recorded/);
 		expect(extractReply('openai', { nope: true })).toMatch(/no choices/);
+	});
+});
+
+describe('upstreamUrl', () => {
+	test('sends each format to the provider path, keeping the query', () => {
+		const base = 'https://api.example.com';
+		expect(upstreamUrl(base, 'claude', '/anything')).toBe(
+			`${base}/v1/messages`,
+		);
+		expect(upstreamUrl(base, 'openai', '/chatgpt/chat/completions')).toBe(
+			`${base}/v1/chat/completions`,
+		);
+		expect(upstreamUrl(base, 'responses', '/chatgpt/responses')).toBe(
+			`${base}/v1/responses`,
+		);
+		expect(
+			upstreamUrl(
+				base,
+				'gemini',
+				'/models/gemini-pro:generateContent?key=k',
+			),
+		).toBe(`${base}/v1beta/models/gemini-pro:generateContent?key=k`);
+	});
+
+	test('does not repeat a version the upstream already ends with', () => {
+		expect(
+			upstreamUrl(
+				'https://api.openai.com/v1/',
+				'openai',
+				'/x/chat/completions',
+			),
+		).toBe('https://api.openai.com/v1/chat/completions');
+		expect(
+			upstreamUrl(
+				'https://generativelanguage.googleapis.com/v1beta',
+				'gemini',
+				'/v1beta/models/m:generateContent',
+			),
+		).toBe(
+			'https://generativelanguage.googleapis.com/v1beta/models/m:generateContent',
+		);
+	});
+
+	test('keeps a prefix on the upstream, and the call path for other formats', () => {
+		expect(
+			upstreamUrl(
+				'http://proxy:9000/anthropic',
+				'claude',
+				'/v1/messages',
+			),
+		).toBe('http://proxy:9000/anthropic/v1/messages');
+		expect(upstreamUrl('http://proxy', 'custom', '/my/route?a=1')).toBe(
+			'http://proxy/my/route?a=1',
+		);
 	});
 });
