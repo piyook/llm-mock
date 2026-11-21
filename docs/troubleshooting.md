@@ -8,7 +8,7 @@ Confirm the server is running and the port matches `.llmockrc.json`. Open `http:
 
 Run `llmock start --foreground` with the same options to see the server's output. If it reports a server already running on the port, run `llmock stop` (with `--port` if it isn't 8001) first.
 
-The server refuses to start on a malformed `responseRules` entry, or on a `storedResponsesFile` that is missing or not valid; the message names the setting and the file. It also refuses a `chaos` setting that is not valid (see [Chaos mode](/guide/delay-and-chaos#chaos-mode-error-simulation)).
+The server refuses to start on a malformed `responseRules` entry, or on a `storedResponsesFile` that is missing or not valid; the message names the setting and the file. It also refuses a `chaos` setting that is not valid (see [Chaos mode](/guide/chaos)).
 
 **Calls fail with a 500 or another error you didn't expect**
 

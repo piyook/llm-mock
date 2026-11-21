@@ -63,11 +63,11 @@ Behaviour:
 
 - **Request validation** requires only `model`, `max_tokens` and `messages`. Extra fields (`system`, `output_config`, `temperature`, ...) are accepted.
 - **Streaming is per request.** `"stream": true` returns Anthropic SSE events in order: `message_start`, `content_block_start`, `content_block_delta` (text deltas that rejoin to the full text), `content_block_stop`, `message_delta` (`stop_reason: "end_turn"`), `message_stop`. Otherwise a single `message` object is returned. The preset's `stream` setting is ignored.
-- **Stop reasons.** A reply ends with `end_turn` unless its response rule sets a [`stopReason`](/guide/response-rules#truncated-and-refused-replies-stopreason) of `max_tokens` or `refusal`. A refusal also carries `stop_details`.
-- **Tool calls.** A response rule with [`content`](/guide/response-rules#tool-calls-claude-content) replies with `tool_use` blocks and `stop_reason: "tool_use"`, streamed or not, so a manual tool loop can run against the mock. `"in": "last"` lets each step's rule match its own `tool_result`.
-- **Mid-stream failures.** [Chaos mode](/guide/delay-and-chaos#stream-failures) can fail a stream part-way through with an `event: error`, a cut connection or a stall. A response rule with [`fail`](/guide/response-rules#failing-one-prompt-fail) does the same for one prompt.
+- **Stop reasons.** A reply ends with `end_turn` unless its response rule sets a [`stopReason`](/guide/stop-reasons) of `max_tokens` or `refusal`. A refusal also carries `stop_details`.
+- **Tool calls.** A response rule with [`content`](/guide/tool-calls) replies with `tool_use` blocks and `stop_reason: "tool_use"`, streamed or not, so a manual tool loop can run against the mock. `"in": "last"` lets each step's rule match its own `tool_result`.
+- **Mid-stream failures.** [Chaos mode](/guide/chaos#stream-failures) can fail a stream part-way through with an `event: error`, a cut connection or a stall. A response rule with [`fail`](/guide/failing-a-prompt) does the same for one prompt.
 - **Responses** have a unique `msg_` id, echo the requested `model`, and report estimated `usage` (about 4 characters per token).
-- [Response rules](/guide/response-rules#response-rules-fixture-replies) and [stored responses](/guide/configuration#response-types) work here too. Rules match against `system` as well as `messages`.
+- [Response rules](/guide/response-rules) and [stored responses](/guide/response-types) work here too. Rules match against `system` as well as `messages`.
 
 ## Template locations
 

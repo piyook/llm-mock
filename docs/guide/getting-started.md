@@ -123,8 +123,10 @@ npm run llmock:stop
 Pick what you want to do:
 
 - **Return a fixed reply for a given prompt**: [Response rules](/guide/response-rules)
+- **Test an agent's tool loop (Claude)**: [Tool calls](/guide/tool-calls)
 - **Use real replies, offline**: [Recording real replies](/guide/recording)
-- **Test retries and error handling**: [Delays and chaos mode](/guide/delay-and-chaos)
+- **Test retries and error handling**: [Chaos mode](/guide/chaos), or [fail one prompt](/guide/failing-a-prompt)
+- **Test loading states and timeouts**: [Response delays](/guide/delays)
 - **Start a server from your tests and check what your code sent**: [Using LLMock in tests](/guide/testing-from-code)
 - **Change replies while it runs**: [Admin API](/reference/admin-api)
 - **Connect LangChain, embeddings or the Responses API**: [Integration](/guide/integration)

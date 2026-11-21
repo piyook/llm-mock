@@ -76,6 +76,11 @@ The `--foreground` flag keeps the server process attached and forwards all outpu
 
 On Windows the background server starts without opening a console window. Use `llmock stop` to shut it down, or `llmock start --foreground` to keep it visible in your terminal.
 
-## Keeping it to your own machine
+## Network exposure
 
-LLMock has no authentication and by default listens on every network interface. For a local mock server this is not usually a problem, but if you want to take extra precautions you can keep it to your own machine. See [Network exposure](/reference/admin-api#network-exposure).
+LLMock has no authentication, and by default it listens on every network interface (`"host": "0.0.0.0"`). Anyone who can reach the port can change the replies through the [admin API](/reference/admin-api), read the calls it recorded (`GET /admin/requests`), and read or clear the [request log](/guide/dashboard-and-logging#request-logging). Both hold the prompts your app sent. Turning the admin API off does not cover the request log.
+
+For a mock server running locally with test data this is not usually a problem. If you want to take extra precautions, you can keep the mock to your own machine:
+
+- Run directly: set `"host": "127.0.0.1"` in the `server` block, or start with `--host=127.0.0.1`.
+- Run in Docker: leave `"host": "0.0.0.0"` in the config, which the container needs, and publish the port on the loopback address only, as `"127.0.0.1:8001:8001"`. The [Docker example](/guide/docker#standalone-docker-setup-no-scaffolding) does this. Other containers in the same compose file still reach the mock by its service name.

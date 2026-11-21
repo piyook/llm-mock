@@ -12,8 +12,8 @@ your app ──► LLMSpy (127.0.0.1:8080) ──► LLMock (localhost:8001)
 This lets you:
 
 - **see what your app really sends**: the prompts, system messages, tool schemas and parameters your SDK, framework or agent builds, without spending tokens to find out
-- **watch your error handling work**: [chaos mode](/guide/delay-and-chaos#chaos-mode-error-simulation) 429s, broken streams and dropped connections show up in LLMSpy as failed calls, next to your app's retries
-- **check an agent loop turn by turn**: with [tool-call rules](/guide/response-rules#tool-calls-claude-content), each turn of a Claude tool loop is a call in LLMSpy, and its Compare tab shows what your agent added between turns
+- **watch your error handling work**: [chaos mode](/guide/chaos) 429s, broken streams and dropped connections show up in LLMSpy as failed calls, next to your app's retries
+- **check an agent loop turn by turn**: with [tool-call rules](/guide/tool-calls), each turn of a Claude tool loop is a call in LLMSpy, and its Compare tab shows what your agent added between turns
 - **try LLMSpy itself** with realistic traffic before you point it at a paid API
 
 LLMSpy reads conversations in the Anthropic Messages and OpenAI Chat Completions formats, so it suits the `claude`, `chatgpt` and `streaming` presets. Calls to the `gemini` preset or a custom template are still captured, and shown in LLMSpy's Raw view.
@@ -116,16 +116,16 @@ Each of these is a normal LLMock setting. LLMSpy shows the result:
 | To see in LLMSpy | LLMock setting |
 |---|---|
 | A streamed reply, put back together | Send `"stream": true` |
-| A reply cut off at the token limit, or a refusal | A response rule with `stopReason` (see [Truncated and refused replies](/guide/response-rules#truncated-and-refused-replies-stopreason)) |
-| A Claude tool call and its result in the next turn | A response rule with `content` (see [Tool calls](/guide/response-rules#tool-calls-claude-content)) |
+| A reply cut off at the token limit, or a refusal | A response rule with `stopReason` (see [Truncated and refused replies](/guide/stop-reasons)) |
+| A Claude tool call and its result in the next turn | A response rule with `content` (see [Tool calls](/guide/tool-calls)) |
 | A 429 with `retry-after`, under LLMSpy's **Failed** chip | `llmock start --model=claude --chaos=true --chaosFrequency=3 --chaosStatus=429` |
 | A stream that breaks part-way through | `--chaos=true --chaosKind=stream-error` (or `stream-drop`), and send `"stream": true` |
 | Slow calls, in LLMSpy's latency cards | `--delayMin=500 --delayMax=3000` |
-| One failing prompt among working ones | A response rule with `fail` (see [Failing one prompt](/guide/response-rules#failing-one-prompt-fail)) |
+| One failing prompt among working ones | A response rule with `fail` (see [Failing one prompt](/guide/failing-a-prompt)) |
 
 Chaos errors carry the `x-llmock-chaos: true` header, which LLMSpy shows in the Raw view, so a mocked failure is easy to tell from a real one.
 
-To change these while both are running, use LLMock's [admin API](/reference/admin-api#admin-api-changing-rules-and-settings-while-running). There is no need to restart either server.
+To change these while both are running, use LLMock's [admin API](/reference/admin-api). There is no need to restart either server.
 
 ## With Docker
 
@@ -137,4 +137,4 @@ LLMSPY_UPSTREAMS=llmock-claude=http://host.docker.internal:8001,llmock-chatgpt-8
 
 The app's base URLs stay as above. `--llmspy` prints `127.0.0.1` in the upstream, which is right for an LLMSpy running directly on your machine, so change it to `host.docker.internal` here.
 
-This works as it is with Docker Desktop. On Linux, `host.docker.internal` does not reach a port bound only to `127.0.0.1`. LLMock listens on every interface by default, so it can be reached there, unless you have [set `host`](/reference/admin-api#network-exposure) to `127.0.0.1`. If LLMock runs in Docker too, either publish its port and use `host.docker.internal:<port>`, or put both containers on one Docker network and use the LLMock container's name.
+This works as it is with Docker Desktop. On Linux, `host.docker.internal` does not reach a port bound only to `127.0.0.1`. LLMock listens on every interface by default, so it can be reached there, unless you have [set `host`](/guide/installation#network-exposure) to `127.0.0.1`. If LLMock runs in Docker too, either publish its port and use `host.docker.internal:<port>`, or put both containers on one Docker network and use the LLMock container's name.

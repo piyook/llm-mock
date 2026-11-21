@@ -33,7 +33,7 @@
 	"bugs": {
 		"url": "https://github.com/piyook/llm-mock/issues"
 	},
-	"homepage": "https://piyook.github.io/llm-mock/",
+	"homepage": "https://llmock.piyook.com/",
 	"engines": {
 		"node": ">=24.0.0"
 	},

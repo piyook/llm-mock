@@ -5,7 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vitepress dev",
-		"build": "vitepress build",
+		"build": "node scripts/check-anchors.mjs && vitepress build",
+		"check-anchors": "node scripts/check-anchors.mjs",
 		"preview": "vitepress preview"
 	},
 	"devDependencies": {

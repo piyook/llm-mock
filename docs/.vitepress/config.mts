@@ -2,9 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig } from 'vitepress';
 
-// The site is served from https://piyook.github.io/llm-mock/ for now.
-// For a custom domain such as docs.llmock.dev, set DOCS_BASE=/ (or change the default).
-const base = process.env.DOCS_BASE ?? '/llm-mock/';
+// The site is served from https://llmock.piyook.com/ (GitHub Pages with a custom domain).
+// To serve it from https://piyook.github.io/llm-mock/ instead, build with DOCS_BASE=/llm-mock/.
+const base = process.env.DOCS_BASE ?? '/';
 const repo = 'https://github.com/piyook/llm-mock';
 
 // GitHub's heading ids, so the README's #anchors carry over to the pages unchanged.
@@ -22,6 +22,7 @@ export default defineConfig({
 		'A configurable mock LLM API server for testing and development',
 	base,
 	cleanUrls: true,
+	sitemap: { hostname: 'https://llmock.piyook.com' },
 	lastUpdated: true,
 	head: [
 		[
@@ -72,15 +73,31 @@ export default defineConfig({
 				text: 'Control the replies',
 				items: [
 					{ text: 'Response rules', link: '/guide/response-rules' },
+					{ text: 'Tool calls (Claude)', link: '/guide/tool-calls' },
+					{
+						text: 'Truncated and refused replies',
+						link: '/guide/stop-reasons',
+					},
+					{
+						text: 'Generated and stored replies',
+						link: '/guide/response-types',
+					},
 					{
 						text: 'Recording real replies',
 						link: '/guide/recording',
 					},
 					{ text: 'Streaming', link: '/guide/streaming' },
+				],
+			},
+			{
+				text: 'Test failures',
+				items: [
+					{ text: 'Chaos mode', link: '/guide/chaos' },
 					{
-						text: 'Delays and chaos mode',
-						link: '/guide/delay-and-chaos',
+						text: 'Failing one prompt',
+						link: '/guide/failing-a-prompt',
 					},
+					{ text: 'Response delays', link: '/guide/delays' },
 				],
 			},
 			{
@@ -109,6 +126,7 @@ export default defineConfig({
 				text: 'Reference',
 				items: [
 					{ text: 'CLI', link: '/reference/cli' },
+					{ text: 'Config file', link: '/reference/config' },
 					{ text: 'Admin API', link: '/reference/admin-api' },
 				],
 			},

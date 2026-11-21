@@ -38,8 +38,8 @@ features:
   - icon: 💥
     title: Chaos mode
     details: Fail every call or 1 in X with a 429, a 500 or any status, or break a stream part-way through, to test retries and error handling.
-    link: /guide/delay-and-chaos
-    linkText: Delays and chaos
+    link: /guide/chaos
+    linkText: Chaos mode
   - icon: 🧪
     title: Made for tests
     details: Start a server from your test on a free port, then check the exact request your code sent. Change replies at run time through the admin API.

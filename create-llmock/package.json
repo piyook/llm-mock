@@ -26,7 +26,7 @@
   "bugs": {
     "url": "https://github.com/piyook/llm-mock/issues"
   },
-  "homepage": "https://piyook.github.io/llm-mock/",
+  "homepage": "https://llmock.piyook.com/",
   "scripts": {
     "docker:start": "docker compose up -d --force-recreate",
     "docker:stop": "docker compose down --volumes",

@@ -96,7 +96,7 @@ Start it and point your app at `http://localhost:8001`:
 docker compose -f docker/llmock/docker-compose.yml up --build
 ```
 
-Config and fixtures are mounted from your project, so neither needs a rebuild: restart the container after editing the config, while fixture edits apply on the next request. Requests containing a `match` string get the fixture file back (see [Response rules](/guide/response-rules#response-rules-fixture-replies)); everything else gets generated lorem text.
+Config and fixtures are mounted from your project, so neither needs a rebuild: restart the container after editing the config, while fixture edits apply on the next request. Requests containing a `match` string get the fixture file back (see [Response rules](/guide/response-rules)); everything else gets generated lorem text.
 
 If you use `storedResponsesFile`, keep that file in the mounted `fixtures` folder (or mount it separately) so it sits at the same path relative to the config inside the container. The same goes for every file a rule names.
 

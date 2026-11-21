@@ -53,4 +53,4 @@ Each option overrides the matching setting of the selected preset for that run:
 
 An on/off option is on for `true`, `1`, `on` or `yes` (in any case) and off for anything else.
 
-`llmock help` prints the same list. `responseRules` and `storedResponsesFile` can only be set in the config file; to add a rule to a running server, use the [admin API](/reference/admin-api#admin-api-changing-rules-and-settings-while-running).
+`llmock help` prints the same list. `responseRules` and `storedResponsesFile` can only be set in the config file; to add a rule to a running server, use the [admin API](/reference/admin-api).
