@@ -113,20 +113,6 @@ export const countForwarded = (saved: boolean): void => {
 	if (saved) forwardCounts.saved += 1;
 };
 
-// The upstream as it can be shown: a user name or password in the URL is
-// left out
-const shownUpstream = (upstream: string): string => {
-	try {
-		const url = new URL(upstream);
-		if (!url.username && !url.password) return upstream;
-		url.username = '';
-		url.password = '';
-		return url.href.replace(/\/+$/, '');
-	} catch {
-		return upstream;
-	}
-};
-
 /**
  * Whether the server records, only replays or neither, for the dashboard:
  * `record` sends the calls no rule answers to `upstream` and saves the
@@ -141,7 +127,7 @@ export const describeRecording = () => {
 	return {
 		mode: upstream ? 'record' : dir ? 'replay' : 'off',
 		paused: upstream !== undefined && paused,
-		upstream: upstream ? shownUpstream(upstream) : null,
+		upstream: upstream ?? null,
 		dir: dir ? ruleFilePath(dir) : null,
 		...forwardCounts,
 	} as const;
@@ -166,6 +152,15 @@ export const checkRecordingSettings = (): void => {
 		if (url.protocol !== 'http:' && url.protocol !== 'https:') {
 			throw new Error(
 				`recordings.upstream must be an http or https URL, not "${upstream}"`,
+			);
+		}
+
+		// fetch() refuses such a URL, so nothing could be recorded, and the
+		// login would be shown wherever the upstream is (startup, errors,
+		// dashboard). The message leaves the URL out for the same reason.
+		if (url.username || url.password) {
+			throw new Error(
+				'recordings.upstream must not hold a user name or password: give a proxy its login in a header your client sends',
 			);
 		}
 	}
