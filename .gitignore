@@ -76,6 +76,8 @@ jspm_packages/
 # Gatsby files
 .cache/
 public
+# ...but the docs site's static files (logo, images) must be committed
+!docs/public/
 
 # Storybook build outputs
 .out
