@@ -139,6 +139,7 @@
 	$: recordedRuleCount =
 		meta?.responseRules?.filter((rule) => rule.source === 'recorded').length ?? 0;
 	$: recordingMode = meta?.recording?.mode ?? 'off';
+	$: recordingPaused = recordingMode === 'record' && meta?.recording?.paused === true;
 
 	// Requests are only logged with both settings on
 	$: loggingOn =
@@ -180,10 +181,10 @@
 					: [
 							{
 								name: 'Recording',
-								on: true,
+								on: !recordingPaused,
 								detail:
 									recordingMode === 'record'
-										? upstreamHost(meta.recording?.upstream ?? null)
+										? `${recordingPaused ? 'paused, ' : ''}${upstreamHost(meta.recording?.upstream ?? null)}`
 										: 'replay only',
 							},
 						]),
@@ -266,7 +267,7 @@
 	// now are. Resolves to whether the change was made.
 	async function change(
 		card: string,
-		route: 'settings' | 'chaos' | 'delay',
+		route: 'settings' | 'chaos' | 'delay' | 'recording',
 		setting: object,
 	): Promise<boolean> {
 		try {
@@ -934,7 +935,19 @@
 						<div class="grid">
 							<div class="kv">
 								<span class="muted">Recording</span>
-								<span class="badge" cy-data="recording_status">{recordingLabels[recordingMode]}</span>
+								<span class="kvValue">
+									<span class="badge" cy-data="recording_status">
+										{recordingPaused ? 'PAUSED' : recordingLabels[recordingMode]}
+									</span>
+									{#if canChange && recordingMode === 'record'}
+										<Toggle
+											name="switch_recording"
+											label="Recording"
+											on={!recordingPaused}
+											on:click={() => change('recording', 'recording', { paused: !recordingPaused })}
+										/>
+									{/if}
+								</span>
 							</div>
 							{#if meta?.recording?.upstream}
 								<div class="kv kvWide">
@@ -969,8 +982,14 @@
 								</div>
 							{/if}
 						</div>
+						{#if changeError?.card === 'recording'}
+							<p class="viewerError cardNote" cy-data="change_error">{changeError.message}</p>
+						{/if}
 						<p class="muted cardNote" cy-data="recording_note">
-							{#if recordingMode === 'record'}
+							{#if recordingPaused}
+								Recording is paused: calls no rule answers get a mock reply and nothing is sent
+								on. The recorded rules still answer. Switch it back on, or reset, to record again.
+							{:else if recordingMode === 'record'}
 								Calls no rule answers are sent on to the upstream, and its replies are saved as
 								response rules in <code>rules.json</code> in the recordings folder. They are matched
 								after the config file's rules, so the same call is answered from the recording next

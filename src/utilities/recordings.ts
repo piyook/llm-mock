@@ -61,6 +61,45 @@ export const recordingsDir = (): string | undefined => {
 // their replies were saved
 const forwardCounts = { forwarded: 0, saved: 0 };
 
+// While paused, a call no rule answers gets a mock reply and nothing is sent
+// on; the recorded rules still answer. Set through the admin API, and undone
+// by a reset or a restart.
+let paused = false;
+
+/** Whether calls no rule answers are sent on to the upstream right now */
+export const isRecording = (): boolean =>
+	recordUpstream() !== undefined && !paused;
+
+/**
+ * Pauses or resumes recording, from a `{ paused: boolean }` change, throwing
+ * an Error that says why it can't be made
+ */
+export const changeRecording = (change: unknown): void => {
+	if (
+		typeof change !== 'object' ||
+		change === null ||
+		Array.isArray(change) ||
+		Object.keys(change).some((key) => key !== 'paused') ||
+		typeof (change as { paused?: unknown }).paused !== 'boolean'
+	) {
+		throw new Error('recording takes { "paused": true | false }');
+	}
+
+	const { paused: pause } = change as { paused: boolean };
+	if (pause && recordUpstream() === undefined) {
+		throw new Error(
+			'Nothing to pause: this server is not recording (no recordings.upstream)',
+		);
+	}
+
+	paused = pause;
+};
+
+/** Back to recording, if the server records: for a reset or a new server */
+export const resumeRecording = (): void => {
+	paused = false;
+};
+
 /** Counts one call sent on to the upstream */
 export const countForwarded = (saved: boolean): void => {
 	forwardCounts.forwarded += 1;
@@ -85,7 +124,8 @@ const shownUpstream = (upstream: string): string => {
  * Whether the server records, only replays or neither, for the dashboard:
  * `record` sends the calls no rule answers to `upstream` and saves the
  * replies in `dir`, `replay` answers from `dir` only. `dir` is relative to
- * the config folder when it is inside it.
+ * the config folder when it is inside it. `paused` is true while recording
+ * is paused through the admin API: nothing is sent on until it is resumed.
  */
 export const describeRecording = () => {
 	const upstream = recordUpstream();
@@ -93,6 +133,7 @@ export const describeRecording = () => {
 
 	return {
 		mode: upstream ? 'record' : dir ? 'replay' : 'off',
+		paused: upstream !== undefined && paused,
 		upstream: upstream ? shownUpstream(upstream) : null,
 		dir: dir ? ruleFilePath(dir) : null,
 		...forwardCounts,

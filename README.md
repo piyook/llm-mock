@@ -593,7 +593,8 @@ While recording, give your client a real API key: the call is sent on with its h
 - An error status from the provider, or a reply LLMock can not read, is sent back as it came and not saved (the server prints why). OpenAI tool calls are not recorded. A provider that can not be reached gives a `502`.
 - Rules from the config file and the [admin API](#admin-api-changing-rules-and-settings-while-running) still win, and [chaos](#chaos-mode-error-simulation) still fails calls before anything is sent on.
 - [`GET /admin/requests`](#checking-what-your-app-sent) shows which calls were sent on, as `forwarded: { "status", "saved" }`. So does the request log (as `request_validation.forwarded`), and the dashboard's log viewer marks those calls.
-- On the dashboard, the **Recording** card (Settings page) shows whether the server is recording, replaying or neither, the upstream, the recordings folder, and how many calls were sent on and saved since it started. Recorded rules are listed last on the Response rules page, marked `recorded`.
+- To stop sending calls on for a while without a restart, pause recording: `PATCH /admin/recording` with `{ "paused": true }`, or the switch on the dashboard. While paused, a call no rule answers gets a normal mock reply and nothing is sent or saved; the recorded rules still answer. `{ "paused": false }`, `POST /admin/reset` or a restart resumes it.
+- On the dashboard, the **Recording** card (Settings page) shows whether the server is recording, paused, replaying or neither, the upstream, the recordings folder, and how many calls were sent on and saved since it started. Recorded rules are listed last on the Response rules page, marked `recorded`.
 - The recordings hold your real prompts and the provider's replies. Look at them before you commit them to a shared repository.
 
 ### Streaming responses
@@ -777,7 +778,9 @@ await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
 | `GET /admin/requests` | The calls your app made, oldest first (see [Checking what your app sent](#checking-what-your-app-sent)) |
 | `GET /admin/requests/<id>` | One recorded call, by its `x-llmock-request-id` |
 | `DELETE /admin/requests` | Forgets the recorded calls |
-| `POST /admin/reset` | Goes back to how the server started: no rules added this way, no recorded calls, the config file's chaos, delay and reply settings, and the chaos call count at 0 |
+| `GET /admin/recording` | Shows whether the server is [recording](#recording-real-replies), and whether that is paused |
+| `PATCH /admin/recording` | Pauses or resumes recording: `{ "paused": true }` or `{ "paused": false }` |
+| `POST /admin/reset` | Goes back to how the server started: no rules added this way, no recorded calls, the config file's chaos, delay and reply settings, recording not paused, and the chaos call count at 0 |
 
 - A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional `in`, [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text`, `content` ([tool calls](#tool-calls-claude-content), `claude` only) or `fail`.
 - The reply is given as `text` or `content`, never as `file`, `files` or `contentFile`. The server has no login, so a path sent over HTTP would let anyone who can reach it read files from your machine.

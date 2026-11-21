@@ -31,6 +31,7 @@ import {
 	checkRecordingSettings,
 	recordUpstream,
 	recordingsDir,
+	resumeRecording,
 } from './utilities/recordings.js';
 import {
 	clearRecordedRequests,
@@ -147,6 +148,7 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 	clearRuntimeRules();
 	clearRecordedRequests();
 	resetChaos();
+	resumeRecording();
 
 	// Each request gets an id, sent back as x-llmock-request-id and written to
 	// the request log, so a call seen in a client or a proxy such as LLMSpy can

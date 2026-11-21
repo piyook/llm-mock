@@ -154,7 +154,9 @@ The way to set up a reply or a failure from inside a test, with no fixture file,
 | `GET /admin/requests` | none; query `match`, `in`, `path` (all optional) | `200 {"requests": [...]}`: the recorded calls, oldest first, that pass the filter; `400 {"error"}` for an unknown or invalid filter. See Recorded requests. |
 | `GET /admin/requests/<id>` | none | `200 {"request": {...}}`; `404 {"error"}` for an id not recorded |
 | `DELETE /admin/requests` | none | `200 {"requests": []}` |
-| `POST /admin/reset` | none | `200 {"rules", "chaos", "stats", "delay", "settings"}`: recorded requests forgotten, runtime rules removed, chaos, delay and reply settings back to their startup values (config file plus CLI flags), chaos counts back to 0 |
+| `GET /admin/recording` | none | `200 {"recording": {"mode", "paused", "upstream", "dir", "forwarded", "saved"}}` (the `/ui-meta` `recording` shape; see Recording) |
+| `PATCH /admin/recording` | `{"paused": true \| false}` (only that key) | `200` in the `GET /admin/recording` shape; `400 {"error"}` for any other body, or for `paused: true` with no upstream (mode `replay`/`off`) |
+| `POST /admin/reset` | none | `200 {"rules", "chaos", "stats", "delay", "settings", "recording"}`: recorded requests forgotten, runtime rules removed, chaos, delay and reply settings back to their startup values (config file plus CLI flags), recording not paused, chaos counts back to 0 |
 
 - `match`, `in`, `content`, `stopReason` and `fail` mean exactly what they mean in `responseRules` (see Fixture replies and Tool calls). A rule needs `text`, `content` (claude presets only, else `400`) or `fail`; with `fail` too, the reply is what a `stream-*` failure sends before it fails.
 - `file`, `files` and `contentFile` are refused with `400`: the reply must be `text` or `content`. Any other key is refused too.
@@ -373,7 +375,8 @@ Record real replies once, replay them offline after.
 - Not saved, sent back as the provider sent it (status, content-type, body), with a `RECORDING: not saved (<why>)` warning: non-2xx, not JSON, a format with nothing to read (custom templates), openai `tool_calls`, Responses `function_call` items, or a call whose last message has no text. Upstream unreachable → `502 {"error":{"type":"llmock_upstream","message"}}`.
 - Match key: the last message's strings joined by `\n` (`input` itself for a string Responses `input`), as `in: "last"` sees them. Substring semantics apply: a recording of `Hi` also answers a later `Hi there`.
 - `<dir>/rules.json` is read on every request and matched after the config's `responseRules`; with `recordings.dir` set and no `upstream` the server only replays. Invalid JSON or an invalid rule in it → server refuses to start (`500` if it turns invalid while running). A missing fixture → startup warning. An `upstream` that is not an http(s) URL → refuses to start.
-- `GET /admin/rules` / `GET /ui-meta` list recorded rules after the config ones with `source: "recorded"` and `id: null`; `/ui-rule-file?rule=<i>` counts config rules then recorded ones. Recorded requests have `forwarded: {"status", "saved"}` for a call that was sent on (`null` otherwise); with logging on, that call's request log entry gets the same as `request_validation.forwarded`. `GET /ui-meta` has `recording: {"mode": "record"|"replay"|"off", "upstream", "dir", "forwarded", "saved"}` (counts since start; a user name or password in the upstream URL is not shown).
+- `GET /admin/rules` / `GET /ui-meta` list recorded rules after the config ones with `source: "recorded"` and `id: null`; `/ui-rule-file?rule=<i>` counts config rules then recorded ones. Recorded requests have `forwarded: {"status", "saved"}` for a call that was sent on (`null` otherwise); with logging on, that call's request log entry gets the same as `request_validation.forwarded`. `GET /ui-meta` has `recording: {"mode": "record"|"replay"|"off", "paused", "upstream", "dir", "forwarded", "saved"}` (counts since start; a user name or password in the upstream URL is not shown).
+- Pause: `PATCH /admin/recording {"paused": true}` (or the dashboard switch, admin API on). While paused, `mode` stays `record` with `paused: true`; a call no rule matches gets the normal generated reply (nothing sent on, nothing saved, no `forwarded`); recorded rules still answer. Resumed by `{"paused": false}`, `POST /admin/reset`, a restart or a new `startServer`.
 - Headers are never written to disk. The fixtures hold real prompts and replies.
 
 ## Custom formats (templates)
@@ -395,7 +398,7 @@ To change a response envelope or the required request keys, or to mock a provide
 | `GET /ui-rule-file?rule=<i>&file=<j>` | Contents of one response rule file, as JSON |
 | `GET /ui-request-log` | `{"file", "log"}`: `log` is an array of the most recent validated requests (the last `maxLoggedRequests`, 10 by default), newest first, each with why it passed/failed and its `request_validation.request_id` (older ones are dropped; `log` is `null` if none logged) |
 | `DELETE /ui-request-log` | Empties the request log; returns `{"file", "log": null}` |
-| `/admin/rules`, `/admin/chaos`, `/admin/delay`, `/admin/settings`, `/admin/reset` | Change response rules, chaos, delay and reply settings while running (see Admin API) |
+| `/admin/rules`, `/admin/chaos`, `/admin/delay`, `/admin/settings`, `/admin/recording`, `/admin/reset` | Change response rules, chaos, delay and reply settings, and pause recording, while running (see Admin API) |
 | `/admin/requests` | The calls received, for asserting what the app sent (see Recorded requests) |
 | `GET /` | HTML dashboard |
 | `GET /<endpoint>` | A generated reply with no validation and no rules (quick smoke test) |
