@@ -1,0 +1,21 @@
+{
+	"name": "llmock-docs",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vitepress dev",
+		"build": "node scripts/check-anchors.mjs && vitepress build",
+		"check-anchors": "node scripts/check-anchors.mjs",
+		"preview": "vitepress preview"
+	},
+	"devDependencies": {
+		"vitepress": "1.6.4"
+	},
+	"overrides": {
+		"vite": "^7.3.8"
+	},
+	"allowScripts": {
+		"esbuild": true
+	}
+}

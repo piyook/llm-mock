@@ -1,6 +1,10 @@
 # Dependencies
 node_modules/
 ui/node_modules/
+docs/node_modules/
+
+# VitePress cache (its build goes to docs/.vitepress/dist, covered by dist/ below)
+docs/.vitepress/cache/
 
 # Build artifacts and outputs
 *.tgz
