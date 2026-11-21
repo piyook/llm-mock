@@ -650,6 +650,61 @@ describe('recording and replaying', () => {
 		});
 		expect(JSON.parse(reply.text)).toEqual(body);
 		expect(existsSync(join(dir, 'recordings', 'rules.json'))).toBe(false);
+
+		// A client that asked for a stream can't read that reply: a 502 says why
+		const streamed = await post('/v1/chat/completions', {
+			model: 'gpt-4o',
+			stream: true,
+			messages: [{ role: 'user', content: 'Call a tool' }],
+		});
+		expect(streamed.status).toBe(502);
+		expect(JSON.parse(streamed.text).error).toMatchObject({
+			type: 'llmock_upstream',
+			message: expect.stringContaining(
+				'OpenAI tool calls are not recorded',
+			),
+		});
+
+		// An error status still reaches a streaming client as it came
+		upstream.answers.set('/v1/chat/completions', {
+			status: 429,
+			body: { error: { message: 'slow down' } },
+		});
+		const limited = await post('/v1/chat/completions', {
+			model: 'gpt-4o',
+			stream: true,
+			messages: [{ role: 'user', content: 'Call a tool' }],
+		});
+		expect(limited.status).toBe(429);
+		expect(JSON.parse(limited.text)).toEqual({
+			error: { message: 'slow down' },
+		});
+	});
+
+	test('Gemini function calls are passed through and not saved', async () => {
+		const body = {
+			candidates: [
+				{
+					content: {
+						role: 'model',
+						parts: [
+							{ functionCall: { name: 'get_weather', args: {} } },
+						],
+					},
+					finishReason: 'STOP',
+				},
+			],
+		};
+		upstream.answers.set('/v1beta/models/gemini-pro:generateContent', {
+			body,
+		});
+		await start('gemini');
+
+		const reply = await post('/models/gemini-pro:generateContent', {
+			contents: [{ role: 'user', parts: [{ text: 'Call a tool' }] }],
+		});
+		expect(JSON.parse(reply.text)).toEqual(body);
+		expect(existsSync(join(dir, 'recordings', 'rules.json'))).toBe(false);
 	});
 
 	test('the Responses API route records too', async () => {

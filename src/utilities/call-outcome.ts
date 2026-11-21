@@ -129,11 +129,24 @@ export const isPassthrough = (
 	reply: MockReply | Passthrough,
 ): reply is Passthrough => 'status' in reply && 'body' in reply;
 
-// Sends an upstream's answer back as it came
+/**
+ * Sends an upstream's answer back as it came. A client that asked for a
+ * stream can't read a whole JSON reply, so a successful one that couldn't be
+ * recorded (and so can't be streamed in llmock's format) becomes a 502 saying
+ * why; an error status is sent as it came, as SDKs read those either way.
+ */
 export const sendPassthrough = (
 	reply: FastifyReply,
-	{ status, contentType, body }: Passthrough,
+	{ status, contentType, body, reason }: Passthrough,
+	streaming: boolean,
 ) => {
+	if (streaming && status >= 200 && status < 300) {
+		const message = `llmock could not record the provider's reply (${reason ?? 'not readable'}), so it can't stream it. Call without stream to get the reply as the provider sent it.`;
+		return reply.status(502).send({
+			error: { type: 'llmock_upstream', message },
+		});
+	}
+
 	reply.status(status);
 	if (contentType) reply.type(contentType);
 	return reply.send(body);

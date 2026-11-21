@@ -49,7 +49,7 @@ const handleRequest = async (
 	const mockReply = await getReply(request, matched, record, 'responses');
 	if (isPassthrough(mockReply)) {
 		record.streamed = false;
-		return sendPassthrough(reply, mockReply);
+		return sendPassthrough(reply, mockReply, streaming);
 	}
 
 	if (!streaming) return reply.send(buildResponsesResponse(mockReply, body));
