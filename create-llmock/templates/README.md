@@ -69,6 +69,6 @@ One preset runs at a time; the chat endpoint is the one for the preset you start
 
 `node_modules/llmock/llms.txt` is a compact reference to the CLI, config schema, response shapes and limits, written for coding agents.
 
-## Development
+## Documentation
 
-For more information about LLMock, visit the main repository: https://github.com/piyook/llm-mock
+The LLMock docs are at https://llmock.piyook.com/: response rules, chaos mode, the admin API, using LLMock in tests, and the full CLI and config reference. The source is at https://github.com/piyook/llm-mock.
