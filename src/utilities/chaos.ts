@@ -164,14 +164,37 @@ export const streamedCount = (
 ): number => Math.max(0, Math.min(available, failure.afterChunks));
 
 /**
+ * The `error` event of an OpenAI Responses API stream, as the API sends it
+ * when a response fails part-way through
+ */
+export function responsesErrorEvent(
+	status: number,
+	sequenceNumber: number,
+): string {
+	const { error } = buildChaosError('openai', status) as {
+		error: { message: string; type: string; code: string | null };
+	};
+
+	return `event: error\ndata: ${JSON.stringify({
+		type: 'error',
+		code: error.code ?? error.type,
+		message: error.message,
+		param: null,
+		sequence_number: sequenceNumber,
+	})}`;
+}
+
+/**
  * Fails a stream that has already sent its opening events and deltas.
  * `format` is the stream's wire format: 'claude' for Anthropic SSE events,
- * anything else for the OpenAI-style stream.
+ * 'responses' for OpenAI Responses API events (`sequenceNumber` is the next
+ * event's), anything else for the OpenAI-style chat stream.
  */
 export function failStream(
 	reply: FastifyReply,
 	failure: StreamFailure,
 	format: string,
+	sequenceNumber = 0,
 ): void {
 	const { raw } = reply;
 	if (raw.destroyed) return;
@@ -192,6 +215,12 @@ export function failStream(
 
 	// stream-error: the provider's in-stream error, then the end of the
 	// response with none of the closing events (no [DONE] either)
+	if (format === 'responses') {
+		raw.write(`${responsesErrorEvent(failure.status, sequenceNumber)}\n\n`);
+		raw.end();
+		return;
+	}
+
 	const error = JSON.stringify(
 		buildChaosError(
 			format === 'claude' ? 'claude' : 'openai',

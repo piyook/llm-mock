@@ -15,7 +15,15 @@ type LogData = {
 	information: string;
 };
 
-export const validateRequest = async (request: any) => {
+/**
+ * Checks a request has the top-level keys of its request template, and logs
+ * it. `templateName` picks the template (`<name>_req.json`), by default the
+ * preset's own.
+ */
+export const validateRequest = async (
+	request: any,
+	templateName: string = process.env.LLM_NAME ?? 'openai',
+) => {
 	// Every entry for this request carries the id sent back with its reply
 	const requestId: string | undefined =
 		typeof request?.id === 'string' ? request.id : undefined;
@@ -38,8 +46,7 @@ export const validateRequest = async (request: any) => {
 	}
 
 	let requestTemplate: { default: JSON[] } | undefined;
-	const llmName = process.env.LLM_NAME ?? 'openai';
-	const templateFileName = `${llmName}_req.json`;
+	const templateFileName = `${templateName}_req.json`;
 
 	// Try the project's templates first (next to the config file). The server
 	// runs from the package folder, so process.cwd() is not the project.

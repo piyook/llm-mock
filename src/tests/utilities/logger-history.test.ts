@@ -16,6 +16,7 @@ const {
 	default: logger,
 	logPath,
 	clearLog,
+	noteForwarded,
 	maxLogEntries,
 	defaultLogEntries,
 	logEntriesLimit,
@@ -126,6 +127,31 @@ describe('request log history', () => {
 		clearLog();
 
 		expect(() => readLog()).toThrow();
+	});
+
+	test('noteForwarded adds the upstream result to the entry with that request id', () => {
+		logger({ id: 1 } as any, 'PASSED', '', '', 'req-1');
+		logger({ id: 2 } as any, 'PASSED', '', '', 'req-2');
+
+		noteForwarded('req-1', { status: 200, saved: true });
+
+		const [second, first] = readLog();
+		expect(first.request_validation.forwarded).toEqual({
+			status: 200,
+			saved: true,
+		});
+		expect(second.request_validation).not.toHaveProperty('forwarded');
+	});
+
+	test('noteForwarded leaves the log alone for an id it does not hold, or with logging off', () => {
+		logger({ id: 1 } as any, 'PASSED', '', '', 'req-1');
+		const before = readFileSync(logPath, 'utf8');
+
+		noteForwarded('req-9', { status: 502, saved: false });
+		process.env.LOG_REQUESTS = 'OFF';
+		noteForwarded('req-1', { status: 502, saved: false });
+
+		expect(readFileSync(logPath, 'utf8')).toBe(before);
 	});
 
 	test('writes nothing when logging is off', () => {

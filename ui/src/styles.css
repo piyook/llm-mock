@@ -788,6 +788,17 @@ select.editBox {
 	gap: 10px;
 }
 
+/* A line about the block below it, e.g. a call sent to the recording upstream */
+.viewerLabel {
+	margin: 0;
+	padding: 6px 12px;
+	border-radius: 12px;
+	background: var(--accent-soft);
+	color: var(--accent);
+	font-weight: 650;
+	overflow-wrap: anywhere;
+}
+
 .viewerTexts.scrollList {
 	max-height: 60vh;
 }

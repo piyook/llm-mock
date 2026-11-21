@@ -2,7 +2,11 @@
 import type { FastifyInstance } from 'fastify';
 import { generateMockEmbeddings } from '../../utilities/response-helpers.js';
 import { applyResponseDelay } from '../../utilities/response-helpers.js';
-import { applyChaos } from '../../utilities/chaos.js';
+import { applyChaos, getChaosConfig } from '../../utilities/chaos.js';
+import {
+	recordRequest,
+	type RecordedRequest,
+} from '../../utilities/request-recorder.js';
 
 // Import the default dimensions constant
 const DEFAULT_EMBEDDING_DIMENSIONS =
@@ -54,13 +58,25 @@ const validateEmbeddingsRequest = async (request: any) => {
  * @param reply - Fastify reply object
  * @returns Promise<void>
  */
-const handleEmbeddingsRequest = async (request: any, reply: any) => {
+const handleEmbeddingsRequest = async (
+	request: any,
+	reply: any,
+	record: RecordedRequest,
+) => {
 	// Apply configured response delay for realistic API simulation
 	await applyResponseDelay();
 
 	// Chaos mode: this call may get an error in place of a reply. The
 	// embeddings endpoint is OpenAI-shaped whichever preset is active.
-	if (applyChaos(reply, 'openai')) return reply;
+	if (applyChaos(reply, 'openai')) {
+		const { kind, status, afterChunks } = getChaosConfig();
+		record.failed = { by: 'chaos', kind, status, afterChunks };
+		record.streamed =
+			kind === 'stream-drop' || kind === 'stream-stall' ? null : false;
+		return reply;
+	}
+
+	record.streamed = false;
 
 	// Extract and parse request parameters
 	// For GET requests, use query params; for POST requests, use body
@@ -101,7 +117,11 @@ function handler(app: FastifyInstance, _pathName: string) {
 
 	// GET route - handles embeddings requests via HTTP GET
 	app.get(`/${embeddingsPath}`, async (request, reply) => {
-		return await handleEmbeddingsRequest(request, reply);
+		return await handleEmbeddingsRequest(
+			request,
+			reply,
+			recordRequest(request),
+		);
 	});
 
 	// POST route - handles embeddings requests via HTTP POST
@@ -109,8 +129,14 @@ function handler(app: FastifyInstance, _pathName: string) {
 	app.post(`/${embeddingsPath}`, async (request, reply) => {
 		// Validate incoming request against embeddings template to ensure API compatibility
 		if (await validateEmbeddingsRequest(request)) {
-			return await handleEmbeddingsRequest(request, reply);
+			return await handleEmbeddingsRequest(
+				request,
+				reply,
+				recordRequest(request),
+			);
 		}
+
+		recordRequest(request, false);
 
 		// Return detailed error message for invalid requests
 		console.log(

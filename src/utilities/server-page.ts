@@ -3,18 +3,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../models/db.js';
-import {
-	getResponseRules,
-	getStoredResponsesFile,
-} from '../config/config-loader.js';
+import { getStoredResponsesFile } from '../config/config-loader.js';
 import { clearLog, logPath, maxLogEntries } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { readRuleFile, ruleFiles } from './response-rules.js';
-import { describeActiveRules } from './runtime-rules.js';
+import { describeActiveRules, getFileRules } from './runtime-rules.js';
 import { getDelay } from './runtime-settings.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
 import { adminApiEnabled } from './admin-api.js';
 import { currentLlmspyRoute } from './llmspy.js';
+import { responsesPaths } from './build-responses-response.js';
+import { describeRecording } from './recordings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -223,6 +222,9 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 		// Read per request: startServer sets it after this module has loaded
 		apiLinksSet.add(`/${process.env?.LLM_URL_ENDPOINT ?? ''}`);
 
+		// The Responses API, served beside the chat route by openai presets
+		for (const route of responsesPaths()) apiLinksSet.add(`/${route}`);
+
 		// Add embeddings endpoint link if enabled
 		if (embeddingsEnabled) {
 			apiLinksSet.add('/v1/embeddings');
@@ -269,6 +271,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			uiTheme: getUiTheme(),
 			// How to put this server behind LLMSpy, null when llmspy is off
 			llmspy: currentLlmspyRoute(),
+			// Recording real replies, or replaying them
+			recording: describeRecording(),
 			apiLinks,
 		});
 	});
@@ -291,7 +295,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	// as rules are added and removed through the admin API.
 	app.get('/ui-rule-file', async (request, reply) => {
 		const query = request.query as { rule?: string; file?: string };
-		const { rules, baseDir } = getResponseRules();
+		// The config file's rules, then the recorded ones
+		const { rules, baseDir } = getFileRules();
 		const rule = rules[Number(query.rule ?? 0)];
 		const file = rule && ruleFiles(rule)[Number(query.file ?? 0)];
 

@@ -27,11 +27,13 @@ A lightweight local server that simulates LLM APIs for development and testing. 
     - [Truncated and refused replies](#truncated-and-refused-replies-stopreason)
     - [Failing one prompt](#failing-one-prompt-fail)
     - [Tool calls (Claude)](#tool-calls-claude-content)
+  - [Recording real replies](#recording-real-replies)
   - [Streaming responses](#streaming-responses)
   - [Response delay simulation](#response-delay-simulation)
   - [Chaos mode (error simulation)](#chaos-mode-error-simulation)
     - [Stream failures](#stream-failures)
   - [Admin API](#admin-api-changing-rules-and-settings-while-running)
+    - [Checking what your app sent](#checking-what-your-app-sent)
     - [Network exposure](#network-exposure)
   - [Custom API paths](#custom-api-paths)
   - [Environment variables](#environment-variables)
@@ -43,6 +45,7 @@ A lightweight local server that simulates LLM APIs for development and testing. 
   - [Debug mode](#debug-mode)
 - [Integration Guide](#integration-guide)
   - [Chat completions](#chat-completions)
+  - [Responses API (OpenAI)](#responses-api-openai)
   - [Embeddings API](#embeddings-api)
   - [Using with LangChain](#using-with-langchain)
 - [Using with LLMSpy](#using-with-llmspy)
@@ -73,7 +76,9 @@ A lightweight local server that simulates LLM APIs for development and testing. 
 - **Intermittent errors** — chaos mode fails every call or 1 in X calls with a 429, 500 or any other error status, to test retries and error handling
 - **OpenAI-compatible** — works with ChatGPT, Grok, Llama, DeepSeek, Gemini, and any OpenAI-style API
 - **Anthropic Messages API** — built-in `claude` preset with the SDK's streaming event format
+- **OpenAI Responses API** — `/v1/responses` beside chat completions, streamed or not, for `client.responses.create()`
 - **Fixture replies** — return canned text or JSON for requests that contain a chosen string
+- **Record and replay** — send unknown calls to the real provider once, save the replies as fixtures, replay them offline after
 - **Your own reply pools** — pick at random from a set of your own texts, per rule or as the default reply
 - **Works with [LLMSpy](https://github.com/piyook/llmspy)** — put LLMSpy in front of LLMock to see every mocked call as a conversation, with no API key (see [Using with LLMSpy](#using-with-llmspy))
 
@@ -196,6 +201,8 @@ Each option overrides the matching setting of the selected preset for that run:
 | `--chaosAfterChunks` | `chaos.afterChunks` | Whole number, `0` or more |
 | `--embeddings` | `embeddings.enabled` | `true` or `false` |
 | `--embeddingDimensions` | `embeddings.dimensions` | Number |
+| `--record` | `recordings.upstream` | The provider's URL, e.g. `https://api.anthropic.com` (empty: replay only). See [Recording real replies](#recording-real-replies) |
+| `--recordings` | `recordings.dir` | Folder, relative to the config file (default `recordings`) |
 | `--foreground` | | No value; keeps the server attached (see below) |
 
 An on/off option is on for `true`, `1`, `on` or `yes` (in any case) and off for anything else.
@@ -238,7 +245,16 @@ In Vitest, start it in `beforeAll` and close it in `afterAll`. Options, all opti
 | `host` | `127.0.0.1` | Address to listen on. Not taken from the config, so a test server stays off the network unless you ask. |
 | `settings` | | Any [CLI option](#cli-options) by name, e.g. `{ stream: true, delayMin: 0, chaos: true }` |
 
-It returns `{ port, host, url, close() }`; `close()` stops the server and puts back the environment variables it set.
+It returns `{ port, host, url, requests(), lastRequest(), clearRequests(), close() }`; `close()` stops the server and puts back the environment variables it set.
+
+`requests(filter?)` gives the calls the server received, oldest first, as [`GET /admin/requests`](#checking-what-your-app-sent) does (it also works with the admin API off). `lastRequest(filter?)` gives the most recent one. The filter is `{ match?, in?, path? }`:
+
+```ts
+await myApp.classify('Printer on fire');
+const call = server.lastRequest({ match: 'Printer on fire' });
+expect(call?.body).toMatchObject({ model: 'claude-opus-5-5', max_tokens: 1024 });
+expect(call?.headers['anthropic-version']).toBe('2023-06-01');
+```
 
 - One server per process at a time: settings live in environment variables and module state, so a second `startServer` before `close()` throws. Vitest runs each test file in its own process by default, so files can each run their own server in parallel. A server started after an earlier one is closed starts clean (no runtime rules, chaos count at 0).
 - LLMock ships TypeScript source, so import it from a runner that loads TypeScript (Vitest, tsx). Plain `node` will not load it from `node_modules`; use the CLI with `--port=0` there.
@@ -312,6 +328,7 @@ The config file is read once at startup, so restart the server after changing it
 | `endpoint` | **Required.** API endpoint path (not `v1/embeddings` while embeddings are enabled) |
 | `responseType` | `"lorem"` (random text) or `"stored"` (predefined responses) |
 | `storedResponsesFile` | Optional JSON file of your own texts for `"stored"` (see [Response types](#response-types)) |
+| `recordings` | Optional `{ "dir", "upstream" }`: replay recorded replies from `dir`, and with `upstream` record new ones (see [Recording real replies](#recording-real-replies)) |
 | `maxLoremParas` | Max sentences in lorem ipsum responses |
 | `validateRequests` | Validate incoming requests against templates |
 | `logRequests` | Save the most recent requests to the log file |
@@ -417,7 +434,8 @@ With a request whose message contains `Classify this support ticket`, the server
 - `match` is a case-sensitive substring, tested against every string value in the request body (message text, system prompt, content blocks), not against JSON keys.
 - Rules are checked in order and the first match wins. `match` and `file` must be non-empty strings.
 - GET requests have no body, so rules never apply to them.
-- Matching covers the whole request, including earlier turns of a conversation (and, for Claude, the `tools` list). A rule that matched an early message keeps matching on every later turn, so use distinctive markers and put more specific rules first. To match only the newest message, give the rule `"in": "last"`: its `match` is then looked for in the content of the last entry of `messages` only (including any `tool_result` content; for Gemini, the parts of the last entry of `contents`), not in earlier turns, the system prompt or the tools. `"in": "any"` is the default.
+- Matching covers the whole request, including earlier turns of a conversation (and, for Claude, the `tools` list). A rule that matched an early message keeps matching on every later turn, so use distinctive markers and put more specific rules first. To match only the newest message, give the rule `"in": "last"`: its `match` is then looked for in the content of the last entry of `messages` only (including any `tool_result` content; for Gemini, the parts of the last entry of `contents`), not in earlier turns, the system prompt or the tools. Ids copied from an earlier reply (a `tool_result`'s `tool_use_id`, `tool_call_id`, `call_id`, `id`) are not looked in either. `"in": "any"` is the default.
+- A rule matches text that *contains* its `match`. Add `"exact": true` to match only when the text looked in is `match` and nothing more: with `"in": "last"`, a rule for `Hi` then answers `Hi` but not `Hi there`. The last message's strings are joined with a newline, so a Claude `tool_result` of `21C` reads `tool_result` + newline + `21C`.
 - `file` is resolved relative to the folder holding the config file, and is read exactly as written (including any trailing newline). It is read on every request, so you can edit it without restarting.
 - For varied replies to the same kind of request, give a rule `files` instead of `file`: `{ "match": "Summarise the thread", "files": ["fixtures/summary-a.txt", "fixtures/summary-b.txt"] }`. One of the files is picked at random on each matching request. A rule has either `file` or `files`, not both, and `files` must be a non-empty list of non-empty strings.
 - For a short reply, a rule can hold the reply itself as `text` in place of a file: `{ "match": "Classify this support ticket", "text": "{\"priority\":\"high\"}" }`. A rule has only one of `text`, `file` and `files`.
@@ -543,6 +561,42 @@ test('the agent looks up the order, then the refund', async () => {
 ```
 
 Out of scope for now: tool calls in the OpenAI and Gemini formats, server tools (`web_search` and the like), and `/v1/messages/count_tokens`.
+
+### Recording real replies
+
+Instead of writing fixtures by hand, let LLMock record them: calls that no rule answers go to the real provider once, and its reply is saved as a fixture file and a response rule. From then on the same call is answered from the recording, with no network, no API key and no cost.
+
+```bash
+# Record: send the calls no rule answers to Anthropic, and save the replies
+llmock start --model=claude --record=https://api.anthropic.com
+
+# Later, or in CI: replay only (the recordings folder is read without --record)
+llmock start --model=claude
+```
+
+Or in the preset:
+
+```json
+"claude": {
+  "name": "claude",
+  "endpoint": "v1/messages",
+  "recordings": { "dir": "recordings", "upstream": "https://api.anthropic.com" }
+}
+```
+
+While recording, give your client a real API key: the call is sent on with its headers, so the provider gets the key your client sent. Headers are never saved. For replaying, any key will do.
+
+- `upstream` is the provider's base URL, such as `https://api.anthropic.com`, `https://api.openai.com` or `https://generativelanguage.googleapis.com` (a trailing `/v1` or `/v1beta` is fine too). LLMock adds the provider's own path for the call, whatever the preset's `endpoint` is: `/v1/messages` (Claude), `/v1/chat/completions` (OpenAI, also from the stock `chatgpt/chat/completions`), `/v1/responses` (the [Responses API](#responses-api-openai)) and `/v1beta/models/<model>:generateContent` (Gemini, with the model from the preset's endpoint). The call's query string is kept, and a path in `upstream` (a proxy's prefix) is kept in front. An `upstream` with a user name or password in it (`https://user:pass@...`) stops the server from starting: give a proxy its login in a header your client sends.
+- `dir` (default `recordings`, relative to the config file) gets `rules.json` and one fixture per recording: `0001-what-is-the-capital-of-france.txt`, or a `.json` [`contentFile`](#tool-calls-claude-content) for a Claude tool-call reply. The rules are read on every request, after the config file's own `responseRules`, so you can edit, reorder or delete them, or move them into the config file. With `dir` set and no `upstream`, LLMock only replays. If an edit leaves `rules.json` broken while the server runs, the recorded rules are skipped (the server prints why) until you fix it, and nothing new is saved over it; a broken file stops the server from starting.
+- A recorded rule matches the call's whole last message, with `"in": "last"` and `"exact": true` (see [Response rules](#response-rules-fixture-replies)): a recording of `Hi` answers `Hi`, not `Hi there`. Ids such as a `tool_result`'s `tool_use_id` are left out, so the steps of a recorded tool loop replay even though each replayed tool call gets a new id. Remove `exact` from a rule to have it answer any last message that contains its `match`.
+- A cut-off reply is saved with `"stopReason": "max_tokens"` and a refused one with `"stopReason": "refusal"`, so they replay the same way. A Claude tool-call reply is saved without its ids, so each replay gets new ones. Thinking blocks are left out.
+- LLMock always asks the provider for a whole reply, then answers in its own format, streamed if the call asked for a stream. The first call and every replay look the same to your app.
+- An error status from the provider, or a reply LLMock can not read, is sent back as it came and not saved (the server prints why). OpenAI and Gemini tool (function) calls are not recorded. If the call asked for a stream, a successful reply that wasn't saved can't be sent as it came (it is one JSON body, not a stream), so the client gets a `502` saying why instead. A provider that can not be reached gives a `502`.
+- Rules from the config file and the [admin API](#admin-api-changing-rules-and-settings-while-running) still win, and [chaos](#chaos-mode-error-simulation) still fails calls before anything is sent on.
+- [`GET /admin/requests`](#checking-what-your-app-sent) shows which calls were sent on, as `forwarded: { "status", "saved" }`. So does the request log (as `request_validation.forwarded`), and the dashboard's log viewer marks those calls.
+- To stop sending calls on for a while without a restart, pause recording: `PATCH /admin/recording` with `{ "paused": true }`, or the switch on the dashboard. While paused, a call no rule answers gets a normal mock reply and nothing is sent or saved; the recorded rules still answer. `{ "paused": false }`, `POST /admin/reset` or a restart resumes it.
+- On the dashboard, the **Recording** card (Settings page) shows whether the server is recording, paused, replaying or neither, the upstream, the recordings folder, and how many calls were sent on and saved since it started or was reset. Recorded rules are listed last on the Response rules page, marked `recorded`.
+- The recordings hold your real prompts and the provider's replies. Look at them before you commit them to a shared repository.
 
 ### Streaming responses
 
@@ -722,15 +776,20 @@ await fetch('http://localhost:8001/admin/reset', { method: 'POST' });
 | `PATCH /admin/delay` | Changes the response delay: `{ "min", "max" }` in milliseconds |
 | `GET /admin/settings` | Shows the reply settings in use |
 | `PATCH /admin/settings` | Changes the reply settings it is given: `responseType`, `maxLoremParas`, `stream`, `validateRequests`, `logRequests`, `maxLoggedRequests` |
-| `POST /admin/reset` | Goes back to how the server started: no rules added this way, the config file's chaos, delay and reply settings, and the chaos call count at 0 |
+| `GET /admin/requests` | The calls your app made, oldest first (see [Checking what your app sent](#checking-what-your-app-sent)) |
+| `GET /admin/requests/<id>` | One recorded call, by its `x-llmock-request-id` |
+| `DELETE /admin/requests` | Forgets the recorded calls |
+| `GET /admin/recording` | Shows whether the server is [recording](#recording-real-replies), and whether that is paused |
+| `PATCH /admin/recording` | Pauses or resumes recording: `{ "paused": true }` or `{ "paused": false }` |
+| `POST /admin/reset` | Goes back to how the server started: no rules added this way, no recorded calls, the config file's chaos, delay and reply settings, recording not paused, and the chaos call count and the [recording](#recording-real-replies) counts at 0 |
 
-- A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional `in`, [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text`, `content` ([tool calls](#tool-calls-claude-content), `claude` only) or `fail`.
+- A rule added this way works like a [response rule](#response-rules-fixture-replies) in the config file: the same `match`, the same optional `in` and `exact`, [`stopReason`](#truncated-and-refused-replies-stopreason) and [`fail`](#failing-one-prompt-fail). It needs `text`, `content` ([tool calls](#tool-calls-claude-content), `claude` only) or `fail`.
 - The reply is given as `text` or `content`, never as `file`, `files` or `contentFile`. The server has no login, so a path sent over HTTP would let anyone who can reach it read files from your machine.
 - Rules added this way are matched before the config file's rules, in the order they were added. To replace a config rule for one test, add a rule with the same `match`.
 - Give a rule `times` (a whole number, 1 or more) to have it answer that many matching requests and then remove itself. A call that [chaos](#chaos-mode-error-simulation) fails does not count, so the rule is still there for the retry. Without `times` a rule stays until you remove it or reset. `times` is for rules added this way only, not for the config file.
 - Nothing is saved. The config file is never written, and a restart starts again with the config file's rules only.
 - A rule that is not valid gets a `400` with `{ "error": "..." }` and is not added.
-- Each rule in a listing has `source` (`"runtime"` or `"config"`), `id` (`null` for a config rule, which can not be removed this way), `in` (`"any"` or `"last"`), `content` (the tool-call blocks, or `null`) and `times` (how many more requests it answers, or `null` if it stays). A tool-call rule's `stopReason` is `"tool_use"`.
+- Each rule in a listing has `source` (`"runtime"` or `"config"`), `id` (`null` for a config rule, which can not be removed this way), `in` (`"any"` or `"last"`), `exact` (`true` or `false`), `content` (the tool-call blocks, or `null`) and `times` (how many more requests it answers, or `null` if it stays). A tool-call rule's `stopReason` is `"tool_use"`.
 - Everything else (the port, the endpoint, the preset with its template and model name, embeddings, debug mode) still comes from the config file and needs a restart to change.
 
 With `times`, a test can have the first call fail and the retry succeed, or give each call in turn its own reply:
@@ -782,9 +841,41 @@ await fetch('http://localhost:8001/admin/chaos', {
 - The dashboard shows the settings in use, so a change appears there within 2 seconds. The **Admin API** box on its **Settings** page has a **Reset** button that does the same as `POST /admin/reset`.
 - To turn the admin API off, set `"admin": false` in the `server` block, or start with `--admin=false`. While it is on, a preset's `endpoint` can not start with `admin/`.
 
+#### Checking what your app sent
+
+Every call to the chat route and to `/v1/embeddings` is kept in memory, so a test can check what its app sent: the prompt, the system text, the tools, the model or a header.
+
+```js
+const { requests } = await (
+  await fetch('http://localhost:8001/admin/requests?match=Classify')
+).json();
+expect(requests).toHaveLength(1);
+expect(requests[0].body.system).toContain('You are a triage bot');
+```
+
+Each entry has:
+
+| Field | |
+|---|---|
+| `id` | The same id as the reply's `x-llmock-request-id` header |
+| `time` | When the call came in (ISO 8601) |
+| `method`, `path`, `query` | The route, without the query string, and the query string's values |
+| `headers` | The request headers, names in lower case. `authorization`, `x-api-key`, `api-key`, `x-goog-api-key`, `proxy-authorization` and `cookie` show as `"[redacted]"`, in case a real key is sent to the mock. So do the query parameters `key` (as Gemini clients send it), `api_key`, `api-key`, `apikey` and `access_token`. |
+| `body` | The JSON body as sent (`null` for none) |
+| `valid` | `false` for a call that failed [request validation](#request-validation) and got a `400` |
+| `streamed` | Whether the reply was a stream; `null` when no reply was sent (a failed validation, or a drop or stall with no stream) |
+| `rule` | `{ "id", "match" }` of the [response rule](#response-rules-fixture-replies) that answered or failed the call (`id` is `null` for a config rule), or `null` |
+| `failed` | How LLMock failed the call on purpose, `{ "by": "rule" or "chaos", "kind", "status", "afterChunks" }`, or `null` |
+| `forwarded` | When [recording](#recording-real-replies): `{ "status", "saved" }` for a call sent on to the provider, else `null` |
+
+- Filter with `?match=` (text the body must contain, case-sensitive, as a rule's `match`), `?in=last` (look only in the last message, as a rule's `in`) and `?path=/v1/messages`. An unknown or invalid filter gets a `400`.
+- Calls are kept whether or not `logRequests` is on, including calls that fail validation. Unlike the [request log](#request-logging) nothing is written to disk.
+- The last 500 calls are kept; older ones are dropped. `DELETE /admin/requests` or `POST /admin/reset` forgets them, as does a restart.
+- Like the rules, this is shared by every client of one server. Tests running in parallel against one server should filter by a `match` of their own, or each [start their own server](#starting-a-server-from-code-tests).
+
 #### Network exposure
 
-LLMock has no authentication, and by default it listens on every network interface (`"host": "0.0.0.0"`). Anyone who can reach the port can change the replies through the admin API, and can read or clear the [request log](#request-logging), which holds the prompts your app sent. Turning the admin API off does not cover the request log.
+LLMock has no authentication, and by default it listens on every network interface (`"host": "0.0.0.0"`). Anyone who can reach the port can change the replies through the admin API, read the calls it recorded (`GET /admin/requests`), and read or clear the [request log](#request-logging). Both hold the prompts your app sent. Turning the admin API off does not cover the request log.
 
 For a mock server running locally with test data this is not usually a problem. If you want to take extra precautions, you can keep the mock to your own machine:
 
@@ -836,6 +927,7 @@ Once running, open `http://localhost:8001` for the live dashboard. A health chec
 |---|---|
 | Configurable (default: `/chatgpt/chat/completions`) | Chat completions |
 | `/v1/messages` (with the `claude` preset) | Anthropic Messages API |
+| `/v1/responses`, and `/<prefix>/responses` beside a `/<prefix>/chat/completions` endpoint (with an `openai` preset) | [OpenAI Responses API](#responses-api-openai) |
 | `/v1/embeddings` | OpenAI-compatible mock embeddings |
 
 ### Request validation
@@ -845,7 +937,7 @@ Validate incoming requests against templates to confirm API compatibility:
 1. Enable validation: `"validateRequests": true`
 2. For a provider that is not built in, add a template to the `request-templates/` folder (see [Template locations](#template-locations))
 
-A request passes when it contains every top-level key of the template. The built-in templates require `model` and `messages` (OpenAI), `contents` (Gemini), and `model`, `max_tokens` and `messages` (Claude). Invalid requests return a `400`; the missing keys are shown under **View request log** on the dashboard.
+A request passes when it contains every top-level key of the template. The built-in templates require `model` and `messages` (OpenAI), `contents` (Gemini), `model`, `max_tokens` and `messages` (Claude), and `model` and `input` (the OpenAI Responses API, template `openai_responses_req.json`). Invalid requests return a `400`; the missing keys are shown under **View request log** on the dashboard.
 
 Only those keys are checked, not what is inside them, so every request of a tool loop passes: a `tools` list, assistant turns of `tool_use` blocks, and user turns of `tool_result` blocks (with string or block content, and `is_error`).
 
@@ -912,6 +1004,31 @@ curl -N http://localhost:8001/chatgpt/chat/completions \
     "stream": true
   }'
 ```
+
+### Responses API (OpenAI)
+
+A preset with the `openai` template (such as `chatgpt` or `streaming`) also serves the [Responses API](https://platform.openai.com/docs/api-reference/responses), which `client.responses.create()` in the OpenAI SDKs calls. It is at `/v1/responses`, and also at `/<prefix>/responses` when the chat endpoint is `/<prefix>/chat/completions`, so one base URL works for both:
+
+```ts
+import OpenAI from 'openai';
+
+// The stock chatgpt preset: chat at /chatgpt/chat/completions, responses at /chatgpt/responses
+const client = new OpenAI({ apiKey: 'mock', baseURL: 'http://localhost:8001/chatgpt' });
+
+const response = await client.responses.create({
+  model: 'gpt-5.1',
+  instructions: 'Answer briefly.',
+  input: 'Classify this ticket',
+});
+console.log(response.output_text);
+```
+
+- The reply is one assistant `message` output item with one `output_text` part. `model`, `instructions`, `max_output_tokens`, `metadata`, `tools`, `temperature` and the other request settings are echoed back, and `usage` is estimated at about 4 characters per token (`instructions` and `input` in, the reply out).
+- `"stream": true` streams the API's events: `response.created`, `response.in_progress`, `response.output_item.added`, `response.content_part.added`, `response.output_text.delta` (several), `response.output_text.done`, `response.content_part.done`, `response.output_item.done` and `response.completed` with the whole response. Each has a `sequence_number`. There is no `[DONE]`. A request with no `stream` goes by the preset's `stream` setting, as on the chat route.
+- [Response rules](#response-rules-fixture-replies), [`stopReason`](#truncated-and-refused-replies-stopreason), [`fail`](#failing-one-prompt-fail), [chaos](#chaos-mode-error-simulation), the [delay](#response-delay-simulation), [validation](#request-validation) (`model` and `input`), the [request log](#request-logging) and the [recorded requests](#checking-what-your-app-sent) all work as they do on the chat route. A rule matches text anywhere in the body, `instructions` included. With `"in": "last"` it looks only at the last `input` item (its `content`, or a tool result's `output`), or at `input` itself when it is a string.
+- `stopReason: "max_tokens"` makes the response `incomplete` with `incomplete_details: { "reason": "max_output_tokens" }`, and a stream ends with `response.incomplete`. `stopReason: "refusal"` puts the text in a `refusal` part, streamed as `response.refusal.delta` events.
+- A chaos `stream-error` sends the opening events and `afterChunks` deltas, then an `error` event (`{ "type": "error", "code", "message", "param", "sequence_number" }`), and ends the stream. An HTTP failure has the chat route's OpenAI error body.
+- Not mocked: tool calls (`function_call` output items), reasoning items, conversation state (`previous_response_id` is echoed but not used), and the other Responses routes (`GET /v1/responses/<id>`, cancel, input items).
 
 ### Embeddings API
 

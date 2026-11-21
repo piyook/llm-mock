@@ -8,6 +8,12 @@ import {
 	removeRuntimeRule,
 } from './runtime-rules.js';
 import {
+	clearRecordedRequests,
+	getRecordedRequest,
+	getRecordedRequests,
+	validateRequestFilter,
+} from './request-recorder.js';
+import {
 	changeChaos,
 	changeDelay,
 	changeReplySettings,
@@ -16,6 +22,11 @@ import {
 	rememberStartupSettings,
 	restoreStartupSettings,
 } from './runtime-settings.js';
+import {
+	changeRecording,
+	describeRecording,
+	resetRecording,
+} from './recordings.js';
 
 /**
  * Routes that change how the server replies while it runs, so a test can set
@@ -129,19 +140,68 @@ function adminApi(app: FastifyInstance) {
 		);
 	});
 
-	// Back to how the server started: no runtime rules, the chaos, delay and
-	// reply settings of the config file, and the chaos count at 0, so a test
-	// can rely on which call fails next
+	app.get('/admin/recording', async (_request, reply) => {
+		return reply.send({ recording: describeRecording() });
+	});
+
+	// Pauses or resumes recording: while paused, a call no rule answers gets a
+	// mock reply and nothing is sent to the upstream
+	app.patch('/admin/recording', async (request, reply) => {
+		return answerChange(
+			reply,
+			() => changeRecording(request.body),
+			() => ({ recording: describeRecording() }),
+		);
+	});
+
+	// The calls made to the chat and embeddings routes, oldest first, so a
+	// test can check what its app sent. ?match=, ?in= and ?path= filter them.
+	app.get('/admin/requests', async (request, reply) => {
+		let filter;
+		try {
+			filter = validateRequestFilter(request.query);
+		} catch (error) {
+			return reply.code(400).send({ error: (error as Error).message });
+		}
+
+		return reply.send({ requests: getRecordedRequests(filter) });
+	});
+
+	app.get('/admin/requests/:id', async (request, reply) => {
+		const { id } = request.params as { id: string };
+		const recorded = getRecordedRequest(id);
+		if (!recorded) {
+			return reply
+				.code(404)
+				.send({ error: `No recorded request with id "${id}"` });
+		}
+
+		return reply.send({ request: recorded });
+	});
+
+	app.delete('/admin/requests', async (_request, reply) => {
+		clearRecordedRequests();
+
+		return reply.send({ requests: [] });
+	});
+
+	// Back to how the server started: no runtime rules, no recorded calls,
+	// the chaos, delay and reply settings of the config file, recording not
+	// paused with its counts at 0, and the chaos count at 0, so a test can rely on which call fails
+	// next
 	app.post('/admin/reset', async (_request, reply) => {
 		clearRuntimeRules();
+		clearRecordedRequests();
 		restoreStartupSettings();
 		resetChaos();
+		resetRecording();
 
 		return reply.send({
 			rules: describeActiveRules(),
 			...describeChaos(),
 			delay: getDelay(),
 			settings: getReplySettings(),
+			recording: describeRecording(),
 		});
 	});
 }
