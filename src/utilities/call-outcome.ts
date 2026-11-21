@@ -1,4 +1,10 @@
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { MockReply } from '../types.js';
+import {
+	forwardAndRecord,
+	recordUpstream,
+	type Passthrough,
+} from './recordings.js';
 import {
 	applyChaos,
 	applyRuleFailure,
@@ -6,7 +12,7 @@ import {
 	type StreamFailure,
 } from './chaos.js';
 import { describeRule, type RecordedRequest } from './request-recorder.js';
-import { getRuleFailure } from './response-helpers.js';
+import { generateResponseContent, getRuleFailure } from './response-helpers.js';
 import { countRuleUse, findRequestRule } from './runtime-rules.js';
 
 export interface CallOutcome {
@@ -66,4 +72,54 @@ export const decideCall = (
 
 	record.streamed = streaming;
 	return { matched, failure: chaos || undefined };
+};
+
+/**
+ * What a call is answered with: the matched rule's reply or a generated one,
+ * or, when recording and no rule matched a POST, the upstream's reply (see
+ * recordings.ts). A Passthrough is the upstream's answer to send back as it
+ * came: an error, or a reply that could not be recorded.
+ *
+ * @param format - The route's wire format: openai, claude, gemini or responses
+ */
+export const getReply = async (
+	request: FastifyRequest,
+	matched: CallOutcome['matched'],
+	record: RecordedRequest,
+	format: string | undefined,
+): Promise<MockReply | Passthrough> => {
+	if (matched || request.method !== 'POST' || !recordUpstream()) {
+		return generateResponseContent(request.body, matched);
+	}
+
+	try {
+		const outcome = await forwardAndRecord(request, format);
+		record.forwarded = { status: outcome.status, saved: outcome.saved };
+		return 'reply' in outcome ? outcome.reply : outcome.passthrough;
+	} catch (error) {
+		const message = `llmock could not reach the recording upstream ${recordUpstream()}: ${(error as Error).message}`;
+		console.warn(`RECORDING: ${message}`);
+		record.forwarded = { status: 502, saved: false };
+		return {
+			status: 502,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				error: { type: 'llmock_upstream', message },
+			}),
+		};
+	}
+};
+
+export const isPassthrough = (
+	reply: MockReply | Passthrough,
+): reply is Passthrough => 'status' in reply && 'body' in reply;
+
+// Sends an upstream's answer back as it came
+export const sendPassthrough = (
+	reply: FastifyReply,
+	{ status, contentType, body }: Passthrough,
+) => {
+	reply.status(status);
+	if (contentType) reply.type(contentType);
+	return reply.send(body);
 };

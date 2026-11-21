@@ -26,7 +26,12 @@ import {
 } from './utilities/response-rules.js';
 import { loadStoredResponses } from './utilities/stored-responses.js';
 import { releaseStalledOnClose, resetChaos } from './utilities/chaos.js';
-import { clearRuntimeRules } from './utilities/runtime-rules.js';
+import { clearRuntimeRules, getFileRules } from './utilities/runtime-rules.js';
+import {
+	checkRecordingSettings,
+	recordUpstream,
+	recordingsDir,
+} from './utilities/recordings.js';
 import {
 	clearRecordedRequests,
 	getRecordedRequests,
@@ -104,8 +109,11 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 	const config = loadConfig(process.env.CONFIG_PATH);
 	setEnvironmentFromConfig(process.env.LLM_MODEL_NAME || config.defaultModel);
 
-	// Fail fast on malformed responseRules and warn about fixture files that can't be read
-	const { rules: responseRules, baseDir: rulesDir } = getResponseRules();
+	// Fail fast on malformed responseRules, recording settings or recorded
+	// rules, and warn about fixture files that can't be read
+	getResponseRules();
+	checkRecordingSettings();
+	const { rules: responseRules, baseDir: rulesDir } = getFileRules();
 	for (const rule of responseRules) {
 		let readable = true;
 		for (const file of ruleFiles(rule)) {
@@ -204,6 +212,16 @@ export async function bootServer({ quiet = false } = {}): Promise<{
 			`USING MODEL: ${getCurrentModel()?.toUpperCase() || 'CHATGPT'}`,
 		);
 		console.log('*****************************************************');
+		const upstream = recordUpstream();
+		const recordings = recordingsDir();
+		if (upstream) {
+			console.log(
+				`\nRECORDING: calls no rule answers are sent to ${upstream} and saved in ${recordings}`,
+			);
+		} else if (recordings) {
+			console.log(`\nREPLAYING recordings from ${recordings}`);
+		}
+
 		const llmspy = currentLlmspyRoute();
 		if (llmspy) console.log(`\n${llmspyLines(llmspy).join('\n')}\n`);
 	}

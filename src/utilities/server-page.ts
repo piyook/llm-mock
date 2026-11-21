@@ -3,14 +3,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { db } from '../models/db.js';
-import {
-	getResponseRules,
-	getStoredResponsesFile,
-} from '../config/config-loader.js';
+import { getStoredResponsesFile } from '../config/config-loader.js';
 import { clearLog, logPath, maxLogEntries } from './logger.js';
 import { loadStoredResponses } from './stored-responses.js';
 import { readRuleFile, ruleFiles } from './response-rules.js';
-import { describeActiveRules } from './runtime-rules.js';
+import { describeActiveRules, getFileRules } from './runtime-rules.js';
 import { getDelay } from './runtime-settings.js';
 import { getChaosConfig, getChaosStats } from './chaos.js';
 import { adminApiEnabled } from './admin-api.js';
@@ -295,7 +292,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 	// as rules are added and removed through the admin API.
 	app.get('/ui-rule-file', async (request, reply) => {
 		const query = request.query as { rule?: string; file?: string };
-		const { rules, baseDir } = getResponseRules();
+		// The config file's rules, then the recorded ones
+		const { rules, baseDir } = getFileRules();
 		const rule = rules[Number(query.rule ?? 0)];
 		const file = rule && ruleFiles(rule)[Number(query.file ?? 0)];
 

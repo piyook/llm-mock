@@ -222,6 +222,11 @@ export function serverEnv(config, modelName, settings = {}, configPath) {
     CHAOS_KIND: custom.chaosKind || modelConfig.chaos.kind,
     CHAOS_AFTER_CHUNKS: custom.chaosAfterChunks || modelConfig.chaos.afterChunks.toString(),
 
+    // Recordings: the folder recorded replies are kept in, and the provider
+    // calls no rule answers are sent on to (empty for none)
+    RECORDINGS_DIR: custom.recordings ?? modelConfig.recordings?.dir ?? '',
+    RECORD_UPSTREAM: custom.record ?? modelConfig.recordings?.upstream ?? '',
+
     // Embeddings
     ENABLE_EMBEDDINGS_MOCK: flag('embeddings', modelConfig.embeddings.enabled, 'true', 'false'),
     EMBEDDING_DIMENSION: custom.embeddingDimensions || modelConfig.embeddings.dimensions.toString(),

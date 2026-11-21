@@ -72,6 +72,9 @@ OPTIONS:
   --embeddingDimensions=<num> Embedding vector dimensions
   --llmspy[=<url>]        Print how to see this server's calls in LLMSpy
                           (LLMSpy's address, default http://127.0.0.1:8080)
+  --record=<url>          Send calls no rule answers to this provider and save
+                          the replies as rules (e.g. https://api.anthropic.com)
+  --recordings=<dir>      Folder of recorded replies to replay (default: recordings)
   --foreground            Run server in foreground (for Docker use)
 
 EXAMPLES:
@@ -84,6 +87,7 @@ EXAMPLES:
   llmock start --chaos=true --chaosFrequency=3 --chaosStatus=429 # Every 3rd call fails with a 429
   llmock start --chaos=true --chaosKind=stream-drop --chaosAfterChunks=1 # Streams are cut after 1 delta
   llmock start --model=claude --llmspy     # Also print the LLMSpy upstream and base URL
+  llmock start --model=claude --record=https://api.anthropic.com # Record real replies, replay them after
   llmock stop                               # Stop running server on default port
   llmock stop --port=3000                   # Stop server on port 3000
   llmock config                              # Show current configuration
