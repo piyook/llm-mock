@@ -754,6 +754,7 @@ describe('admin API', () => {
 			stats: { calls: 0, injected: 0 },
 			delay: { min: 0, max: 0 },
 			settings: startSettings,
+			recording: expect.objectContaining({ mode: 'off', paused: false }),
 		});
 		expect(shouldInjectError()).toBe(false);
 	});

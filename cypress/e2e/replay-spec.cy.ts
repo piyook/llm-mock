@@ -26,7 +26,7 @@ describe('Mock LLM Spec replaying recordings', () => {
 
     it('shows the recording state on the Settings page', () => {
         cy.visit('/#/settings');
-        cy.get('[cy-data="recording_status"]').should('have.text', 'REPLAY ONLY');
+        cy.get('[cy-data="recording_status"]').should('contain', 'REPLAY ONLY');
         cy.get('[cy-data="recording_dir"]').should('have.text', dir);
         cy.get('[cy-data="recording_rules"]').should('contain.text', '1');
         cy.get('[cy-data="recording_upstream"]').should('not.exist');

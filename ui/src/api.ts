@@ -68,9 +68,11 @@ export type UiMeta = {
 	// Recording real replies: `record` sends the calls no rule answers to
 	// `upstream` and saves them in `dir`, `replay` answers from `dir` only.
 	// `forwarded` and `saved` count the calls sent on since the server started.
+	// `paused` is true while recording is paused through the admin API.
 	// (Missing from an older llmock)
 	recording?: {
 		mode: 'record' | 'replay' | 'off';
+		paused?: boolean;
 		upstream: string | null;
 		dir: string | null;
 		forwarded: number;
@@ -131,7 +133,7 @@ export function resetRuntimeChanges(): Promise<unknown> {
 // Changes settings on the running server through the admin API; a change
 // that can't be made is answered with `{ error }` saying why
 export async function changeRuntimeSettings(
-	route: 'settings' | 'chaos' | 'delay',
+	route: 'settings' | 'chaos' | 'delay' | 'recording',
 	change: object,
 ): Promise<unknown> {
 	const res = await fetch(`/admin/${route}`, {

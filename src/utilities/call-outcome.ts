@@ -3,6 +3,7 @@ import type { MockReply } from '../types.js';
 import {
 	countForwarded,
 	forwardAndRecord,
+	isRecording,
 	recordUpstream,
 	type Passthrough,
 } from './recordings.js';
@@ -102,7 +103,7 @@ export const getReply = async (
 	record: RecordedRequest,
 	format: string | undefined,
 ): Promise<MockReply | Passthrough> => {
-	if (matched || request.method !== 'POST' || !recordUpstream()) {
+	if (matched || request.method !== 'POST' || !isRecording()) {
 		return generateResponseContent(request.body, matched);
 	}
 

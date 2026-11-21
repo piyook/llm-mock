@@ -270,6 +270,7 @@ describe('recording and replaying', () => {
 
 		expect(await recording()).toEqual({
 			mode: 'record',
+			paused: false,
 			upstream: upstream.url,
 			dir: 'recordings',
 			forwarded: before.forwarded + 2,
@@ -292,6 +293,87 @@ describe('recording and replaying', () => {
 			upstream: null,
 			dir: 'recordings',
 		});
+	});
+
+	test('recording can be paused and resumed through the admin API, and a reset resumes it', async () => {
+		const patch = async (body: unknown) => {
+			const response = await fetch(`${server!.url}/admin/recording`, {
+				method: 'PATCH',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify(body),
+			});
+			return {
+				status: response.status,
+				body: (await response.json()) as any,
+			};
+		};
+
+		upstream.answers.set('/v1/messages', {
+			body: claudeMessage([{ type: 'text', text: 'Recorded before.' }]),
+		});
+		await start('claude');
+		await askClaude('Before the pause');
+		expect(upstream.calls).toHaveLength(1);
+
+		const paused = await patch({ paused: true });
+		expect(paused.status).toBe(200);
+		expect(paused.body.recording).toMatchObject({
+			mode: 'record',
+			paused: true,
+		});
+
+		// Nothing is sent on or saved; the recorded rule still answers
+		const mocked = await askClaude('During the pause');
+		expect(mocked.status).toBe(200);
+		expect(mocked.text).not.toContain('Recorded before.');
+		expect((await askClaude('Before the pause')).text).toContain(
+			'Recorded before.',
+		);
+		expect(upstream.calls).toHaveLength(1);
+		expect(recordedRules()).toHaveLength(1);
+
+		const shown = (await (
+			await fetch(`${server!.url}/admin/recording`)
+		).json()) as any;
+		expect(shown.recording.paused).toBe(true);
+
+		// Resumed by a PATCH
+		expect((await patch({ paused: false })).body.recording.paused).toBe(
+			false,
+		);
+		await askClaude('After the pause');
+		expect(upstream.calls).toHaveLength(2);
+
+		// And by a reset
+		await patch({ paused: true });
+		const reset = (await (
+			await fetch(`${server!.url}/admin/reset`, { method: 'POST' })
+		).json()) as any;
+		expect(reset.recording.paused).toBe(false);
+
+		// A change that isn't { paused: boolean } is refused
+		for (const bad of [
+			{ paused: 'yes' },
+			{},
+			{ paused: true, upstream: 'x' },
+		]) {
+			const refused = await patch(bad);
+			expect(refused.status).toBe(400);
+			expect(refused.body.error).toContain('paused');
+		}
+	});
+
+	test('a server that only replays has no recording to pause', async () => {
+		await start('claude', { record: '' });
+		const response = await fetch(`${server!.url}/admin/recording`, {
+			method: 'PATCH',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ paused: true }),
+		});
+		expect(response.status).toBe(400);
+		expect(((await response.json()) as any).error).toContain(
+			'not recording',
+		);
 	});
 
 	test('the dashboard is not shown a user name or password in the upstream URL', async () => {
