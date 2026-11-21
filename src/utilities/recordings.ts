@@ -20,8 +20,9 @@ import type { MockReply } from '../types.js';
  * the same call is answered from the recording, also after a restart and
  * with no upstream (replay only).
  *
- * A recorded rule matches the text of the call's last message, with
- * `in: "last"`. The client gets llmock's own reply built from the recorded
+ * A recorded rule matches the whole text of the call's last message, with
+ * `in: "last"` and `exact: true` (ids such as a tool_result's tool_use_id are
+ * left out, as replayed tool calls get new ones). The client gets llmock's own reply built from the recorded
  * text, streamed if it asked for a stream (the provider is always asked for
  * a whole reply), so the first call and every replay look the same.
  */
@@ -366,13 +367,19 @@ export const saveRecording = (
 	if ('content' in reply) {
 		const path = join(dir, `${base}.json`);
 		writeFileSync(path, `${JSON.stringify(reply.content, null, 2)}\n`);
-		rule = { match, in: 'last', contentFile: ruleFilePath(path) };
+		rule = {
+			match,
+			in: 'last',
+			exact: true,
+			contentFile: ruleFilePath(path),
+		};
 	} else {
 		const path = join(dir, `${base}.txt`);
 		writeFileSync(path, reply.text);
 		rule = {
 			match,
 			in: 'last',
+			exact: true,
 			file: ruleFilePath(path),
 			...(reply.stopReason && { stopReason: reply.stopReason }),
 		};

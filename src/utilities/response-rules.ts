@@ -57,6 +57,12 @@ export interface ResponseRule {
 	stopReason?: StopReason | 'tool_use';
 	fail?: Partial<CallFailure>;
 	in?: RuleScope;
+	/**
+	 * True: the text looked in must be `match` exactly, not merely contain it.
+	 * Recorded rules use it, so a short recording ("Hi") doesn't answer a
+	 * longer call ("Hi, summarise this").
+	 */
+	exact?: boolean;
 }
 
 /**
@@ -81,23 +87,42 @@ export const ruleHasToolCalls = (rule: ResponseRule): boolean =>
  * content blocks...), ignoring keys and non-strings. Matching against these
  * rather than the serialized JSON means quotes and newlines in `match` work.
  */
-export const collectStrings = (value: unknown): string[] => {
+export const collectStrings = (
+	value: unknown,
+	skipKeys?: ReadonlySet<string>,
+): string[] => {
 	if (typeof value === 'string') return [value];
 
-	if (Array.isArray(value)) return value.flatMap(collectStrings);
+	if (Array.isArray(value)) {
+		return value.flatMap((entry) => collectStrings(entry, skipKeys));
+	}
 
 	if (typeof value === 'object' && value !== null) {
-		return Object.values(value).flatMap(collectStrings);
+		return Object.entries(value).flatMap(([key, entry]) =>
+			skipKeys?.has(key) ? [] : collectStrings(entry, skipKeys),
+		);
 	}
 
 	return [];
 };
 
+// Ids a client copies from an earlier reply, e.g. the tool_use_id of a Claude
+// tool_result. A replayed tool call gets new ids each time, so they are left
+// out of the last message's text, or the next turn could never match the
+// rule recorded for it.
+const idKeys: ReadonlySet<string> = new Set([
+	'id',
+	'tool_use_id',
+	'tool_call_id',
+	'call_id',
+]);
+
 /**
  * The string values of the last message: the last entry of `messages` (its
  * content, as a string or blocks, tool_result content included), or for
- * Gemini the last entry of `contents` (its parts). Its role is left out.
- * Empty if the body has neither.
+ * Gemini the last entry of `contents` (its parts). Its role is left out, and
+ * so are ids copied from an earlier reply (`id`, `tool_use_id`,
+ * `tool_call_id`, `call_id`). Empty if the body has neither.
  */
 export const collectLastMessageStrings = (body: unknown): string[] => {
 	if (typeof body !== 'object' || body === null) return [];
@@ -118,7 +143,7 @@ export const collectLastMessageStrings = (body: unknown): string[] => {
 		if (typeof last === 'string') return [last];
 		if (typeof last !== 'object' || last === null) return [];
 		const item = last as Record<string, unknown>;
-		return collectStrings(item.content ?? item.output);
+		return collectStrings(item.content ?? item.output, idKeys);
 	}
 	const [list, key] = Array.isArray(messages)
 		? [messages, 'content']
@@ -127,14 +152,15 @@ export const collectLastMessageStrings = (body: unknown): string[] => {
 
 	const last: unknown = list.at(-1);
 	return typeof last === 'object' && last !== null
-		? collectStrings((last as Record<string, unknown>)[key])
+		? collectStrings((last as Record<string, unknown>)[key], idKeys)
 		: [];
 };
 
 /**
  * Returns the first rule (in config order) whose `match` appears in the
  * request body, or undefined. Matching is case-sensitive. A rule with
- * `in: "last"` is matched against the last message only.
+ * `in: "last"` is matched against the last message only, and one with
+ * `exact: true` only when that text is `match` and nothing more.
  */
 export const findMatchingRule = (
 	rules: ResponseRule[],
@@ -151,7 +177,12 @@ export const findMatchingRule = (
 				: collectStrings(body)
 		).join('\n'));
 
-	return rules.find((rule) => textIn(rule.in ?? 'any').includes(rule.match));
+	return rules.find((rule) => {
+		const text = textIn(rule.in ?? 'any');
+		return rule.exact === true
+			? text === rule.match
+			: text.includes(rule.match);
+	});
 };
 
 /**
@@ -362,6 +393,11 @@ export const validateResponseRule = (
 		throw new TypeError(
 			`${label}.in must be one of: ${ruleScopes.join(', ')}`,
 		);
+	}
+
+	const { exact } = rule as Partial<ResponseRule>;
+	if (exact !== undefined && typeof exact !== 'boolean') {
+		throw new TypeError(`${label}.exact must be true or false`);
 	}
 
 	if (content !== undefined || contentFile !== undefined) {
