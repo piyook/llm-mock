@@ -1,10 +1,12 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { MockReply } from '../types.js';
 import {
+	countForwarded,
 	forwardAndRecord,
 	recordUpstream,
 	type Passthrough,
 } from './recordings.js';
+import { noteForwarded as noteForwardedInLog } from './logger.js';
 import {
 	applyChaos,
 	applyRuleFailure,
@@ -74,6 +76,18 @@ export const decideCall = (
 	return { matched, failure: chaos || undefined };
 };
 
+// Notes a call that was sent on to the upstream: on its recorded entry, in
+// the dashboard's count, and on its request log entry
+const noteForwarded = (
+	record: RecordedRequest,
+	status: number,
+	saved: boolean,
+) => {
+	record.forwarded = { status, saved };
+	countForwarded(saved);
+	noteForwardedInLog(record.id, record.forwarded);
+};
+
 /**
  * What a call is answered with: the matched rule's reply or a generated one,
  * or, when recording and no rule matched a POST, the upstream's reply (see
@@ -94,12 +108,12 @@ export const getReply = async (
 
 	try {
 		const outcome = await forwardAndRecord(request, format);
-		record.forwarded = { status: outcome.status, saved: outcome.saved };
+		noteForwarded(record, outcome.status, outcome.saved);
 		return 'reply' in outcome ? outcome.reply : outcome.passthrough;
 	} catch (error) {
 		const message = `llmock could not reach the recording upstream ${recordUpstream()}: ${(error as Error).message}`;
 		console.warn(`RECORDING: ${message}`);
-		record.forwarded = { status: 502, saved: false };
+		noteForwarded(record, 502, false);
 		return {
 			status: 502,
 			contentType: 'application/json',

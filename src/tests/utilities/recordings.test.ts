@@ -241,6 +241,72 @@ describe('recording and replaying', () => {
 		expect(upstream.calls).toHaveLength(0);
 	});
 
+	test('the dashboard is told whether the server records or replays, and what was sent on', async () => {
+		const recording = async () =>
+			(
+				(await (await fetch(`${server!.url}/ui-meta`)).json()) as {
+					recording: unknown;
+				}
+			).recording;
+
+		upstream.answers.set('/v1/messages', {
+			body: claudeMessage([{ type: 'text', text: 'Counted.' }]),
+		});
+		await start('claude');
+		const before = (await recording()) as {
+			forwarded: number;
+			saved: number;
+		};
+		expect(before).toMatchObject({
+			mode: 'record',
+			upstream: upstream.url,
+			dir: 'recordings',
+		});
+
+		await askClaude('Count me');
+		await askClaude('Count me'); // replayed: not sent on
+		upstream.answers.set('/v1/messages', { status: 500, body: {} });
+		await askClaude('Fail me');
+
+		expect(await recording()).toEqual({
+			mode: 'record',
+			upstream: upstream.url,
+			dir: 'recordings',
+			forwarded: before.forwarded + 2,
+			saved: before.saved + 1,
+		});
+
+		// The recorded rule is marked as one
+		const meta = (await (await fetch(`${server!.url}/ui-meta`)).json()) as {
+			responseRules: Array<{ source: string }>;
+		};
+		expect(meta.responseRules.map((rule) => rule.source)).toEqual([
+			'recorded',
+		]);
+
+		// With no upstream: replay only
+		await server!.close();
+		await start('claude', { record: '' });
+		expect(await recording()).toMatchObject({
+			mode: 'replay',
+			upstream: null,
+			dir: 'recordings',
+		});
+	});
+
+	test('the dashboard is not shown a user name or password in the upstream URL', async () => {
+		const withLogin = upstream.url.replace(
+			'http://',
+			'http://user:secret@',
+		);
+		await start('claude', { record: withLogin });
+
+		const { recording } = (await (
+			await fetch(`${server!.url}/ui-meta`)
+		).json()) as { recording: { upstream: string } };
+		expect(recording.upstream).toBe(upstream.url);
+	});
+
 	test('a streamed call is recorded from a whole reply and streamed by llmock', async () => {
 		upstream.answers.set('/v1/messages', {
 			body: claudeMessage([

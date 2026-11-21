@@ -57,6 +57,48 @@ export const recordingsDir = (): string | undefined => {
 	return dir ? resolve(getConfigDir(), dir) : undefined;
 };
 
+// Calls sent on to the upstream since the server started, and how many of
+// their replies were saved
+const forwardCounts = { forwarded: 0, saved: 0 };
+
+/** Counts one call sent on to the upstream */
+export const countForwarded = (saved: boolean): void => {
+	forwardCounts.forwarded += 1;
+	if (saved) forwardCounts.saved += 1;
+};
+
+// The upstream as it can be shown: a user name or password in the URL is
+// left out
+const shownUpstream = (upstream: string): string => {
+	try {
+		const url = new URL(upstream);
+		if (!url.username && !url.password) return upstream;
+		url.username = '';
+		url.password = '';
+		return url.href.replace(/\/+$/, '');
+	} catch {
+		return upstream;
+	}
+};
+
+/**
+ * Whether the server records, only replays or neither, for the dashboard:
+ * `record` sends the calls no rule answers to `upstream` and saves the
+ * replies in `dir`, `replay` answers from `dir` only. `dir` is relative to
+ * the config folder when it is inside it.
+ */
+export const describeRecording = () => {
+	const upstream = recordUpstream();
+	const dir = recordingsDir();
+
+	return {
+		mode: upstream ? 'record' : dir ? 'replay' : 'off',
+		upstream: upstream ? shownUpstream(upstream) : null,
+		dir: dir ? ruleFilePath(dir) : null,
+		...forwardCounts,
+	} as const;
+};
+
 /**
  * Checks the recording settings when the server starts, throwing an Error
  * that says what is wrong

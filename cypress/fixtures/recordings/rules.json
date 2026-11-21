@@ -1,0 +1,7 @@
+[
+  {
+    "match": "E2E_RECORDED",
+    "in": "last",
+    "file": "cypress/fixtures/recordings/0001-e2e-recorded.txt"
+  }
+]

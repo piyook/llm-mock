@@ -13,6 +13,7 @@ import { getChaosConfig, getChaosStats } from './chaos.js';
 import { adminApiEnabled } from './admin-api.js';
 import { currentLlmspyRoute } from './llmspy.js';
 import { responsesPaths } from './build-responses-response.js';
+import { describeRecording } from './recordings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -270,6 +271,8 @@ function serverPage(app: FastifyInstance, _apiPaths: string[]) {
 			uiTheme: getUiTheme(),
 			// How to put this server behind LLMSpy, null when llmspy is off
 			llmspy: currentLlmspyRoute(),
+			// Recording real replies, or replaying them
+			recording: describeRecording(),
 			apiLinks,
 		});
 	});

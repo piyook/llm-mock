@@ -18,13 +18,15 @@
 	// requests (`texts`, one block each), or a single rule fixture (one block,
 	// exactly as written). `note` follows the source in the header. A `paged`
 	// view shows one block at a time with back/next; `clearable` adds the
-	// button that empties the request log.
+	// button that empties the request log. `labels` holds a line shown above
+	// each block of a paged view, or null for none.
 	type Viewer = {
 		title: string;
 		source: string;
 		note?: string;
 		paged?: boolean;
 		clearable?: boolean;
+		labels?: Array<string | null>;
 		texts: string[] | null;
 		error: string | null;
 	};
@@ -133,6 +135,10 @@
 	// rules (what /ui-rule-file goes by) is its place in the list less this
 	$: runtimeRuleCount =
 		meta?.responseRules?.filter((rule) => rule.source === 'runtime').length ?? 0;
+	// Rules saved by recording, listed after the config file's
+	$: recordedRuleCount =
+		meta?.responseRules?.filter((rule) => rule.source === 'recorded').length ?? 0;
+	$: recordingMode = meta?.recording?.mode ?? 'off';
 
 	// Requests are only logged with both settings on
 	$: loggingOn =
@@ -167,6 +173,20 @@
 					on: meta.logRequests?.toUpperCase() === 'ON',
 					detail: `last ${meta.maxLoggedRequests}`,
 				},
+				// Only listed while recording or replaying, so the overview keeps
+				// to one window when it is off
+				...(recordingMode === 'off'
+					? []
+					: [
+							{
+								name: 'Recording',
+								on: true,
+								detail:
+									recordingMode === 'record'
+										? upstreamHost(meta.recording?.upstream ?? null)
+										: 'replay only',
+							},
+						]),
 				{ name: 'Debug mode', on: meta.debugMode === 'ON', detail: '' },
 				{ name: 'Admin API', on: meta.adminApi === 'ENABLED', detail: '' },
 			]
@@ -297,10 +317,36 @@
 					: 'newest first · logging is off, these were logged earlier',
 				paged: true,
 				clearable: true,
+				labels: entries.map(forwardedLabel),
 				texts: entries.map((entry) => JSON.stringify(entry, null, 2)),
 			};
 		});
 	}
+
+	// For a logged call that was sent on to the recording upstream, what it
+	// answered and whether the reply was saved; null for any other call
+	function forwardedLabel(entry: unknown): string | null {
+		const forwarded = (
+			entry as { request_validation?: { forwarded?: { status?: unknown; saved?: unknown } } }
+		)?.request_validation?.forwarded;
+		if (typeof forwarded?.status !== 'number') return null;
+		return `Sent to the recording upstream · ${forwarded.status} · ${
+			forwarded.saved === true ? 'saved as a recording' : 'not saved'
+		}`;
+	}
+
+	// The host of the recording upstream, e.g. "api.anthropic.com"
+	function upstreamHost(upstream: string | null): string {
+		if (!upstream) return '';
+		try {
+			return new URL(upstream).host;
+		} catch {
+			return upstream;
+		}
+	}
+
+	// What the recording card's badge says
+	const recordingLabels = { record: 'RECORDING', replay: 'REPLAY ONLY', off: 'OFF' } as const;
 
 	// Empties the request log, then shows the now empty view. A failure is
 	// shown in place of the log.
@@ -511,7 +557,11 @@
 				<a class="tile" href="#/rules" cy-data="tile_rules">
 					<span class="tileLabel">Response rules</span>
 					<span class="tileValue">{ruleCount}</span>
-					<span class="tileNote">{runtimeRuleCount} added while running</span>
+					<span class="tileNote">
+						{runtimeRuleCount} added while running{recordedRuleCount > 0
+							? ` · ${recordedRuleCount} recorded`
+							: ''}
+					</span>
 				</a>
 				<a class="tile" href="#/settings" cy-data="tile_request_log">
 					<span class="tileLabel">Request log</span>
@@ -879,6 +929,64 @@
 						</div>
 					</section>
 
+					<section class="card" cy-data="recording">
+						<h2>Recording</h2>
+						<div class="grid">
+							<div class="kv">
+								<span class="muted">Recording</span>
+								<span class="badge" cy-data="recording_status">{recordingLabels[recordingMode]}</span>
+							</div>
+							{#if meta?.recording?.upstream}
+								<div class="kv kvWide">
+									<span class="muted">Upstream</span>
+									<span class="badge" cy-data="recording_upstream">{meta.recording.upstream}</span>
+								</div>
+							{/if}
+							{#if meta?.recording?.dir}
+								<div class="kv kvWide">
+									<span class="muted">Recordings Folder</span>
+									<span class="badge" cy-data="recording_dir">{meta.recording.dir}</span>
+								</div>
+							{/if}
+							{#if recordingMode !== 'off'}
+								<div class="kv">
+									<span class="muted">Recorded Rules</span>
+									<a class="fileLink" href="#/rules" cy-data="recording_rules" title="See them on the response rules page">
+										{recordedRuleCount}
+									</a>
+								</div>
+							{/if}
+							{#if recordingMode === 'record'}
+								<div class="kv">
+									<span class="muted">Sent Upstream</span>
+									<span
+										class="badge"
+										cy-data="recording_forwarded"
+										title="Calls no rule answered, sent on to the upstream since the server started"
+									>
+										{meta?.recording?.forwarded ?? 0}, {meta?.recording?.saved ?? 0} saved
+									</span>
+								</div>
+							{/if}
+						</div>
+						<p class="muted cardNote" cy-data="recording_note">
+							{#if recordingMode === 'record'}
+								Calls no rule answers are sent on to the upstream, and its replies are saved as
+								response rules in <code>rules.json</code> in the recordings folder. They are matched
+								after the config file's rules, so the same call is answered from the recording next
+								time.
+							{:else if recordingMode === 'replay'}
+								Calls are answered from the rules recorded in the recordings folder. Nothing is sent
+								on: to record new replies, set <code>recordings.upstream</code> or start with
+								<code>--record=&lt;url&gt;</code>.
+							{:else}
+								To record real replies and replay them, set <code>recordings</code>
+								(<code>dir</code>, <code>upstream</code>) in the model preset in
+								<code>.llmockrc.json</code>, or start with <code>--record=&lt;url&gt;</code>.
+							{/if}
+						</p>
+					</section>
+
 					<section class="card" cy-data="admin">
 						<h2>Admin API</h2>
 						<div class="grid">
@@ -977,6 +1085,16 @@
 												{rule.times} left
 											</span>
 										{/if}
+									</span>
+								{:else if rule.source === 'recorded'}
+									<span class="rulePills">
+										<span
+											class="countPill"
+											cy-data="rule_recorded"
+											title={`Recorded from a real reply, kept in ${meta?.recording?.dir ?? 'the recordings folder'}/rules.json; matched after the config file's rules`}
+										>
+											recorded
+										</span>
 									</span>
 								{/if}
 							</div>
@@ -1094,6 +1212,9 @@
 				<p class="muted">Loading…</p>
 			{:else if viewer.paged}
 				<div class="viewerTexts">
+					{#if viewer.labels?.[page]}
+						<p class="viewerLabel" cy-data="viewer_label">{viewer.labels[page]}</p>
+					{/if}
 					<pre cy-data="viewer_text">{viewer.texts[page]}</pre>
 				</div>
 			{:else}
