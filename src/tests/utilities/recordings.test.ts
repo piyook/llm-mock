@@ -435,6 +435,62 @@ describe('recording and replaying', () => {
 		]);
 	});
 
+	test('a rules file broken while running is skipped, and never written over', async () => {
+		upstream.answers.set('/v1/messages', {
+			body: claudeMessage([{ type: 'text', text: 'Saved.' }]),
+		});
+		await start('claude');
+		await askClaude('Keep me');
+		const rulesPath = join(dir, 'recordings', 'rules.json');
+		const broken = readFileSync(rulesPath, 'utf8').replace(/\]\s*$/, ',]');
+		writeFileSync(rulesPath, broken);
+
+		// Calls, the rules listing and a reset still work
+		const { status } = await askClaude('Something else');
+		expect(status).toBe(200);
+		expect((await fetch(`${server!.url}/admin/rules`)).status).toBe(200);
+		expect(
+			(await fetch(`${server!.url}/admin/reset`, { method: 'POST' }))
+				.status,
+		).toBe(200);
+
+		// The reply came from the upstream but wasn't saved over the broken file
+		expect(upstream.calls).toHaveLength(2);
+		expect(readFileSync(rulesPath, 'utf8')).toBe(broken);
+
+		// Mended: the recorded rule answers again
+		writeFileSync(rulesPath, broken.replace(',]', ']'));
+		const replayed = await askClaude('Keep me');
+		expect(JSON.parse(replayed.text).content[0].text).toBe('Saved.');
+		expect(upstream.calls).toHaveLength(2);
+	});
+
+	test('a new recording never reuses the name of a fixture already there', async () => {
+		upstream.answers.set('/v1/messages', {
+			body: claudeMessage([{ type: 'text', text: 'One.' }]),
+		});
+		await start('claude');
+		await askClaude('hi');
+		await askClaude('hi there');
+		const rulesPath = join(dir, 'recordings', 'rules.json');
+
+		// The first rule is removed by hand; its fixture stays
+		const [, second] = recordedRules();
+		writeFileSync(rulesPath, JSON.stringify([second]));
+
+		upstream.answers.set('/v1/messages', {
+			body: claudeMessage([{ type: 'text', text: 'Three.' }]),
+		});
+		await askClaude('hi again');
+		expect(recordedRules().map((rule) => rule.file)).toEqual([
+			'recordings/0002-hi-there.txt',
+			'recordings/0003-hi-again.txt',
+		]);
+		expect(
+			readFileSync(join(dir, 'recordings', '0002-hi-there.txt'), 'utf8'),
+		).toBe('One.');
+	});
+
 	test('the dashboard is not shown a user name or password in the upstream URL', async () => {
 		const withLogin = upstream.url.replace(
 			'http://',
