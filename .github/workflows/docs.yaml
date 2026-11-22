@@ -40,7 +40,7 @@ jobs:
               working-directory: docs
             - run: npm run build
               working-directory: docs
-            - uses: actions/upload-pages-artifact@v4
+            - uses: actions/upload-pages-artifact@v5
               if: github.event_name != 'pull_request'
               with:
                   path: docs/.vitepress/dist
@@ -57,4 +57,4 @@ jobs:
             url: ${{ steps.deployment.outputs.page_url }}
         steps:
             - id: deployment
-              uses: actions/deploy-pages@v4
+              uses: actions/deploy-pages@v5
