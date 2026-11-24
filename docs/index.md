@@ -63,7 +63,7 @@ npm run llmock:start
 
 Then open `http://localhost:8001` for the dashboard. [Getting started](/guide/getting-started) walks you through your first request.
 
-![The LLMock dashboard](/images/server-page.png)
+<DemoVideo />
 
 ::: tip Using a coding agent?
 Point it at [`llms.txt`](/llms.txt) (also shipped in the npm package at `node_modules/llmock/llms.txt`): a compact reference to the CLI, config schema, response shapes and gotchas.
